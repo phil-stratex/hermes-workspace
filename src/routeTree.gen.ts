@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WorldRouteImport } from './routes/world'
+import { Route as UsageRouteImport } from './routes/usage'
 import { Route as TerminalRouteImport } from './routes/terminal'
 import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as Swarm2RouteImport } from './routes/swarm2'
@@ -25,6 +26,7 @@ import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as HermesWorldRouteImport } from './routes/hermes-world'
 import { Route as FilesRouteImport } from './routes/files'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as CouncilRouteImport } from './routes/council'
 import { Route as ConductorRouteImport } from './routes/conductor'
 import { Route as AgoraRouteImport } from './routes/agora'
 import { Route as SplatRouteImport } from './routes/$'
@@ -34,11 +36,13 @@ import { Route as ChatIndexRouteImport } from './routes/chat/index'
 import { Route as SettingsProvidersRouteImport } from './routes/settings/providers'
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
+import { Route as ApiUsageRouteImport } from './routes/api/usage'
 import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
 import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
 import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-input'
 import { Route as ApiTerminalCloseRouteImport } from './routes/api/terminal-close'
 import { Route as ApiSystemMetricsRouteImport } from './routes/api/system-metrics'
+import { Route as ApiSystemInfoRouteImport } from './routes/api/system-info'
 import { Route as ApiSwitchModelRouteImport } from './routes/api/switch-model'
 import { Route as ApiSwarmTmuxStopRouteImport } from './routes/api/swarm-tmux-stop'
 import { Route as ApiSwarmTmuxStartRouteImport } from './routes/api/swarm-tmux-start'
@@ -52,6 +56,7 @@ import { Route as ApiSwarmMissionsRouteImport } from './routes/api/swarm-mission
 import { Route as ApiSwarmMemoryRouteImport } from './routes/api/swarm-memory'
 import { Route as ApiSwarmLifecycleRouteImport } from './routes/api/swarm-lifecycle'
 import { Route as ApiSwarmKanbanRouteImport } from './routes/api/swarm-kanban'
+import { Route as ApiSwarmIdleTickRouteImport } from './routes/api/swarm-idle-tick'
 import { Route as ApiSwarmHealthRouteImport } from './routes/api/swarm-health'
 import { Route as ApiSwarmEnvironmentRouteImport } from './routes/api/swarm-environment'
 import { Route as ApiSwarmDispatchRouteImport } from './routes/api/swarm-dispatch'
@@ -87,6 +92,7 @@ import { Route as ApiGatewayReprobeRouteImport } from './routes/api/gateway-repr
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as ApiCrewStatusRouteImport } from './routes/api/crew-status'
+import { Route as ApiCouncilRouteImport } from './routes/api/council'
 import { Route as ApiContextUsageRouteImport } from './routes/api/context-usage'
 import { Route as ApiConnectionStatusRouteImport } from './routes/api/connection-status'
 import { Route as ApiConnectionSettingsRouteImport } from './routes/api/connection-settings'
@@ -150,6 +156,11 @@ import { Route as ApiMcpNameLogsRouteImport } from './routes/api/mcp/$name.logs'
 const WorldRoute = WorldRouteImport.update({
   id: '/world',
   path: '/world',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UsageRoute = UsageRouteImport.update({
+  id: '/usage',
+  path: '/usage',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TerminalRoute = TerminalRouteImport.update({
@@ -227,6 +238,11 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CouncilRoute = CouncilRouteImport.update({
+  id: '/council',
+  path: '/council',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ConductorRoute = ConductorRouteImport.update({
   id: '/conductor',
   path: '/conductor',
@@ -272,6 +288,11 @@ const ApiWorkspaceRoute = ApiWorkspaceRouteImport.update({
   path: '/api/workspace',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiUsageRoute = ApiUsageRouteImport.update({
+  id: '/api/usage',
+  path: '/api/usage',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTerminalStreamRoute = ApiTerminalStreamRouteImport.update({
   id: '/api/terminal-stream',
   path: '/api/terminal-stream',
@@ -295,6 +316,11 @@ const ApiTerminalCloseRoute = ApiTerminalCloseRouteImport.update({
 const ApiSystemMetricsRoute = ApiSystemMetricsRouteImport.update({
   id: '/api/system-metrics',
   path: '/api/system-metrics',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSystemInfoRoute = ApiSystemInfoRouteImport.update({
+  id: '/api/system-info',
+  path: '/api/system-info',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSwitchModelRoute = ApiSwitchModelRouteImport.update({
@@ -361,6 +387,11 @@ const ApiSwarmLifecycleRoute = ApiSwarmLifecycleRouteImport.update({
 const ApiSwarmKanbanRoute = ApiSwarmKanbanRouteImport.update({
   id: '/api/swarm-kanban',
   path: '/api/swarm-kanban',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmIdleTickRoute = ApiSwarmIdleTickRouteImport.update({
+  id: '/api/swarm-idle-tick',
+  path: '/api/swarm-idle-tick',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSwarmHealthRoute = ApiSwarmHealthRouteImport.update({
@@ -536,6 +567,11 @@ const ApiEventsRoute = ApiEventsRouteImport.update({
 const ApiCrewStatusRoute = ApiCrewStatusRouteImport.update({
   id: '/api/crew-status',
   path: '/api/crew-status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCouncilRoute = ApiCouncilRouteImport.update({
+  id: '/api/council',
+  path: '/api/council',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiContextUsageRoute = ApiContextUsageRouteImport.update({
@@ -841,6 +877,7 @@ export interface FileRoutesByFullPath {
   '/$': typeof SplatRoute
   '/agora': typeof AgoraRoute
   '/conductor': typeof ConductorRoute
+  '/council': typeof CouncilRoute
   '/dashboard': typeof DashboardRoute
   '/files': typeof FilesRoute
   '/hermes-world': typeof HermesWorldRoute
@@ -856,6 +893,7 @@ export interface FileRoutesByFullPath {
   '/swarm2': typeof Swarm2Route
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
+  '/usage': typeof UsageRoute
   '/world': typeof WorldRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRoute
@@ -871,6 +909,7 @@ export interface FileRoutesByFullPath {
   '/api/connection-settings': typeof ApiConnectionSettingsRoute
   '/api/connection-status': typeof ApiConnectionStatusRoute
   '/api/context-usage': typeof ApiContextUsageRoute
+  '/api/council': typeof ApiCouncilRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
@@ -906,6 +945,7 @@ export interface FileRoutesByFullPath {
   '/api/swarm-dispatch': typeof ApiSwarmDispatchRoute
   '/api/swarm-environment': typeof ApiSwarmEnvironmentRoute
   '/api/swarm-health': typeof ApiSwarmHealthRoute
+  '/api/swarm-idle-tick': typeof ApiSwarmIdleTickRoute
   '/api/swarm-kanban': typeof ApiSwarmKanbanRoute
   '/api/swarm-lifecycle': typeof ApiSwarmLifecycleRoute
   '/api/swarm-memory': typeof ApiSwarmMemoryRouteWithChildren
@@ -919,11 +959,13 @@ export interface FileRoutesByFullPath {
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
   '/api/swarm-tmux-stop': typeof ApiSwarmTmuxStopRoute
   '/api/switch-model': typeof ApiSwitchModelRoute
+  '/api/system-info': typeof ApiSystemInfoRoute
   '/api/system-metrics': typeof ApiSystemMetricsRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/usage': typeof ApiUsageRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
@@ -980,6 +1022,7 @@ export interface FileRoutesByTo {
   '/$': typeof SplatRoute
   '/agora': typeof AgoraRoute
   '/conductor': typeof ConductorRoute
+  '/council': typeof CouncilRoute
   '/dashboard': typeof DashboardRoute
   '/files': typeof FilesRoute
   '/hermes-world': typeof HermesWorldRoute
@@ -994,6 +1037,7 @@ export interface FileRoutesByTo {
   '/swarm2': typeof Swarm2Route
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
+  '/usage': typeof UsageRoute
   '/world': typeof WorldRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRoute
@@ -1009,6 +1053,7 @@ export interface FileRoutesByTo {
   '/api/connection-settings': typeof ApiConnectionSettingsRoute
   '/api/connection-status': typeof ApiConnectionStatusRoute
   '/api/context-usage': typeof ApiContextUsageRoute
+  '/api/council': typeof ApiCouncilRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
@@ -1044,6 +1089,7 @@ export interface FileRoutesByTo {
   '/api/swarm-dispatch': typeof ApiSwarmDispatchRoute
   '/api/swarm-environment': typeof ApiSwarmEnvironmentRoute
   '/api/swarm-health': typeof ApiSwarmHealthRoute
+  '/api/swarm-idle-tick': typeof ApiSwarmIdleTickRoute
   '/api/swarm-kanban': typeof ApiSwarmKanbanRoute
   '/api/swarm-lifecycle': typeof ApiSwarmLifecycleRoute
   '/api/swarm-memory': typeof ApiSwarmMemoryRouteWithChildren
@@ -1057,11 +1103,13 @@ export interface FileRoutesByTo {
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
   '/api/swarm-tmux-stop': typeof ApiSwarmTmuxStopRoute
   '/api/switch-model': typeof ApiSwitchModelRoute
+  '/api/system-info': typeof ApiSystemInfoRoute
   '/api/system-metrics': typeof ApiSystemMetricsRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/usage': typeof ApiUsageRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
@@ -1119,6 +1167,7 @@ export interface FileRoutesById {
   '/$': typeof SplatRoute
   '/agora': typeof AgoraRoute
   '/conductor': typeof ConductorRoute
+  '/council': typeof CouncilRoute
   '/dashboard': typeof DashboardRoute
   '/files': typeof FilesRoute
   '/hermes-world': typeof HermesWorldRoute
@@ -1134,6 +1183,7 @@ export interface FileRoutesById {
   '/swarm2': typeof Swarm2Route
   '/tasks': typeof TasksRoute
   '/terminal': typeof TerminalRoute
+  '/usage': typeof UsageRoute
   '/world': typeof WorldRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
   '/api/auth': typeof ApiAuthRoute
@@ -1149,6 +1199,7 @@ export interface FileRoutesById {
   '/api/connection-settings': typeof ApiConnectionSettingsRoute
   '/api/connection-status': typeof ApiConnectionStatusRoute
   '/api/context-usage': typeof ApiContextUsageRoute
+  '/api/council': typeof ApiCouncilRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
@@ -1184,6 +1235,7 @@ export interface FileRoutesById {
   '/api/swarm-dispatch': typeof ApiSwarmDispatchRoute
   '/api/swarm-environment': typeof ApiSwarmEnvironmentRoute
   '/api/swarm-health': typeof ApiSwarmHealthRoute
+  '/api/swarm-idle-tick': typeof ApiSwarmIdleTickRoute
   '/api/swarm-kanban': typeof ApiSwarmKanbanRoute
   '/api/swarm-lifecycle': typeof ApiSwarmLifecycleRoute
   '/api/swarm-memory': typeof ApiSwarmMemoryRouteWithChildren
@@ -1197,11 +1249,13 @@ export interface FileRoutesById {
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
   '/api/swarm-tmux-stop': typeof ApiSwarmTmuxStopRoute
   '/api/switch-model': typeof ApiSwitchModelRoute
+  '/api/system-info': typeof ApiSystemInfoRoute
   '/api/system-metrics': typeof ApiSystemMetricsRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/usage': typeof ApiUsageRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
@@ -1260,6 +1314,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/agora'
     | '/conductor'
+    | '/council'
     | '/dashboard'
     | '/files'
     | '/hermes-world'
@@ -1275,6 +1330,7 @@ export interface FileRouteTypes {
     | '/swarm2'
     | '/tasks'
     | '/terminal'
+    | '/usage'
     | '/world'
     | '/api/artifacts'
     | '/api/auth'
@@ -1290,6 +1346,7 @@ export interface FileRouteTypes {
     | '/api/connection-settings'
     | '/api/connection-status'
     | '/api/context-usage'
+    | '/api/council'
     | '/api/crew-status'
     | '/api/events'
     | '/api/files'
@@ -1325,6 +1382,7 @@ export interface FileRouteTypes {
     | '/api/swarm-dispatch'
     | '/api/swarm-environment'
     | '/api/swarm-health'
+    | '/api/swarm-idle-tick'
     | '/api/swarm-kanban'
     | '/api/swarm-lifecycle'
     | '/api/swarm-memory'
@@ -1338,11 +1396,13 @@ export interface FileRouteTypes {
     | '/api/swarm-tmux-start'
     | '/api/swarm-tmux-stop'
     | '/api/switch-model'
+    | '/api/system-info'
     | '/api/system-metrics'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/usage'
     | '/api/workspace'
     | '/chat/$sessionKey'
     | '/settings/providers'
@@ -1399,6 +1459,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/agora'
     | '/conductor'
+    | '/council'
     | '/dashboard'
     | '/files'
     | '/hermes-world'
@@ -1413,6 +1474,7 @@ export interface FileRouteTypes {
     | '/swarm2'
     | '/tasks'
     | '/terminal'
+    | '/usage'
     | '/world'
     | '/api/artifacts'
     | '/api/auth'
@@ -1428,6 +1490,7 @@ export interface FileRouteTypes {
     | '/api/connection-settings'
     | '/api/connection-status'
     | '/api/context-usage'
+    | '/api/council'
     | '/api/crew-status'
     | '/api/events'
     | '/api/files'
@@ -1463,6 +1526,7 @@ export interface FileRouteTypes {
     | '/api/swarm-dispatch'
     | '/api/swarm-environment'
     | '/api/swarm-health'
+    | '/api/swarm-idle-tick'
     | '/api/swarm-kanban'
     | '/api/swarm-lifecycle'
     | '/api/swarm-memory'
@@ -1476,11 +1540,13 @@ export interface FileRouteTypes {
     | '/api/swarm-tmux-start'
     | '/api/swarm-tmux-stop'
     | '/api/switch-model'
+    | '/api/system-info'
     | '/api/system-metrics'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/usage'
     | '/api/workspace'
     | '/chat/$sessionKey'
     | '/settings/providers'
@@ -1537,6 +1603,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/agora'
     | '/conductor'
+    | '/council'
     | '/dashboard'
     | '/files'
     | '/hermes-world'
@@ -1552,6 +1619,7 @@ export interface FileRouteTypes {
     | '/swarm2'
     | '/tasks'
     | '/terminal'
+    | '/usage'
     | '/world'
     | '/api/artifacts'
     | '/api/auth'
@@ -1567,6 +1635,7 @@ export interface FileRouteTypes {
     | '/api/connection-settings'
     | '/api/connection-status'
     | '/api/context-usage'
+    | '/api/council'
     | '/api/crew-status'
     | '/api/events'
     | '/api/files'
@@ -1602,6 +1671,7 @@ export interface FileRouteTypes {
     | '/api/swarm-dispatch'
     | '/api/swarm-environment'
     | '/api/swarm-health'
+    | '/api/swarm-idle-tick'
     | '/api/swarm-kanban'
     | '/api/swarm-lifecycle'
     | '/api/swarm-memory'
@@ -1615,11 +1685,13 @@ export interface FileRouteTypes {
     | '/api/swarm-tmux-start'
     | '/api/swarm-tmux-stop'
     | '/api/switch-model'
+    | '/api/system-info'
     | '/api/system-metrics'
     | '/api/terminal-close'
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/usage'
     | '/api/workspace'
     | '/chat/$sessionKey'
     | '/settings/providers'
@@ -1677,6 +1749,7 @@ export interface RootRouteChildren {
   SplatRoute: typeof SplatRoute
   AgoraRoute: typeof AgoraRoute
   ConductorRoute: typeof ConductorRoute
+  CouncilRoute: typeof CouncilRoute
   DashboardRoute: typeof DashboardRoute
   FilesRoute: typeof FilesRoute
   HermesWorldRoute: typeof HermesWorldRoute
@@ -1692,6 +1765,7 @@ export interface RootRouteChildren {
   Swarm2Route: typeof Swarm2Route
   TasksRoute: typeof TasksRoute
   TerminalRoute: typeof TerminalRoute
+  UsageRoute: typeof UsageRoute
   WorldRoute: typeof WorldRoute
   ApiArtifactsRoute: typeof ApiArtifactsRouteWithChildren
   ApiAuthRoute: typeof ApiAuthRoute
@@ -1707,6 +1781,7 @@ export interface RootRouteChildren {
   ApiConnectionSettingsRoute: typeof ApiConnectionSettingsRoute
   ApiConnectionStatusRoute: typeof ApiConnectionStatusRoute
   ApiContextUsageRoute: typeof ApiContextUsageRoute
+  ApiCouncilRoute: typeof ApiCouncilRoute
   ApiCrewStatusRoute: typeof ApiCrewStatusRoute
   ApiEventsRoute: typeof ApiEventsRoute
   ApiFilesRoute: typeof ApiFilesRoute
@@ -1742,6 +1817,7 @@ export interface RootRouteChildren {
   ApiSwarmDispatchRoute: typeof ApiSwarmDispatchRoute
   ApiSwarmEnvironmentRoute: typeof ApiSwarmEnvironmentRoute
   ApiSwarmHealthRoute: typeof ApiSwarmHealthRoute
+  ApiSwarmIdleTickRoute: typeof ApiSwarmIdleTickRoute
   ApiSwarmKanbanRoute: typeof ApiSwarmKanbanRoute
   ApiSwarmLifecycleRoute: typeof ApiSwarmLifecycleRoute
   ApiSwarmMemoryRoute: typeof ApiSwarmMemoryRouteWithChildren
@@ -1755,11 +1831,13 @@ export interface RootRouteChildren {
   ApiSwarmTmuxStartRoute: typeof ApiSwarmTmuxStartRoute
   ApiSwarmTmuxStopRoute: typeof ApiSwarmTmuxStopRoute
   ApiSwitchModelRoute: typeof ApiSwitchModelRoute
+  ApiSystemInfoRoute: typeof ApiSystemInfoRoute
   ApiSystemMetricsRoute: typeof ApiSystemMetricsRoute
   ApiTerminalCloseRoute: typeof ApiTerminalCloseRoute
   ApiTerminalInputRoute: typeof ApiTerminalInputRoute
   ApiTerminalResizeRoute: typeof ApiTerminalResizeRoute
   ApiTerminalStreamRoute: typeof ApiTerminalStreamRoute
+  ApiUsageRoute: typeof ApiUsageRoute
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
   ChatIndexRoute: typeof ChatIndexRoute
@@ -1793,6 +1871,13 @@ declare module '@tanstack/react-router' {
       path: '/world'
       fullPath: '/world'
       preLoaderRoute: typeof WorldRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/usage': {
+      id: '/usage'
+      path: '/usage'
+      fullPath: '/usage'
+      preLoaderRoute: typeof UsageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/terminal': {
@@ -1900,6 +1985,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/council': {
+      id: '/council'
+      path: '/council'
+      fullPath: '/council'
+      preLoaderRoute: typeof CouncilRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/conductor': {
       id: '/conductor'
       path: '/conductor'
@@ -1963,6 +2055,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspaceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/usage': {
+      id: '/api/usage'
+      path: '/api/usage'
+      fullPath: '/api/usage'
+      preLoaderRoute: typeof ApiUsageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/terminal-stream': {
       id: '/api/terminal-stream'
       path: '/api/terminal-stream'
@@ -1996,6 +2095,13 @@ declare module '@tanstack/react-router' {
       path: '/api/system-metrics'
       fullPath: '/api/system-metrics'
       preLoaderRoute: typeof ApiSystemMetricsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/system-info': {
+      id: '/api/system-info'
+      path: '/api/system-info'
+      fullPath: '/api/system-info'
+      preLoaderRoute: typeof ApiSystemInfoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/switch-model': {
@@ -2087,6 +2193,13 @@ declare module '@tanstack/react-router' {
       path: '/api/swarm-kanban'
       fullPath: '/api/swarm-kanban'
       preLoaderRoute: typeof ApiSwarmKanbanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-idle-tick': {
+      id: '/api/swarm-idle-tick'
+      path: '/api/swarm-idle-tick'
+      fullPath: '/api/swarm-idle-tick'
+      preLoaderRoute: typeof ApiSwarmIdleTickRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/swarm-health': {
@@ -2332,6 +2445,13 @@ declare module '@tanstack/react-router' {
       path: '/api/crew-status'
       fullPath: '/api/crew-status'
       preLoaderRoute: typeof ApiCrewStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/council': {
+      id: '/api/council'
+      path: '/api/council'
+      fullPath: '/api/council'
+      preLoaderRoute: typeof ApiCouncilRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/context-usage': {
@@ -2915,6 +3035,7 @@ const rootRouteChildren: RootRouteChildren = {
   SplatRoute: SplatRoute,
   AgoraRoute: AgoraRoute,
   ConductorRoute: ConductorRoute,
+  CouncilRoute: CouncilRoute,
   DashboardRoute: DashboardRoute,
   FilesRoute: FilesRoute,
   HermesWorldRoute: HermesWorldRoute,
@@ -2930,6 +3051,7 @@ const rootRouteChildren: RootRouteChildren = {
   Swarm2Route: Swarm2Route,
   TasksRoute: TasksRoute,
   TerminalRoute: TerminalRoute,
+  UsageRoute: UsageRoute,
   WorldRoute: WorldRoute,
   ApiArtifactsRoute: ApiArtifactsRouteWithChildren,
   ApiAuthRoute: ApiAuthRoute,
@@ -2945,6 +3067,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiConnectionSettingsRoute: ApiConnectionSettingsRoute,
   ApiConnectionStatusRoute: ApiConnectionStatusRoute,
   ApiContextUsageRoute: ApiContextUsageRoute,
+  ApiCouncilRoute: ApiCouncilRoute,
   ApiCrewStatusRoute: ApiCrewStatusRoute,
   ApiEventsRoute: ApiEventsRoute,
   ApiFilesRoute: ApiFilesRoute,
@@ -2980,6 +3103,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSwarmDispatchRoute: ApiSwarmDispatchRoute,
   ApiSwarmEnvironmentRoute: ApiSwarmEnvironmentRoute,
   ApiSwarmHealthRoute: ApiSwarmHealthRoute,
+  ApiSwarmIdleTickRoute: ApiSwarmIdleTickRoute,
   ApiSwarmKanbanRoute: ApiSwarmKanbanRoute,
   ApiSwarmLifecycleRoute: ApiSwarmLifecycleRoute,
   ApiSwarmMemoryRoute: ApiSwarmMemoryRouteWithChildren,
@@ -2993,11 +3117,13 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSwarmTmuxStartRoute: ApiSwarmTmuxStartRoute,
   ApiSwarmTmuxStopRoute: ApiSwarmTmuxStopRoute,
   ApiSwitchModelRoute: ApiSwitchModelRoute,
+  ApiSystemInfoRoute: ApiSystemInfoRoute,
   ApiSystemMetricsRoute: ApiSystemMetricsRoute,
   ApiTerminalCloseRoute: ApiTerminalCloseRoute,
   ApiTerminalInputRoute: ApiTerminalInputRoute,
   ApiTerminalResizeRoute: ApiTerminalResizeRoute,
   ApiTerminalStreamRoute: ApiTerminalStreamRoute,
+  ApiUsageRoute: ApiUsageRoute,
   ApiWorkspaceRoute: ApiWorkspaceRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
   ChatIndexRoute: ChatIndexRoute,
