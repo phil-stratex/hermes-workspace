@@ -228,6 +228,8 @@ export function OperationalWorkerCard({
   const [draftRole, setDraftRole] = useState('')
   const [draftModel, setDraftModel] = useState('')
   const [draftAvatar, setDraftAvatar] = useState('')
+  const [savingSettings, setSavingSettings] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [taskComposerOpen, setTaskComposerOpen] = useState(false)
   const state = deriveWorkerState(member, currentTask)
   const status = statusStyles(state)
@@ -779,41 +781,59 @@ export function OperationalWorkerCard({
                 >
                   Cancel
                 </button>
+                {saveError ? (
+                  <span className="text-[10px] text-red-400 max-w-[180px] truncate" title={saveError}>
+                    {saveError}
+                  </span>
+                ) : null}
                 <button
                   type="button"
-                  className="rounded-xl bg-[var(--theme-accent)] px-3 py-2 text-[11px] font-semibold text-primary-950 hover:bg-[var(--theme-accent-strong)]"
-                  onClick={() => {
+                  disabled={savingSettings}
+                  className="rounded-xl bg-[var(--theme-accent)] px-3 py-2 text-[11px] font-semibold text-primary-950 hover:bg-[var(--theme-accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={async () => {
+                    if (savingSettings) return
                     const next: WorkerCardSettings = {
                       displayName: draftName.trim() || undefined,
                       avatarGlyph: draftAvatar.trim() || undefined,
                       role: draftRole.trim() || undefined,
                       modelLabel: draftModel.trim() || undefined,
                     }
-                    setSettings(next)
-                    try {
-                      window.localStorage.setItem(`${SETTINGS_STORAGE_PREFIX}${member.id}`, JSON.stringify(next))
-                    } catch {
-                      /* noop */
-                    }
                     // Persist the swarm-relevant fields (name, role, model)
-                    // back into swarm.yaml via PATCH so the dispatcher and
-                    // tmux-bridge actually honor them.
+                    // back into swarm.yaml via PATCH first; only mirror to
+                    // local UI state on success so a server-side schema
+                    // rejection doesn't leave the UI claiming a value the
+                    // dispatcher doesn't actually honor.
+                    setSavingSettings(true)
+                    setSaveError(null)
                     const patch: Record<string, unknown> = { id: member.id }
                     if (next.displayName) patch.name = next.displayName
                     if (next.role) patch.role = next.role
                     if (next.modelLabel) patch.model = next.modelLabel
-                    void fetch('/api/swarm-roster', {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify(patch),
-                    }).catch((err) => {
-                      // Best-effort — localStorage already updated for UI.
-                      console.error('swarm-roster PATCH failed', err)
-                    })
-                    setSettingsOpen(false)
+                    try {
+                      const res = await fetch('/api/swarm-roster', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(patch),
+                      })
+                      if (!res.ok) {
+                        const text = await res.text().catch(() => '')
+                        throw new Error(text || `HTTP ${res.status}`)
+                      }
+                      setSettings(next)
+                      try {
+                        window.localStorage.setItem(`${SETTINGS_STORAGE_PREFIX}${member.id}`, JSON.stringify(next))
+                      } catch {
+                        /* noop */
+                      }
+                      setSettingsOpen(false)
+                    } catch (err) {
+                      setSaveError(err instanceof Error ? err.message : String(err))
+                    } finally {
+                      setSavingSettings(false)
+                    }
                   }}
                 >
-                  Save
+                  {savingSettings ? 'Speichere…' : 'Save'}
                 </button>
               </div>
             </div>

@@ -5,6 +5,7 @@ import os from 'node:os'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { writeJsonAtomic, withMutex } from '../../server/atomic-write'
 import { requireJsonContentType } from '../../server/rate-limit'
 import {
   SESSIONS_API_UNAVAILABLE_MESSAGE,
@@ -41,15 +42,19 @@ function readSessionTitles(): Record<string, string> {
   }
   return {}
 }
-function writeSessionTitle(key: string, title: string): void {
-  const map = readSessionTitles()
-  map[key] = title
-  try {
-    fs.mkdirSync(path.dirname(TITLES_FILE), { recursive: true })
-    fs.writeFileSync(TITLES_FILE, JSON.stringify(map, null, 2))
-  } catch {
-    // best-effort; UI still has the optimistic update
-  }
+function writeSessionTitle(key: string, title: string): Promise<void> {
+  // Serialise read-modify-write per file path so concurrent PATCH calls
+  // can't lose updates (one read => map mutation => atomic rename).
+  return withMutex(TITLES_FILE, () => {
+    const map = readSessionTitles()
+    map[key] = title
+    try {
+      fs.mkdirSync(path.dirname(TITLES_FILE), { recursive: true })
+      writeJsonAtomic(TITLES_FILE, map)
+    } catch {
+      // best-effort; UI still has the optimistic update
+    }
+  })
 }
 function applyStoredTitles<T extends Record<string, unknown>>(
   sessions: Array<T>,
@@ -246,9 +251,9 @@ export const Route = createFileRoute('/api/sessions')({
           if (capabilities.dashboard.available && !capabilities.enhancedChat) {
             // Zero-fork mode: backend gateway can't accept session updates,
             // so we persist titles locally in HERMES_HOME/session-titles.json.
-            if (label) writeSessionTitle(sessionKey, label)
+            if (label) await writeSessionTitle(sessionKey, label)
             if (rawFriendlyId && rawFriendlyId !== sessionKey && label) {
-              writeSessionTitle(rawFriendlyId, label)
+              await writeSessionTitle(rawFriendlyId, label)
             }
             return json({
               ok: true,
