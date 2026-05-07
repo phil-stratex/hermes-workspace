@@ -1016,8 +1016,6 @@ function ChatMessageListComponent({
 
   const streamingState = useMemo(() => {
     const nextSignatures = new Map<string, string>()
-    const isInitialRender = initialRenderRef.current
-
     displayEntries.forEach(({ message, sourceIndex }) => {
       const stableId = getStableMessageId(message, sourceIndex)
       const text = textFromMessage(message)
@@ -1027,24 +1025,25 @@ function ChatMessageListComponent({
       nextSignatures.set(stableId, signature)
     })
 
-    messageSignatureRef.current = nextSignatures
-    if (isInitialRender) {
-      initialRenderRef.current = false
-      return {
-        streamingTargets: new Set<string>(),
-        signatureById: nextSignatures,
-      }
-    }
-
-    // Typewriter disabled — messages just fade in via CSS animation
-    // toStream stays empty, no streaming targets
-
+    // Typewriter disabled — messages just fade in via CSS animation,
+    // so streaming-target tracking stays empty.
     return {
       streamingTargets: new Set<string>(),
       signatureById: nextSignatures,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayEntries, streamingCleared])
+
+  // Persist the latest signature map and the initial-render flag in refs
+  // *outside* useMemo so the memo callback is pure (side-effects in
+  // useMemo break under React 19 concurrent rendering — the memo can run
+  // multiple times for the same input). The semantic effect is unchanged.
+  useEffect(() => {
+    messageSignatureRef.current = streamingState.signatureById
+    if (initialRenderRef.current) {
+      initialRenderRef.current = false
+    }
+  }, [streamingState])
 
   const lastAssistantIndex = visibleEntries
     .filter(({ message }) => message.role === 'assistant')
@@ -1329,15 +1328,38 @@ function ChatMessageListComponent({
     )
   }
 
-  // Sync near-bottom ref to state every 500ms for button visibility
+  // Sync near-bottom ref to state for button visibility. Throttled to
+  // 1500ms (was 500ms — drained battery on background tabs) and paused
+  // entirely while the document is hidden. The button only changes
+  // visibility on user scroll, so this loop is a safety net, not a
+  // primary update path.
   useEffect(() => {
-    const timer = window.setInterval(() => {
+    const tick = () =>
       setIsNearBottom((prev) => {
         const current = isNearBottomRef.current
         return prev === current ? prev : current
       })
-    }, 500)
-    return () => window.clearInterval(timer)
+    let timer: number | null = null
+    const start = () => {
+      if (timer != null) return
+      timer = window.setInterval(tick, 1500)
+    }
+    const stop = () => {
+      if (timer != null) {
+        window.clearInterval(timer)
+        timer = null
+      }
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') start()
+      else stop()
+    }
+    onVisibility()
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      stop()
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [])
 
   // Simple: scroll to bottom when messages change and we should stick

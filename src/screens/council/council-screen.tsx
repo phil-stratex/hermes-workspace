@@ -16,6 +16,7 @@ import {
   UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
 import { cn } from '@/lib/utils'
+import { Markdown } from '@/components/prompt-kit/markdown'
 
 type CouncilMode = 'chairman' | 'debate' | 'moa'
 
@@ -168,6 +169,43 @@ type HistoryEntry = {
   totalTokens: number | null
 }
 
+/** localStorage key holding `{ startedAt, mode, question }` for the
+ * currently-running council. Set on run start, cleared on completion or
+ * error. Used to render a resume-from-history banner if the user
+ * reloads/navigates back while a run is still in flight. */
+const ACTIVE_RUN_STORAGE_KEY = 'council:active-run'
+
+/** How long after a run start we still consider the active-run signal
+ * useful. Beyond this we drop the marker — the run is almost certainly
+ * either finished (and persisted to history) or genuinely lost. */
+const ACTIVE_RUN_RESUME_WINDOW_MS = 10 * 60_000
+
+type ActiveRunMarker = { startedAt: number; mode: string; question: string }
+
+function readActiveRunMarker(): ActiveRunMarker | null {
+  try {
+    const raw = window.localStorage.getItem(ACTIVE_RUN_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<ActiveRunMarker>
+    if (
+      typeof parsed.startedAt === 'number' &&
+      typeof parsed.mode === 'string' &&
+      typeof parsed.question === 'string' &&
+      Date.now() - parsed.startedAt < ACTIVE_RUN_RESUME_WINDOW_MS
+    ) {
+      return parsed as ActiveRunMarker
+    }
+  } catch {
+    /* corrupt — drop it */
+  }
+  try {
+    window.localStorage.removeItem(ACTIVE_RUN_STORAGE_KEY)
+  } catch {
+    /* noop */
+  }
+  return null
+}
+
 export function CouncilScreen() {
   const [view, setView] = useState<ViewMode>('wizard')
   const [step, setStep] = useState<Step>(1)
@@ -181,6 +219,12 @@ export function CouncilScreen() {
   const [log, setLog] = useState<Array<LogEntry>>([])
   const [final, setFinal] = useState<FinalEvent | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  // Resume-from-history banner: if the user reloads while a run is still
+  // in flight, the server-side persistence eventually lands the result
+  // in council history — surface a hint so they don't think it's lost.
+  const [resumeMarker, setResumeMarker] = useState<ActiveRunMarker | null>(
+    () => (typeof window === 'undefined' ? null : readActiveRunMarker()),
+  )
 
   const modelsQuery = useQuery({
     queryKey: ['models'],
@@ -312,8 +356,32 @@ export function CouncilScreen() {
     setLog([])
     setFinal(null)
     setRunning(true)
+    setResumeMarker(null)
     const controller = new AbortController()
     abortRef.current = controller
+    // Mark this run as active so a returning user (mid-stream reload) can
+    // be invited to resume from history. Cleared when the stream emits a
+    // final event or hits an error path below.
+    const runStartedAt = Date.now()
+    try {
+      window.localStorage.setItem(
+        ACTIVE_RUN_STORAGE_KEY,
+        JSON.stringify({ startedAt: runStartedAt, mode, question: question.trim() }),
+      )
+    } catch {
+      /* noop */
+    }
+    // Idle-timeout watchdog: if no SSE chunk arrives for IDLE_TIMEOUT_MS the
+    // upstream is wedged (Cloudflare cull, Ollama hang). Abort the fetch and
+    // surface an error event so the UI doesn't sit in "Council tagt…" forever.
+    let lastChunkAt = Date.now()
+    const IDLE_TIMEOUT_MS = 5 * 60_000
+    const idleTimer = setInterval(() => {
+      if (Date.now() - lastChunkAt > IDLE_TIMEOUT_MS) {
+        controller.abort()
+      }
+    }, 15_000)
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
     try {
       const res = await fetch('/api/council', {
         method: 'POST',
@@ -340,12 +408,13 @@ export function CouncilScreen() {
         ])
         return
       }
-      const reader = res.body.getReader()
+      reader = res.body.getReader()
       const decoder = new TextDecoder()
       let buf = ''
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
+        lastChunkAt = Date.now()
         buf += decoder.decode(value, { stream: true })
         const events = buf.split('\n\n')
         buf = events.pop() ?? ''
@@ -377,12 +446,32 @@ export function CouncilScreen() {
         }
       }
     } catch (err) {
-      if ((err as Error).name !== 'AbortError') {
+      if ((err as Error).name === 'AbortError') {
+        // Distinguish manual abort from idle-timeout abort.
+        const idle = Date.now() - lastChunkAt > IDLE_TIMEOUT_MS
+        if (idle) {
+          setLog((prev) => [
+            ...prev,
+            { type: 'error', error: `Council-Stream nach ${Math.round(IDLE_TIMEOUT_MS / 60_000)} min ohne Antwort abgebrochen.` },
+          ])
+        }
+      } else {
         setLog((prev) => [...prev, { type: 'error', error: (err as Error).message }])
       }
     } finally {
+      clearInterval(idleTimer)
+      try {
+        reader?.releaseLock()
+      } catch {
+        /* noop */
+      }
       setRunning(false)
       abortRef.current = null
+      try {
+        window.localStorage.removeItem(ACTIVE_RUN_STORAGE_KEY)
+      } catch {
+        /* noop */
+      }
     }
   }
 
@@ -449,6 +538,45 @@ export function CouncilScreen() {
           ) : null}
         </div>
       </header>
+
+      {resumeMarker && !running ? (
+        <div className="rounded-xl border border-[var(--theme-accent)] bg-[var(--theme-accent-soft)] p-3 text-sm">
+          <div className="flex items-start gap-3">
+            <HugeiconsIcon icon={Clock01Icon} size={18} />
+            <div className="flex-1">
+              <div className="font-semibold">Council läuft im Hintergrund</div>
+              <div className="text-xs text-[var(--theme-muted)] mt-1">
+                Vor {Math.round((Date.now() - resumeMarker.startedAt) / 60_000)} min
+                gestartet · Modus {resumeMarker.mode}. Falls die Verbindung abbrach,
+                lädt die Antwort gleich im Verlauf.
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setView('history')}
+                className="rounded-lg bg-[var(--theme-accent)] px-3 py-1.5 text-xs font-semibold text-primary-950"
+              >
+                Verlauf öffnen
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setResumeMarker(null)
+                  try {
+                    window.localStorage.removeItem(ACTIVE_RUN_STORAGE_KEY)
+                  } catch {
+                    /* noop */
+                  }
+                }}
+                className="rounded-lg border border-[var(--theme-border)] px-3 py-1.5 text-xs text-[var(--theme-muted)]"
+              >
+                Verwerfen
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {view === 'history' ? (
         <CouncilHistory
@@ -674,9 +802,9 @@ function CouncilHistory({
                   <HugeiconsIcon icon={CheckmarkCircle02Icon} size={16} />
                   Finale Antwort
                 </div>
-                <pre className="whitespace-pre-wrap text-sm text-[var(--theme-text)]">
-                  {detailRecord.finalContent}
-                </pre>
+                <div className="prose prose-sm max-w-none text-[var(--theme-text)]">
+                  <Markdown>{detailRecord.finalContent}</Markdown>
+                </div>
               </div>
             ) : null}
             {detailRecord.log && detailRecord.log.length > 0 ? (
@@ -1153,9 +1281,9 @@ function CouncilOutput({
               {final.totalTokens ? ` · ${final.totalTokens} tokens` : ''}
             </span>
           </div>
-          <pre className="whitespace-pre-wrap text-sm text-[var(--theme-text)]">
-            {final.content}
-          </pre>
+          <div className="prose prose-sm max-w-none text-[var(--theme-text)]">
+            <Markdown>{final.content}</Markdown>
+          </div>
           <CouncilFinalActions content={final.content} />
         </div>
       )}

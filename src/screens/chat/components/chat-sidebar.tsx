@@ -256,7 +256,11 @@ function NavItem({
               render={
                 <Link
                   to={item.to}
-                  search={item.search}
+                  // TanStack Router 1.132 narrows search to a typed
+                  // ParamsReducerFn or `true` in this register's strict
+                  // mode. NavItemDef intentionally carries plain
+                  // route-agnostic shapes — cast to bypass.
+                  search={item.search as never}
                   hash={item.hash}
                   onClick={handleSelect}
                   className={cls}
@@ -274,7 +278,7 @@ function NavItem({
     return (
       <Link
         to={item.to}
-        search={item.search}
+        search={item.search as never}
         hash={item.hash}
         onClick={handleSelect}
         className={cls}

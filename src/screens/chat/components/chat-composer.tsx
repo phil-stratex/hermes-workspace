@@ -68,7 +68,7 @@ type ChatComposerAttachment = {
   kind?: 'image' | 'file' | 'audio'
 }
 
-type ThinkingLevel = 'off' | 'low' | 'medium' | 'high'
+type ThinkingLevel = 'off' | 'low' | 'medium' | 'high' | 'adaptive'
 
 type ChatComposerProps = {
   onSubmit: (
@@ -864,6 +864,9 @@ function ChatComposerComponent({
   const attachmentInputRef = useRef<HTMLInputElement | null>(null)
   const profileMenuRef = useRef<HTMLDivElement | null>(null)
   const dragCounterRef = useRef(0)
+  // Reentrancy guard for /api/switch-model so rapid double-clicks don't
+  // race two POSTs against the same config.yaml.
+  const modelSwitchInFlightRef = useRef(false)
   const shouldRefocusAfterSendRef = useRef(false)
   const submittingRef = useRef(false)
   const pendingSubmitAfterAttachmentsRef = useRef(false)
@@ -1036,6 +1039,14 @@ function ChatComposerComponent({
       // Local extension: also push the change to the remote Hermes Agent
       // so that the gateway actually serves this model (it ignores the
       // per-request `model` field and reads default from config.yaml).
+      // Guard against rapid re-clicks racing two POSTs over the same
+      // config.yaml: skip if a switch is already in flight.
+      if (modelSwitchInFlightRef.current) {
+        toast(`Model switch already in progress…`)
+        return
+      }
+      modelSwitchInFlightRef.current = true
+      toast(`Switching backend to ${resolved}…`)
       void fetch('/api/switch-model', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1051,6 +1062,9 @@ function ChatComposerComponent({
         })
         .catch((err) => {
           toast(`Model switch failed: ${String(err)}`)
+        })
+        .finally(() => {
+          modelSwitchInFlightRef.current = false
         })
     },
     [
@@ -1247,6 +1261,13 @@ function ChatComposerComponent({
         if (fresh && typeof parsed.content === 'string' && parsed.content.length > 0) {
           window.localStorage.removeItem('council-prefill-chat')
           setValue(parsed.content)
+          // Persist as the session draft so a subsequent session-switch
+          // (which reloads from sessionStorage) doesn't drop the prefill.
+          try {
+            window.sessionStorage.setItem(draftStorageKey, parsed.content)
+          } catch {
+            /* noop */
+          }
           return
         }
         window.localStorage.removeItem('council-prefill-chat')
