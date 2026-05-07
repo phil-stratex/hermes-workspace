@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { requireJsonContentType } from '../../server/rate-limit'
 import { newestCheckpointFromMessages, type ParsedSwarmCheckpoint } from '../../server/swarm-checkpoints'
 import { readWorkerMessages } from '../../server/swarm-chat-reader'
 import { createOrUpdateMission, markMissionAssignmentDispatched, recordMissionCheckpoint } from '../../server/swarm-missions'
@@ -770,7 +771,11 @@ async function sendPromptToLiveSession(workerId: string, prompt: string): Promis
 }
 
 function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: SwarmRosterWorker | undefined, options?: { waitForCheckpoint?: boolean; checkpointPollMs?: number; missionId?: string | null; notifySessionKey?: string | null }): Promise<WorkerResult> {
-  return new Promise(async (resolve) => {
+  // Wrapper guards against the `new Promise(async (resolve) => ...)`
+  // antipattern — a synchronous throw before the first `resolve(...)`
+  // would otherwise be swallowed and the promise would hang forever.
+  return new Promise<WorkerResult>((resolve, reject) => {
+    void (async () => {
     const workerId = assignment.workerId
     const prompt = buildWorkerPrompt({
       workerId,
@@ -1013,6 +1018,12 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
       markDispatchResult(workerId, result)
       resolve(result)
     })
+    })().catch((err) => {
+      // A synchronous throw before any resolve() (e.g. mkdirSync EACCES,
+      // markDispatchStarted file-lock failure) used to silently leak —
+      // promote it to a rejection so callers see the failure.
+      reject(err)
+    })
   })
 }
 
@@ -1023,6 +1034,8 @@ export const Route = createFileRoute('/api/swarm-dispatch')({
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
 
         let body: DispatchRequest
         try {
@@ -1052,9 +1065,10 @@ export const Route = createFileRoute('/api/swarm-dispatch')({
         if (assignments.some((assignment) => assignment.task.length === 0)) {
           return json({ error: 'assignment task required' }, { status: 400 })
         }
-        if (assignments.some((assignment) => assignment.task.length > MAX_PROMPT_CHARS)) {
-          return json({ error: `assignment task exceeds ${MAX_PROMPT_CHARS} characters` }, { status: 400 })
-        }
+        // NOTE: MAX_PROMPT_CHARS validation moved BELOW attachment enrichment
+        // (was here) — pre-enrichment a 1KB task with a 9MB attachment would
+        // sail past the check, then explode downstream. See validation block
+        // after the attachment-processing chunk.
 
         // Local patch (Block A3): attachments → file-reader → text inlined
         // into each assignment.task; binary files (images, raw PDFs that
@@ -1096,7 +1110,18 @@ export const Route = createFileRoute('/api/swarm-dispatch')({
                   const comma = dataUrl.indexOf(',')
                   const b64 = comma >= 0 ? dataUrl.slice(comma + 1) : ''
                   if (!b64) continue
-                  const safeName = res.name.replace(/[^\w.\-]/g, '_')
+                  // Prefix with a short random hex so two attachments
+                  // with the same logical name never overwrite each other
+                  // in the inbox dir (`logo.png` + `logo.png` would clobber
+                  // before this).
+                  const sanitized = res.name.replace(/[^\w.\-]/g, '_')
+                  const uniqueId =
+                    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+                      ? (crypto as { randomUUID: () => string })
+                          .randomUUID()
+                          .slice(0, 8)
+                      : Math.random().toString(16).slice(2, 10)
+                  const safeName = `${uniqueId}-${sanitized}`
                   fs.writeFileSync(
                     path.join(inboxDir, safeName),
                     Buffer.from(b64, 'base64'),
@@ -1121,6 +1146,18 @@ export const Route = createFileRoute('/api/swarm-dispatch')({
           } catch {
             // attachment processing best-effort — do not block dispatch
           }
+        }
+
+        // Re-validate the enriched task against the prompt cap so a
+        // user-supplied attachment can't smuggle in a multi-MB blob that
+        // overruns Hermes' context window downstream.
+        if (assignments.some((assignment) => assignment.task.length > MAX_PROMPT_CHARS)) {
+          return json(
+            {
+              error: `enriched task exceeds ${MAX_PROMPT_CHARS} characters (attachments may have inflated it)`,
+            },
+            { status: 400 },
+          )
         }
 
         const timeoutRaw = typeof body.timeoutSeconds === 'number' ? body.timeoutSeconds : DEFAULT_TIMEOUT_S

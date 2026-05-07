@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { requireJsonContentType } from '../../server/rate-limit'
 import { BEARER_TOKEN, ensureGatewayProbed, getResolvedUrls } from '../../server/gateway-capabilities'
 
 type DecomposeRequest = {
@@ -196,6 +197,8 @@ export const Route = createFileRoute('/api/swarm-decompose')({
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
         await ensureGatewayProbed()
         let body: DecomposeRequest
         try { body = await request.json() as DecomposeRequest } catch { return json({ error: 'Invalid JSON body' }, { status: 400 }) }

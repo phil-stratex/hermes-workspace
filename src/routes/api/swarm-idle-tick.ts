@@ -17,6 +17,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { requireJsonContentType } from '../../server/rate-limit'
 import {
   getSwarmProfilePath,
   listSwarmWorkerIds,
@@ -41,6 +42,8 @@ export const Route = createFileRoute('/api/swarm-idle-tick')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
         const ids = listSwarmWorkerIds({ swarmOnly: true })
         const roster = rosterByWorkerId(ids)
         const now = Date.now()

@@ -37,6 +37,7 @@ import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { requireJsonContentType } from '../../server/rate-limit'
 import {
   extractAttachmentText,
   renderTextAttachmentsAsBlock,
@@ -208,6 +209,8 @@ export const Route = createFileRoute('/api/council')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
         let body: CouncilRequest
         try {
           body = (await request.json()) as CouncilRequest
@@ -543,7 +546,17 @@ export const Route = createFileRoute('/api/council')({
             .readdirSync(COUNCIL_SESSIONS_DIR)
             .filter((f) => f.endsWith('.json'))
           if (id) {
-            const match = files.find((f) => f.includes(id))
+            // Reject anything that isn't a plausible UUID-ish id before
+            // touching disk. Substring `.includes(id)` previously let a
+            // request like `?id=.` match the alphabetically-first session
+            // and leak its full record (the listing endpoint truncates the
+            // `question`/`log` fields, the detail endpoint does not).
+            if (!/^[a-zA-Z0-9_-]{4,128}$/.test(id)) {
+              return json({ ok: false, error: 'invalid id format' }, { status: 400 })
+            }
+            const match = files.find(
+              (f) => f === `${id}.json` || f.endsWith(`-${id}.json`),
+            )
             if (!match) {
               return json({ ok: false, error: 'session not found' }, { status: 404 })
             }

@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { requireJsonContentType } from '../../server/rate-limit'
 import {
   SWARM_ROSTER_PATH,
   readSwarmRoster,
@@ -28,6 +29,8 @@ export const Route = createFileRoute('/api/swarm-roster')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
+        const csrfCheckPost = requireJsonContentType(request)
+        if (csrfCheckPost) return csrfCheckPost
         let body: unknown
         try {
           body = await request.json()
@@ -49,6 +52,8 @@ export const Route = createFileRoute('/api/swarm-roster')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
+        const csrfCheckPatch = requireJsonContentType(request)
+        if (csrfCheckPatch) return csrfCheckPatch
         let body: unknown
         try {
           body = await request.json()

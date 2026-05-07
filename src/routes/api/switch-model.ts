@@ -2,15 +2,10 @@ import { spawn } from 'node:child_process'
 import { json } from '@tanstack/react-start'
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { OLLAMA_CLOUD_IDS } from '../../server/ollama-cloud-models'
+import { requireJsonContentType } from '../../server/rate-limit'
 
-const ALLOWED_MODELS = new Set([
-  'kimi-k2.6',
-  'deepseek-v4-pro',
-  'qwen3.5:397b',
-  'qwen3-coder:480b',
-  'glm-5.1',
-  'deepseek-v4-flash',
-])
+const ALLOWED_MODELS = new Set<string>(OLLAMA_CLOUD_IDS)
 
 const SSH_TARGET = process.env.HERMES_VPS_SSH ?? 'root@72.62.50.32'
 const REMOTE_SCRIPT =
@@ -56,6 +51,8 @@ export const Route = createFileRoute('/api/switch-model')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
         let body: unknown
         try {
           body = await request.json()

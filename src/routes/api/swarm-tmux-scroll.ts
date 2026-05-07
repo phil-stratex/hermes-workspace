@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { requireLocalOrAuth } from '../../server/auth-middleware'
+import { requireJsonContentType } from '../../server/rate-limit'
 import { swarmExec, useDockerExec } from '../../server/swarm-docker-exec'
 import { rosterByWorkerId } from '../../server/swarm-roster'
 
@@ -68,6 +69,8 @@ export const Route = createFileRoute('/api/swarm-tmux-scroll')({
         if (!requireLocalOrAuth(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
 
         let body: ScrollRequest
         try {
