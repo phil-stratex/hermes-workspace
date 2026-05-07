@@ -9,6 +9,8 @@ import {
   getSwarmProfilePath,
   patchSwarmRuntimeFile,
 } from '../../server/swarm-foundation'
+import { swarmExec, useDockerExec } from '../../server/swarm-docker-exec'
+import { rosterByWorkerId } from '../../server/swarm-roster'
 
 /**
  * POST /api/swarm-tmux-stop
@@ -93,6 +95,58 @@ export const Route = createFileRoute('/api/swarm-tmux-stop')({
           typeof body.workerId === 'string' ? body.workerId.trim() : ''
         if (!workerId || !validateWorkerId(workerId)) {
           return json({ error: 'workerId required' }, { status: 400 })
+        }
+
+        // VPS mode: tmux runs in the agent container.
+        if (useDockerExec()) {
+          const sessionName = `swarm-${workerId}`
+          const containerOverride =
+            rosterByWorkerId([workerId]).get(workerId)?.container || undefined
+          const has = await swarmExec(
+            'tmux',
+            ['has-session', '-t', sessionName],
+            { timeoutMs: 5_000, container: containerOverride },
+          )
+          if (!has.ok) {
+            return json({
+              workerId,
+              sessionName,
+              wasRunning: false,
+              killed: false,
+            })
+          }
+          const kill = await swarmExec(
+            'tmux',
+            ['kill-session', '-t', sessionName],
+            { timeoutMs: 5_000, container: containerOverride },
+          )
+          if (!kill.ok) {
+            return json(
+              { error: kill.stderr || 'tmux kill-session failed' },
+              { status: 500 },
+            )
+          }
+          // Reconcile runtime.json on the shared volume.
+          const profilePath = getSwarmProfilePath(workerId)
+          const patchResult = patchSwarmRuntimeFile(profilePath, workerId, {
+            state: 'idle',
+            phase: 'stopped',
+            currentTask: null,
+            activeTool: null,
+            needsHuman: false,
+            blockedReason: null,
+            checkpointStatus: 'none',
+            lastDispatchResult: 'Stopped via UI',
+            lastOutputAt: Date.now(),
+          })
+          return json({
+            workerId,
+            sessionName,
+            wasRunning: true,
+            killed: true,
+            runtimePatched: patchResult.ok,
+            runtimePatchError: patchResult.ok ? undefined : patchResult.error,
+          })
         }
 
         const tmuxBin = resolveTmuxBin()

@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { execFile } from 'node:child_process'
+import { swarmExec, useDockerExec } from '../../server/swarm-docker-exec'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { isAuthenticated } from '../../server/auth-middleware'
@@ -97,12 +98,20 @@ function lastLogTail(
 }
 
 function tmuxHasSession(name: string): Promise<boolean> {
+  if (useDockerExec()) {
+    return swarmExec('tmux', ['has-session', '-t', name], { timeoutMs: 5_000 }).then(
+      (r) => r.ok,
+    )
+  }
   return new Promise((resolve) => {
     execFile('tmux', ['has-session', '-t', name], (error) => resolve(!error))
   })
 }
 
 function tmuxIsInstalled(): Promise<boolean> {
+  if (useDockerExec()) {
+    return swarmExec('tmux', ['-V'], { timeoutMs: 4_000 }).then((r) => r.ok)
+  }
   // Honour HERMES_TMUX_BIN so a custom-path install isn't reported as
   // 'tmux not installed' just because PATH doesn't include it. See #244.
   const bin =

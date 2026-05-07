@@ -8,6 +8,12 @@ import { isAuthenticated } from '../../server/auth-middleware'
 import { rosterByWorkerId } from '../../server/swarm-roster'
 import { resolveSwarmModelLabel } from '../../server/swarm-model-resolver'
 import { syncSwarmProfileModel } from '../../server/swarm-profile-config'
+import {
+  ensureWorkerProfile,
+  swarmExec,
+  useDockerExec,
+  VPS_PROFILES_DIR,
+} from '../../server/swarm-docker-exec'
 
 // Inlined to avoid SSR module-resolution races against freshly-written
 // helpers; mirrors `src/server/claude-paths.ts` getProfilesDir().
@@ -170,6 +176,101 @@ export const Route = createFileRoute('/api/swarm-tmux-start')({
             { error: 'workerId required (alnum, _, -; ≤64 chars)' },
             { status: 400 },
           )
+        }
+
+        // VPS mode: tmux + hermes live in the agent container; profiles
+        // live on the shared /opt/data volume. Branch early to avoid the
+        // local-host wrapper / binary lookups below.
+        if (useDockerExec()) {
+          const profilePath = `${VPS_PROFILES_DIR}/${workerId}`
+          const sessionName = `swarm-${workerId}`
+
+          // Resolve roster model so we can sync it into the profile config
+          // before launching tmux. This also bootstraps the profile dir.
+          const roster = rosterByWorkerId([workerId]).get(workerId)
+          const containerOverride = roster?.container || undefined
+          const resolved = resolveSwarmModelLabel(roster?.model ?? null)
+          const bootstrap = await ensureWorkerProfile(
+            workerId,
+            resolved
+              ? { provider: resolved.provider, default: resolved.default }
+              : undefined,
+            containerOverride,
+          )
+          if (!bootstrap.ok) {
+            return json(
+              {
+                error: `profile bootstrap failed: ${bootstrap.stderr || bootstrap.stdout}`,
+              },
+              { status: 500 },
+            )
+          }
+
+          // Idempotent: check existing session.
+          const has = await swarmExec(
+            'tmux',
+            ['has-session', '-t', sessionName],
+            { timeoutMs: 5_000, container: containerOverride },
+          )
+          if (has.ok) {
+            return json({
+              workerId,
+              sessionName,
+              alreadyRunning: true,
+              started: false,
+              modelSync: {
+                attempted: Boolean(resolved),
+                changed: false,
+                target: resolved
+                  ? `${resolved.provider}/${resolved.default}`
+                  : undefined,
+              },
+            })
+          }
+
+          // Start the worker hermes TUI inside its own profile.
+          const launchCmd = [
+            `HERMES_HOME='${profilePath}'`,
+            `exec hermes chat --tui`,
+          ].join(' ')
+          const start = await swarmExec(
+            'tmux',
+            [
+              'new-session',
+              '-d',
+              '-s',
+              sessionName,
+              '-c',
+              profilePath,
+              'sh',
+              '-c',
+              launchCmd,
+            ],
+            { timeoutMs: 8_000, container: containerOverride },
+          )
+          if (!start.ok) {
+            return json(
+              {
+                error: start.stderr || start.stdout || 'tmux new-session failed',
+              },
+              { status: 500 },
+            )
+          }
+
+          return json({
+            workerId,
+            sessionName,
+            alreadyRunning: false,
+            started: true,
+            cwd: profilePath,
+            modelSync: {
+              attempted: Boolean(resolved),
+              changed: true,
+              target: resolved
+                ? `${resolved.provider}/${resolved.default}`
+                : undefined,
+            },
+          })
         }
 
         const profilesDir = getProfilesDir()

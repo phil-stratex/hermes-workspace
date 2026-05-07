@@ -13,6 +13,7 @@ import {
 import { AgentProgress } from '@/components/agent-view/agent-progress'
 import { PixelAvatar } from '@/components/agent-swarm/pixel-avatar'
 import { useQuery } from '@tanstack/react-query'
+import { ActivityDot, type ActivityStatus } from '@/components/activity-dot'
 import { Swarm2Artifacts, type Swarm2Artifact, type Swarm2Preview } from './swarm2-artifacts'
 import { Swarm2LiveChat } from './swarm2-live-chat'
 import { Swarm2TaskQueue } from './swarm2-task-queue'
@@ -242,6 +243,57 @@ export function OperationalWorkerCard({
     refetchInterval: 60_000,
     staleTime: 30_000,
   })
+  // Live runtime.json fetch — gives us the live state, blockedReason,
+  // lastSummary, nextAction. Refreshes every 10s while the card is on
+  // screen so a blocked banner reflects the latest reason.
+  const runtimeQuery = useQuery({
+    queryKey: ['swarm-runtime', member.id],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/swarm-runtime?workerId=${encodeURIComponent(member.id)}`,
+      )
+      if (!res.ok) return null
+      const data = (await res.json()) as {
+        entries?: Array<Record<string, unknown>>
+      }
+      return data.entries?.[0] ?? null
+    },
+    enabled: Boolean(member.id) && member.profileFound,
+    refetchInterval: 10_000,
+    staleTime: 5_000,
+  })
+  const runtime = runtimeQuery.data as
+    | {
+        state?: string
+        blockedReason?: string | null
+        lastSummary?: string | null
+        nextAction?: string | null
+        lastDispatchResult?: string | null
+        checkpointStatus?: string
+        phase?: string
+        lastCheckIn?: string | null
+      }
+    | null
+    | undefined
+  const [showBlockedDetails, setShowBlockedDetails] = useState(false)
+  // Dynamic model list — replaces the legacy hard-coded MODEL_OPTIONS
+  // with whatever the workspace exposes via /api/models (which reads
+  // ~/.hermes/models.json + the gateway). Falls back to MODEL_OPTIONS.
+  const modelsQuery = useQuery({
+    queryKey: ['models'],
+    queryFn: async () => {
+      const res = await fetch('/api/models')
+      if (!res.ok) return { models: [] as Array<{ id: string }> }
+      return (await res.json()) as { models: Array<{ id: string; name?: string }> }
+    },
+    staleTime: 5 * 60 * 1000,
+  })
+  const dynamicModelOptions = useMemo(() => {
+    const ids = (modelsQuery.data?.models ?? [])
+      .map((m) => m.id)
+      .filter((id) => id && id !== 'hermes-agent')
+    return ids.length > 0 ? ids : MODEL_OPTIONS
+  }, [modelsQuery.data])
   const projectName = projectQuery.data?.projectName ?? null
   const projectBranch = projectQuery.data?.branch ?? null
   const cardChangedFiles = projectQuery.data?.changedFiles ?? []
@@ -364,13 +416,17 @@ export function OperationalWorkerCard({
             <span className="inline-flex max-w-full items-center justify-center gap-2">
               {avatarGlyph ? <span>{avatarGlyph}</span> : null}
               <span className="truncate">{displayName}</span>
-              <span
-                className={cn(
-                  'h-2 w-2 shrink-0 rounded-full',
-                  state !== 'idle' && state !== 'offline' && state !== 'waiting' && 'animate-pulse',
-                  status.dot,
-                )}
-                aria-label={status.label}
+              <ActivityDot
+                status={
+                  (state === 'offline'
+                    ? 'offline'
+                    : state === 'idle' || state === 'waiting'
+                      ? 'idle'
+                      : state === 'error'
+                        ? 'blocked'
+                        : 'running') as ActivityStatus
+                }
+                size={8}
                 title={status.label}
               />
               {livePulse ? (
@@ -434,6 +490,58 @@ export function OperationalWorkerCard({
       {!member.profileFound ? (
         <div className="mb-2 rounded-xl border border-amber-400/35 bg-amber-500/10 px-3 py-2 text-center text-[11px] text-amber-200">
           Roster-only agent, not provisioned yet. Configure now, bootstrap profile later.
+        </div>
+      ) : null}
+
+      {runtime?.state === 'blocked' ? (
+        <div
+          className="mb-2 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-[11px] text-red-200"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-1.5 font-semibold">
+              <span>⚠ Blocked:</span>
+              <span className="truncate">
+                {runtime.blockedReason ?? 'unknown reason'}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowBlockedDetails((v) => !v)}
+              className="shrink-0 rounded-md border border-red-500/40 px-2 py-0.5 text-[10px] hover:bg-red-500/20"
+            >
+              {showBlockedDetails ? 'Weniger' : 'Details'}
+            </button>
+          </div>
+          {showBlockedDetails ? (
+            <dl className="mt-2 space-y-1 text-[10px]">
+              {runtime.lastSummary ? (
+                <div>
+                  <dt className="font-semibold text-red-300">Letzte Aktion</dt>
+                  <dd className="text-red-100">{runtime.lastSummary}</dd>
+                </div>
+              ) : null}
+              {runtime.lastDispatchResult ? (
+                <div>
+                  <dt className="font-semibold text-red-300">Dispatch-Ergebnis</dt>
+                  <dd className="text-red-100">{runtime.lastDispatchResult}</dd>
+                </div>
+              ) : null}
+              {runtime.nextAction ? (
+                <div>
+                  <dt className="font-semibold text-red-300">Nächster Schritt</dt>
+                  <dd className="text-red-100">{runtime.nextAction}</dd>
+                </div>
+              ) : null}
+              <div className="flex flex-wrap gap-2 pt-1 text-red-200/80">
+                <span>Phase: {runtime.phase ?? '–'}</span>
+                <span>· Checkpoint: {runtime.checkpointStatus ?? '–'}</span>
+                {runtime.lastCheckIn ? (
+                  <span>· Last check-in: {runtime.lastCheckIn}</span>
+                ) : null}
+              </div>
+            </dl>
+          ) : null}
         </div>
       ) : null}
 
@@ -638,7 +746,7 @@ export function OperationalWorkerCard({
                   onChange={(event) => setDraftModel(event.target.value)}
                   className="w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 py-2 text-[var(--theme-text)] outline-none"
                 >
-                  {Array.from(new Set([draftModel || baseModelLabel, ...MODEL_OPTIONS].filter(Boolean))).map((option) => (
+                  {Array.from(new Set([draftModel || baseModelLabel, ...dynamicModelOptions].filter(Boolean))).map((option) => (
                     <option key={option} value={option}>
                       {option}
                     </option>
@@ -687,6 +795,21 @@ export function OperationalWorkerCard({
                     } catch {
                       /* noop */
                     }
+                    // Persist the swarm-relevant fields (name, role, model)
+                    // back into swarm.yaml via PATCH so the dispatcher and
+                    // tmux-bridge actually honor them.
+                    const patch: Record<string, unknown> = { id: member.id }
+                    if (next.displayName) patch.name = next.displayName
+                    if (next.role) patch.role = next.role
+                    if (next.modelLabel) patch.model = next.modelLabel
+                    void fetch('/api/swarm-roster', {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(patch),
+                    }).catch((err) => {
+                      // Best-effort — localStorage already updated for UI.
+                      console.error('swarm-roster PATCH failed', err)
+                    })
                     setSettingsOpen(false)
                   }}
                 >

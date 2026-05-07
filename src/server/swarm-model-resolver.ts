@@ -104,5 +104,23 @@ export function resolveSwarmModelLabel(
     return { provider: slashMatch[1], default: slashMatch[2] }
   }
 
+  // Ollama Cloud — bare model ids in our fallback chain. Comparison is
+  // case-insensitive against the original label (preserves colons / dots).
+  const OLLAMA_CLOUD_IDS = [
+    'kimi-k2.6',
+    'deepseek-v4-pro',
+    'qwen3.5:397b',
+    'qwen3-coder:480b',
+    'glm-5.1',
+    'deepseek-v4-flash',
+  ]
+  const trimmed = label.trim()
+  const match = OLLAMA_CLOUD_IDS.find(
+    (id) => id.toLowerCase() === trimmed.toLowerCase(),
+  )
+  if (match) {
+    return { provider: 'ollama-cloud', default: match }
+  }
+
   return null
 }

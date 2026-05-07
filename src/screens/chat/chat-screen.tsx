@@ -877,10 +877,14 @@ export function ChatScreen({
 
   const clearTimerRef = useRef<number | null>(null)
 
-  // Failsafe: clear after done event + 10s if response never shows in display
+  // Failsafe: once the run is marked completed, the response is in the
+  // store. waitingForResponse may still be true due to a desync between
+  // the streaming-message hook (clears isStreaming) and the chat-store
+  // (which holds waitingForResponse). Clear it after a short grace
+  // period so React has time to render the final message frame.
   useEffect(() => {
     if (lastCompletedRunAt && waitingForResponse) {
-      const timer = window.setTimeout(() => streamFinish(), 10000)
+      const timer = window.setTimeout(() => streamFinish(), 500)
       return () => window.clearTimeout(timer)
     }
   }, [lastCompletedRunAt, waitingForResponse, streamFinish])

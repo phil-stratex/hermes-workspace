@@ -1026,31 +1026,36 @@ function ChatComposerComponent({
         typeof sessionKey === 'string' && sessionKey.trim().length > 0
           ? sessionKey.trim()
           : undefined
-      if (
-        shouldBlockZeroForkModelSwitch(
-          gatewayModeQuery.data,
-          zeroForkModelInfoFlags,
-        )
-      ) {
-        toast(MODEL_SWITCH_BLOCKED_TOAST)
-        setIsModelMenuOpen(false)
-        return
-      }
       setModelNotice(null)
       const resolved = getResolvedModelKey(model, provider)
-      // Per-session, browser-local persistence. No global config write —
-      // picking a model here only affects this chat. The actual model is
-      // passed on each request via the chat-completion `model` field.
       if (normalizedSessionKey) {
         setPersistedSessionModel(normalizedSessionKey, resolved)
       }
       setIsModelMenuOpen(false)
+
+      // Local extension: also push the change to the remote Hermes Agent
+      // so that the gateway actually serves this model (it ignores the
+      // per-request `model` field and reads default from config.yaml).
+      void fetch('/api/switch-model', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: resolved }),
+      })
+        .then(async (res) => {
+          if (!res.ok) {
+            const text = await res.text().catch(() => '')
+            toast(`Model switch failed: ${text || res.status}`)
+          } else {
+            toast(`Switched backend to ${resolved}`)
+          }
+        })
+        .catch((err) => {
+          toast(`Model switch failed: ${String(err)}`)
+        })
     },
     [
-      gatewayModeQuery.data,
       sessionKey,
       setPersistedSessionModel,
-      zeroForkModelInfoFlags,
     ],
   )
 
@@ -1232,6 +1237,23 @@ function ChatComposerComponent({
 
   useEffect(() => {
     if (typeof window === 'undefined') return
+    // Council → Chat handoff: pick up a final answer that was sent over
+    // from the Council page and prefill the composer with it once.
+    try {
+      const raw = window.localStorage.getItem('council-prefill-chat')
+      if (raw) {
+        const parsed = JSON.parse(raw) as { content?: string; at?: number }
+        const fresh = typeof parsed.at === 'number' && Date.now() - parsed.at < 60_000
+        if (fresh && typeof parsed.content === 'string' && parsed.content.length > 0) {
+          window.localStorage.removeItem('council-prefill-chat')
+          setValue(parsed.content)
+          return
+        }
+        window.localStorage.removeItem('council-prefill-chat')
+      }
+    } catch {
+      /* noop */
+    }
     const savedDraft = window.sessionStorage.getItem(draftStorageKey)
     setValue(savedDraft ?? '')
   }, [draftStorageKey])

@@ -6,12 +6,14 @@ import {
   BrainIcon,
   Building01Icon,
   Castle02Icon,
+  ChartBarLineIcon,
   Chat01Icon,
   CheckListIcon,
   Clock01Icon,
   ComputerTerminal01Icon,
   DashboardSquare01Icon,
   File01Icon,
+  JusticeScale02Icon,
   McpServerIcon,
   MessageMultiple01Icon,
   Moon02Icon,
@@ -587,6 +589,8 @@ function ChatSidebarComponent({
   const isConductorActive = pathname === '/conductor'
   const isOperationsActive = pathname === '/operations'
   const isSwarmActive = pathname === '/swarm' || pathname === '/swarm2'
+  const isCouncilActive = pathname === '/council'
+  const isUsageActive = pathname === '/usage'
   const mainRoutes = ['/chat', '/new', '/files', '/terminal']
   const knowledgeRoutes = ['/memory', '/skills']
   const systemRoutes = ['/settings', '/logs']
@@ -790,6 +794,13 @@ function ChatSidebarComponent({
     },
     {
       kind: 'link',
+      to: '/usage',
+      icon: ChartBarLineIcon,
+      label: 'Usage',
+      active: isUsageActive,
+    },
+    {
+      kind: 'link',
       to: '/chat',
       icon: MessageMultiple01Icon,
       label: t('nav.chat'),
@@ -844,6 +855,13 @@ function ChatSidebarComponent({
       icon: UserGroupIcon,
       label: 'Swarm',
       active: isSwarmActive,
+    },
+    {
+      kind: 'link',
+      to: '/council',
+      icon: JusticeScale02Icon,
+      label: 'Council',
+      active: isCouncilActive,
     },
 
   ]

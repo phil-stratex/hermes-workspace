@@ -5,11 +5,13 @@ import {
   Building01Icon,
   Cancel01Icon,
   Castle02Icon,
+  ChartBarLineIcon,
   Chat01Icon,
   Clock01Icon,
   CommandLineIcon,
   DashboardSquare01Icon,
   File01Icon,
+  JusticeScale02Icon,
   McpServerIcon,
   Menu01Icon,
   PuzzleIcon,
@@ -41,6 +43,13 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     icon: DashboardSquare01Icon,
     to: '/dashboard',
     match: (p: string) => p.startsWith('/dashboard'),
+  },
+  {
+    id: 'usage',
+    label: 'Usage',
+    icon: ChartBarLineIcon,
+    to: '/usage',
+    match: (p: string) => p.startsWith('/usage'),
   },
   {
     id: 'playground',
@@ -84,7 +93,13 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     to: '/swarm',
     match: (p: string) => p === '/swarm' || p.startsWith('/swarm2'),
   },
-
+  {
+    id: 'council',
+    label: 'Council',
+    icon: JusticeScale02Icon,
+    to: '/council',
+    match: (p: string) => p.startsWith('/council'),
+  },
   {
     id: 'memory',
     label: 'Memory',

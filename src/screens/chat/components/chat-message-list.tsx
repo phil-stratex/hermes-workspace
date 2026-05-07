@@ -1091,14 +1091,13 @@ function ChatMessageListComponent({
       const lastId = getStableMessageId(lastMessage, lastEntry.sourceIndex)
       const isBeingTypewritten = streamingState.streamingTargets.has(lastId)
       if (isBeingTypewritten) return false
-      // If we're in grace period waiting for a NEW response, the last assistant
-      // message is from the PREVIOUS turn — don't let its text hide the bubble.
-      // Only suppress once we know this IS the new response (i.e. not waiting).
-      if (thinkingGrace || waitingForResponse || sending) return true
-      // Check if assistant message has visible text — if not, keep showing indicator
+      // Visible assistant text means the response is rendered. Hide the
+      // bubble even if waitingForResponse is still set — that flag can get
+      // stuck when the server SSE stream drops the done-event.
       const msgText = textFromMessage(lastMessage)
-      if (!msgText || msgText.trim().length === 0) return true
-      return false
+      if (msgText && msgText.trim().length > 0) return false
+      if (thinkingGrace || waitingForResponse || sending) return true
+      return true
     }
     return true
   })()

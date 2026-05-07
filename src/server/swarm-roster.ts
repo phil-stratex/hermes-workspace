@@ -20,6 +20,10 @@ export const SwarmRosterWorkerSchema = z.object({
   maxConcurrentTasks: z.number().int().positive().default(1),
   acceptsBroadcast: z.boolean().default(true),
   reviewRequired: z.boolean().default(false),
+  // B6 — optional per-worker docker container override. Unset → uses
+  // HERMES_VPS_CONTAINER env. Set this to spread workers across multiple
+  // hermes-agent containers for true parallelism.
+  container: z.string().optional(),
 })
 
 export const SwarmRosterSchema = z.object({
@@ -116,6 +120,33 @@ export function upsertSwarmRosterWorker(input: SwarmRosterUpsert, ids: Array<str
   }
   writeSwarmRoster(next)
   return next
+}
+
+/**
+ * Partial update — only the fields you pass are touched. The worker must
+ * already exist; missing workers throw. Useful from UI dialogs that only
+ * edit a subset of fields (model, role, name, mission).
+ */
+export const SwarmRosterPatchSchema = z
+  .object({
+    id: z.string().regex(/^swarm\d+$/i, 'worker id must look like swarm13'),
+  })
+  .merge(SwarmRosterWorkerSchema.partial().omit({ id: true }))
+
+export type SwarmRosterPatch = z.infer<typeof SwarmRosterPatchSchema>
+
+export function patchSwarmRosterWorker(
+  input: SwarmRosterPatch,
+  ids: Array<string> = [],
+): SwarmRoster {
+  const patch = SwarmRosterPatchSchema.parse(input)
+  const current = readSwarmRoster(ids)
+  const existing = current.workers.find((worker) => worker.id === patch.id)
+  if (!existing) {
+    throw new Error(`worker ${patch.id} not in roster — use POST to add new`)
+  }
+  const merged: SwarmRosterWorker = { ...existing, ...patch }
+  return upsertSwarmRosterWorker(merged, ids)
 }
 
 export function rosterByWorkerId(ids: Array<string> = []): Map<string, SwarmRosterWorker> {

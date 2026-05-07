@@ -12,6 +12,8 @@ import { memo, useMemo } from 'react'
 import { getMessageTimestamp } from '../../utils'
 import type { SessionMeta } from '../../types'
 import { cn } from '@/lib/utils'
+import { useChatStore } from '@/stores/chat-store'
+import { ActivityDot, type ActivityStatus } from '@/components/activity-dot'
 import {
   MenuContent,
   MenuItem,
@@ -106,6 +108,20 @@ function SessionItemComponent({
   const isError = session.titleStatus === 'error'
   const baseTitle = getSessionDisplayTitle(session, isGenerating)
 
+  // Per-session live activity (running/idle). Subscribes to the chat store
+  // so the dot pulses while a response is streaming on this session and
+  // resets when the run finishes — works regardless of whether the user
+  // is actively viewing the session or has it open in another tab.
+  const isWaiting = useChatStore((state) => {
+    const keys = state.waitingSessionKeys
+    return keys.has(session.key) || keys.has(session.friendlyId)
+  })
+  const activity: ActivityStatus = isWaiting
+    ? 'running'
+    : isError
+      ? 'blocked'
+      : 'idle'
+
   const updatedAt = useMemo(() => {
     if (typeof session.updatedAt === 'number') return session.updatedAt
     if (session.lastMessage) return getMessageTimestamp(session.lastMessage)
@@ -145,11 +161,12 @@ function SessionItemComponent({
       <div className="flex-1 min-w-0 py-1.5">
         <div
           className={cn(
-            'truncate text-sm font-[500]',
+            'truncate text-sm font-[500] flex items-center gap-1.5',
             isGenerating ? 'text-primary-700' : '',
           )}
         >
-          <span className={cn(isGenerating ? 'animate-pulse' : undefined)}>
+          <ActivityDot status={activity} size={7} />
+          <span className={cn('truncate', isGenerating ? 'animate-pulse' : undefined)}>
             {baseTitle}
           </span>
         </div>

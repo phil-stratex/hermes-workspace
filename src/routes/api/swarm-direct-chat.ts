@@ -6,6 +6,15 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { readWorkerMessages, type SwarmChatMessage } from '../../server/swarm-chat-reader'
+import { swarmExec, useDockerExec } from '../../server/swarm-docker-exec'
+
+function isVpsRoutableCmd(cmd: string): string | null {
+  const base = cmd.split('/').pop() ?? cmd
+  if (base === 'tmux') return 'tmux'
+  if (base === 'hermes') return 'hermes'
+  if (/^swarm\d+$/i.test(base)) return 'hermes'
+  return null
+}
 
 type DirectChatRequest = {
   workerId?: unknown
@@ -105,6 +114,16 @@ function execFileAsync(
   timeout = 8_000,
   input?: string,
 ): Promise<{ ok: true; stdout: string; stderr: string } | { ok: false; error: string }> {
+  if (useDockerExec()) {
+    const remoteCmd = isVpsRoutableCmd(cmd)
+    if (remoteCmd) {
+      return swarmExec(remoteCmd, args, { timeoutMs: timeout, input, trim: false }).then((r) =>
+        r.ok
+          ? { ok: true, stdout: r.stdout, stderr: r.stderr }
+          : { ok: false, error: r.stderr || `exit ${r.code}` },
+      )
+    }
+  }
   return new Promise((resolve) => {
     const child = execFile(cmd, args, { timeout, maxBuffer: MAX_OUTPUT_CHARS }, (error, stdout, stderr) => {
       if (error) {
@@ -122,6 +141,11 @@ function execFileAsync(
 }
 
 function tmuxHasSession(tmuxBin: string, name: string): Promise<boolean> {
+  if (useDockerExec()) {
+    return swarmExec('tmux', ['has-session', '-t', name], { timeoutMs: 5_000 }).then(
+      (r) => r.ok,
+    )
+  }
   return new Promise((resolve) => {
     execFile(tmuxBin, ['has-session', '-t', name], (error) => {
       resolve(!error)

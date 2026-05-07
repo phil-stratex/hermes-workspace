@@ -18,6 +18,11 @@ type WorkerHint = {
   skills?: Array<string>
   capabilities?: Array<string>
   notes?: string
+  preferredTaskTypes?: Array<string>
+  /** Live runtime state from runtime.json — 'idle' | 'running' | 'blocked' | … */
+  state?: string
+  /** Soft cap per swarm.yaml; over-assigning is penalised, not blocked. */
+  maxConcurrentTasks?: number
 }
 
 type RouteAssignment = {
@@ -142,6 +147,28 @@ function scoreWorker(prompt: string, worker: WorkerHint): number {
     for (const term of terms) if (text.includes(term)) score += 3
   }
   if (text.includes('swarm-worker-core')) score += 1
+
+  // B2 — preferredTaskTypes match (strong signal, +5 per hit, capped).
+  if (worker.preferredTaskTypes?.length) {
+    let preferredHits = 0
+    for (const type of worker.preferredTaskTypes) {
+      if (!type) continue
+      const t = type.toLowerCase()
+      if (lower.includes(t)) preferredHits += 1
+    }
+    score += Math.min(preferredHits * 5, 15)
+  }
+
+  // B2 — busy-state penalty so a free worker beats an equally-matched busy one.
+  if (worker.state) {
+    const s = worker.state.toLowerCase()
+    if (s === 'running' || s === 'active' || s === 'thinking' || s === 'reviewing' || s === 'writing') {
+      score -= 4
+    } else if (s === 'blocked' || s === 'error') {
+      score -= 8
+    }
+    // 'idle' / 'offline' / unknown → no penalty
+  }
   return score
 }
 
@@ -193,6 +220,16 @@ export const Route = createFileRoute('/api/swarm-decompose')({
             skills: Array.isArray(obj.skills) ? obj.skills.filter((value): value is string => typeof value === 'string') : undefined,
             capabilities: Array.isArray(obj.capabilities) ? obj.capabilities.filter((value): value is string => typeof value === 'string') : undefined,
             notes: typeof obj.notes === 'string' ? obj.notes : undefined,
+            preferredTaskTypes: Array.isArray(obj.preferredTaskTypes)
+              ? (obj.preferredTaskTypes as Array<unknown>).filter(
+                  (value): value is string => typeof value === 'string',
+                )
+              : undefined,
+            state: typeof obj.state === 'string' ? obj.state : undefined,
+            maxConcurrentTasks:
+              typeof obj.maxConcurrentTasks === 'number'
+                ? obj.maxConcurrentTasks
+                : undefined,
           })
         }
         if (workers.length === 0) return json({ error: 'workers[] required' }, { status: 400 })

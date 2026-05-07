@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { execFile } from 'node:child_process'
+import { swarmExec, useDockerExec } from '../../server/swarm-docker-exec'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -52,6 +53,7 @@ type DispatchRequest = {
   missionTitle?: unknown
   direct?: unknown
   notifySessionKey?: unknown
+  attachments?: unknown
 }
 
 type WorkerResult = {
@@ -145,11 +147,25 @@ function resolveTmuxBin(): string | null {
 }
 
 function tmuxHasSession(tmuxBin: string, name: string): Promise<boolean> {
+  if (useDockerExec()) {
+    return swarmExec('tmux', ['has-session', '-t', name], { timeoutMs: 5_000 }).then(
+      (r) => r.ok,
+    )
+  }
   return new Promise((resolve) => {
     execFile(tmuxBin, ['has-session', '-t', name], (error) => {
       resolve(!error)
     })
   })
+}
+
+function isVpsRoutableCmd(cmd: string): string | null {
+  const base = cmd.split('/').pop() ?? cmd
+  if (base === 'tmux') return 'tmux'
+  if (base === 'hermes') return 'hermes'
+  // ~/.local/bin/swarm<N> wrappers — re-route to bare hermes in container.
+  if (/^swarm\d+$/i.test(base)) return 'hermes'
+  return null
 }
 
 function execFileAsync(
@@ -158,6 +174,20 @@ function execFileAsync(
   timeout = 8_000,
   input?: string,
 ): Promise<{ ok: true; stdout: string; stderr: string } | { ok: false; error: string }> {
+  if (useDockerExec()) {
+    const remoteCmd = isVpsRoutableCmd(cmd)
+    if (remoteCmd) {
+      return swarmExec(remoteCmd, args, {
+        timeoutMs: timeout,
+        input,
+        trim: false,
+      }).then((r) =>
+        r.ok
+          ? { ok: true, stdout: r.stdout, stderr: r.stderr }
+          : { ok: false, error: r.stderr || `exit ${r.code}` },
+      )
+    }
+  }
   return new Promise((resolve) => {
     const child = execFile(cmd, args, { timeout, maxBuffer: MAX_OUTPUT_CHARS }, (error, stdout, stderr) => {
       if (error) {
@@ -871,7 +901,6 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
     const cmd = useWrapper ? wrapperPath : resolveHermesBin()
     const args = ['chat', '-q', prompt, '-Q', '--yolo', '--ignore-rules', '--source', 'swarm-dispatch']
     const env: NodeJS.ProcessEnv = {
-      ...process.env,
       HERMES_HOME: profilePath,
     }
     const ghToken = resolveGithubToken()
@@ -880,11 +909,56 @@ function runWorker(assignment: AssignmentRequest, timeoutMs: number, roster: Swa
       env.GITHUB_TOKEN = ghToken
     }
 
+    // VPS mode: tmux-bridge handles routing into the hermes-agent
+    // container. The local execFile path stays for upstream parity.
+    if (useDockerExec()) {
+      const containerOverride = roster?.container || undefined
+      swarmExec(
+        'hermes',
+        args,
+        {
+          timeoutMs,
+          env: { ...env },
+          container: containerOverride,
+          trim: false,
+        },
+      ).then((r) => {
+        const durationMs = Date.now() - startedAt
+        const out =
+          r.stdout.length > MAX_OUTPUT_CHARS
+            ? r.stdout.slice(-MAX_OUTPUT_CHARS)
+            : r.stdout
+        const result: WorkerResult = r.ok
+          ? {
+              workerId,
+              ok: true,
+              output: out,
+              error: r.stderr.trim() || null,
+              durationMs,
+              exitCode: 0,
+              delivery: 'oneshot',
+            }
+          : {
+              workerId,
+              ok: false,
+              output: out,
+              error: r.stderr.trim() || `exit ${r.code}`,
+              durationMs,
+              exitCode: r.code,
+              delivery: 'oneshot',
+            }
+        markDispatchResult(workerId, result)
+        resolve(result)
+      })
+      return
+    }
+
+    const localEnv: NodeJS.ProcessEnv = { ...process.env, ...env }
     const proc = execFile(
       cmd,
       args,
       {
-        env,
+        env: localEnv,
         cwd: homedir(),
         timeout: timeoutMs,
         maxBuffer: MAX_OUTPUT_CHARS,
@@ -980,6 +1054,73 @@ export const Route = createFileRoute('/api/swarm-dispatch')({
         }
         if (assignments.some((assignment) => assignment.task.length > MAX_PROMPT_CHARS)) {
           return json({ error: `assignment task exceeds ${MAX_PROMPT_CHARS} characters` }, { status: 400 })
+        }
+
+        // Local patch (Block A3): attachments → file-reader → text inlined
+        // into each assignment.task; binary files (images, raw PDFs that
+        // failed extraction) go into the worker's profile inbox so the
+        // CLI worker can read them via tools.
+        const rawAttachments = Array.isArray(body.attachments)
+          ? (body.attachments as Array<Record<string, unknown>>)
+          : []
+        if (rawAttachments.length > 0) {
+          try {
+            const fs = await import('node:fs')
+            const path = await import('node:path')
+            const { extractAttachmentText, renderTextAttachmentsAsBlock } =
+              await import('../../server/file-reader')
+            const extracted = await Promise.all(
+              rawAttachments.map((att) => extractAttachmentText(att)),
+            )
+            const textBlock = renderTextAttachmentsAsBlock(extracted)
+            const profilesDir = getProfilesDir()
+            const dispatchTag = String(Date.now())
+            const binaryFiles = extracted
+              .map((res, idx) => ({ res, raw: rawAttachments[idx] }))
+              .filter((entry) => entry.res.kind === 'image')
+            // For each unique worker, write binaries to their inbox.
+            const inboxByWorker = new Map<string, string>()
+            for (const workerId of new Set(assignments.map((a) => a.workerId))) {
+              if (binaryFiles.length === 0) continue
+              const inboxDir = path.join(
+                profilesDir,
+                workerId,
+                'inbox',
+                dispatchTag,
+              )
+              try {
+                fs.mkdirSync(inboxDir, { recursive: true })
+                for (const { res, raw } of binaryFiles) {
+                  const dataUrl = String(raw.dataUrl ?? '')
+                  if (!dataUrl.startsWith('data:')) continue
+                  const comma = dataUrl.indexOf(',')
+                  const b64 = comma >= 0 ? dataUrl.slice(comma + 1) : ''
+                  if (!b64) continue
+                  const safeName = res.name.replace(/[^\w.\-]/g, '_')
+                  fs.writeFileSync(
+                    path.join(inboxDir, safeName),
+                    Buffer.from(b64, 'base64'),
+                  )
+                }
+                inboxByWorker.set(workerId, inboxDir)
+              } catch {
+                /* inbox-write best-effort */
+              }
+            }
+            // Enrich each assignment.task.
+            assignments = assignments.map((assignment) => {
+              const inbox = inboxByWorker.get(assignment.workerId)
+              const inboxNote = inbox
+                ? `\n\n[${binaryFiles.length} Binärdatei(en) liegen für dich in: ${inbox} — lies sie mit deinen Tools.]`
+                : ''
+              const enrichedTask = textBlock
+                ? `${textBlock}\n\n${assignment.task}${inboxNote}`
+                : `${assignment.task}${inboxNote}`
+              return { ...assignment, task: enrichedTask }
+            })
+          } catch {
+            // attachment processing best-effort — do not block dispatch
+          }
         }
 
         const timeoutRaw = typeof body.timeoutSeconds === 'number' ? body.timeoutSeconds : DEFAULT_TIMEOUT_S

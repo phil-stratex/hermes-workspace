@@ -373,11 +373,37 @@ export const Route = createFileRoute('/api/send-stream')({
           resolvedFriendlyId = sessionKey
         }
 
-        const workspaceScope = await loadWorkspaceCatalog().catch(() => null)
-        const scopedMessage = buildWorkspaceScopedTextMessage(
-          getChatMessage(message, attachments),
-          workspaceScope,
-        )
+        // Local patch: extract text from non-image attachments (text/code/PDF)
+        // and inline them as <attachment> blocks before the user message.
+        // Image attachments stay in `attachments` for buildMultimodalContent.
+        const baseMessage = getChatMessage(message, attachments)
+        let attachmentTextBlock = ''
+        if (attachments && attachments.length > 0) {
+          try {
+            const { extractAttachmentText, renderTextAttachmentsAsBlock } =
+              await import('../../server/file-reader')
+            const extracted = await Promise.all(
+              attachments.map((att) =>
+                extractAttachmentText(att as Record<string, unknown>),
+              ),
+            )
+            attachmentTextBlock = renderTextAttachmentsAsBlock(extracted)
+          } catch {
+            // best-effort — if extraction fails, fall through with empty block
+          }
+        }
+        const enrichedMessage = attachmentTextBlock
+          ? `${attachmentTextBlock}\n\n${baseMessage}`
+          : baseMessage
+        // Local patch: disable workspace_context prefix on chat messages.
+        // Set HERMES_INJECT_WORKSPACE_CONTEXT=1 to re-enable upstream behavior.
+        const scopedMessage =
+          process.env.HERMES_INJECT_WORKSPACE_CONTEXT === '1'
+            ? buildWorkspaceScopedTextMessage(
+                enrichedMessage,
+                await loadWorkspaceCatalog().catch(() => null),
+              )
+            : enrichedMessage
 
         // Create streaming response using the SHARED server connection
         const encoder = new TextEncoder()

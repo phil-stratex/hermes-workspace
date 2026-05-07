@@ -1,4 +1,7 @@
 import { randomUUID } from 'node:crypto'
+import fs from 'node:fs'
+import path from 'node:path'
+import os from 'node:os'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
@@ -15,6 +18,53 @@ import {
 } from '../../server/claude-api'
 import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 import { deleteLocalSession, getLocalSession, listLocalSessions } from '../../server/local-session-store'
+
+// Local patch: persistent session titles for zero-fork mode where the
+// upstream gateway doesn't accept session label updates.
+const TITLES_FILE = path.join(
+  process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes'),
+  'session-titles.json',
+)
+function readSessionTitles(): Record<string, string> {
+  try {
+    const raw = fs.readFileSync(TITLES_FILE, 'utf-8')
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const out: Record<string, string> = {}
+      for (const [k, v] of Object.entries(parsed)) {
+        if (typeof v === 'string') out[k] = v
+      }
+      return out
+    }
+  } catch {
+    // missing or invalid — start empty
+  }
+  return {}
+}
+function writeSessionTitle(key: string, title: string): void {
+  const map = readSessionTitles()
+  map[key] = title
+  try {
+    fs.mkdirSync(path.dirname(TITLES_FILE), { recursive: true })
+    fs.writeFileSync(TITLES_FILE, JSON.stringify(map, null, 2))
+  } catch {
+    // best-effort; UI still has the optimistic update
+  }
+}
+function applyStoredTitles<T extends Record<string, unknown>>(
+  sessions: Array<T>,
+): Array<T> {
+  const titles = readSessionTitles()
+  if (Object.keys(titles).length === 0) return sessions
+  return sessions.map((s) => {
+    const ids = [s.key, s.id, s.friendlyId].filter(
+      (v): v is string => typeof v === 'string',
+    )
+    const stored = ids.map((id) => titles[id]).find(Boolean)
+    if (!stored) return s
+    return { ...s, label: stored, title: stored, derivedTitle: stored }
+  })
+}
 
 export const Route = createFileRoute('/api/sessions')({
   server: {
@@ -56,7 +106,7 @@ export const Route = createFileRoute('/api/sessions')({
             }
           }
 
-          return json({ sessions: gatewaySessions })
+          return json({ sessions: applyStoredTitles(gatewaySessions) })
         } catch (err) {
           return json(
             {
@@ -194,18 +244,25 @@ export const Route = createFileRoute('/api/sessions')({
           }
 
           if (capabilities.dashboard.available && !capabilities.enhancedChat) {
+            // Zero-fork mode: backend gateway can't accept session updates,
+            // so we persist titles locally in HERMES_HOME/session-titles.json.
+            if (label) writeSessionTitle(sessionKey, label)
+            if (rawFriendlyId && rawFriendlyId !== sessionKey && label) {
+              writeSessionTitle(rawFriendlyId, label)
+            }
             return json({
               ok: true,
               sessionKey,
               entry: {
                 key: sessionKey,
                 id: sessionKey,
+                friendlyId: rawFriendlyId || sessionKey,
                 title: label || sessionKey,
                 label: label || sessionKey,
                 derivedTitle: label || sessionKey,
                 updatedAt: Date.now(),
               },
-              updated: false,
+              updated: true,
             })
           }
 

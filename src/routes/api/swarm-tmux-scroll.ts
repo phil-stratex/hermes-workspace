@@ -5,6 +5,8 @@ import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { requireLocalOrAuth } from '../../server/auth-middleware'
+import { swarmExec, useDockerExec } from '../../server/swarm-docker-exec'
+import { rosterByWorkerId } from '../../server/swarm-roster'
 
 /**
  * POST /api/swarm-tmux-scroll
@@ -95,12 +97,39 @@ export const Route = createFileRoute('/api/swarm-tmux-scroll')({
           return json({ error: 'direction must be up or down' }, { status: 400 })
         }
 
+        const session = requestedSession || `swarm-${workerId}`
+        const cmd = direction === 'up' ? 'scroll-up' : 'scroll-down'
+
+        // VPS mode: tmux runs in the agent container.
+        if (useDockerExec()) {
+          const containerOverride =
+            rosterByWorkerId([workerId]).get(workerId)?.container || undefined
+          const enter = await swarmExec(
+            'tmux',
+            ['copy-mode', '-t', session],
+            { timeoutMs: 4_000, container: containerOverride },
+          )
+          if (!enter.ok) {
+            return json({ error: enter.stderr || 'copy-mode failed' }, { status: 500 })
+          }
+          const scrolled = await swarmExec(
+            'tmux',
+            ['send-keys', '-t', session, '-X', '-N', String(lines), cmd],
+            { timeoutMs: 4_000, container: containerOverride },
+          )
+          if (!scrolled.ok) {
+            return json(
+              { error: scrolled.stderr || 'send-keys failed' },
+              { status: 500 },
+            )
+          }
+          return json({ ok: true, workerId, session, direction, lines })
+        }
+
         const tmuxBin = resolveTmuxBin()
         if (!tmuxBin) {
           return json({ error: 'tmux not installed' }, { status: 503 })
         }
-
-        const session = requestedSession || `swarm-${workerId}`
 
         const enterCopy = await execFileAsync(tmuxBin, [
           'copy-mode',
@@ -111,7 +140,6 @@ export const Route = createFileRoute('/api/swarm-tmux-scroll')({
           return json({ error: enterCopy.error }, { status: 500 })
         }
 
-        const cmd = direction === 'up' ? 'scroll-up' : 'scroll-down'
         const scrolled = await execFileAsync(tmuxBin, [
           'send-keys',
           '-t',

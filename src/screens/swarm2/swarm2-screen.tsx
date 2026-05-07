@@ -19,6 +19,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import type { CrewMember } from '@/hooks/use-crew-status'
 import { getOnlineStatus, useCrewStatus } from '@/hooks/use-crew-status'
+import { useStandingMissionTicker } from './hooks/use-standing-mission-ticker'
 import { toast } from '@/components/ui/toast'
 import { OperationalWorkerCard } from './operational-worker-card'
 import { Swarm2OrchestratorCard } from './swarm2-orchestrator-card'
@@ -975,6 +976,9 @@ export const __runtimeTabInternals = {
 export function Swarm2Screen() {
   const { crew, lastUpdated } = useCrewStatus()
   useUpdatedAgo(lastUpdated)
+  // Standing missions: idle workers with a custom mission auto-dispatch
+  // every 60s (5-min cooldown server-side per worker).
+  useStandingMissionTicker()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [roomIds, setRoomIds] = useState<Array<string>>(() => {
     if (typeof window === 'undefined') return []

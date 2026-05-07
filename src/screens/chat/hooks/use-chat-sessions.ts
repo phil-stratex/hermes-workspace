@@ -25,8 +25,17 @@ function mergeSessionTitle(
     : (stored.source ?? session.titleSource)
   const titleError = stored.error ?? session.titleError
 
+  // Local patch: in zero-fork mode the backend doesn't persist title
+  // changes (PATCH returns updated: false). The stored title from
+  // localStorage is the source of truth. Surface it as `label` too —
+  // the sidebar checks `label || title || derivedTitle` and would
+  // otherwise show the empty backend label after a refetch.
+  const label =
+    !hasManualTitle && stored.title ? stored.title : session.label
+
   return {
     ...session,
+    label,
     derivedTitle,
     titleStatus,
     titleSource,
@@ -77,7 +86,17 @@ export function useChatSessions({
 
   const sessions = useMemo(() => {
     const rawSessions = sessionsQuery.data ?? []
-    const filtered = filterSessionsWithTombstones(rawSessions)
+    // Local patch: hide backend-only `api-*` sessions that the gateway
+    // creates per chat-completions request in zero-fork mode. They are
+    // duplicates of the frontend-managed UUID sessions and clutter the
+    // sidebar.
+    const deduped = rawSessions.filter((s: Record<string, unknown>) => {
+      const ids = [s.friendlyId, s.id, s.sessionKey, s.key].filter(
+        (v): v is string => typeof v === 'string',
+      )
+      return !ids.some((id) => id.startsWith('api-'))
+    })
+    const filtered = filterSessionsWithTombstones(deduped)
     const merged = filtered.map((session) =>
       mergeSessionTitle(session, storedTitles[session.friendlyId]),
     )
