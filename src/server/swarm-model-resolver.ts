@@ -12,9 +12,21 @@
  * profile config alone (so a typo in the roster never wedges a worker).
  */
 
+import { OLLAMA_CLOUD_IDS } from './ollama-cloud-models'
+
 export type ResolvedSwarmModel = {
   provider: string
   default: string
+}
+
+/**
+ * Reject characters that would let a roster `model:` value escape a
+ * shell or python string context downstream. The resolver itself is
+ * pure, but its output is consumed by `syncSwarmProfileModel` (yaml)
+ * and historically also by docker-exec helpers — defence in depth.
+ */
+function isSafeIdSegment(value: string): boolean {
+  return /^[a-zA-Z0-9._:\-/]+$/.test(value)
 }
 
 /**
@@ -98,22 +110,20 @@ export function resolveSwarmModelLabel(
     return { provider: 'ollama-pc1', default: 'qwen3-30b-a3b-fixed:latest' }
   }
 
-  // Provider-prefixed full id (already in canonical form). Pass through.
-  const slashMatch = label.trim().match(/^([\w.-]+)\/(.+)$/)
-  if (slashMatch) {
+  // Provider-prefixed full id (already in canonical form). Pass through
+  // only if both halves use a safe id charset and bounded length — the
+  // resolved values flow into yaml writes and historically into shell
+  // contexts; an unconstrained `(.+)` would let a roster PATCH inject
+  // newlines, quotes, or shell metacharacters.
+  const slashMatch = label
+    .trim()
+    .match(/^([a-z][a-z0-9-]{1,30})\/([a-zA-Z0-9._:\-/]{1,80})$/)
+  if (slashMatch && isSafeIdSegment(slashMatch[1]) && isSafeIdSegment(slashMatch[2])) {
     return { provider: slashMatch[1], default: slashMatch[2] }
   }
 
   // Ollama Cloud — bare model ids in our fallback chain. Comparison is
   // case-insensitive against the original label (preserves colons / dots).
-  const OLLAMA_CLOUD_IDS = [
-    'kimi-k2.6',
-    'deepseek-v4-pro',
-    'qwen3.5:397b',
-    'qwen3-coder:480b',
-    'glm-5.1',
-    'deepseek-v4-flash',
-  ]
   const trimmed = label.trim()
   const match = OLLAMA_CLOUD_IDS.find(
     (id) => id.toLowerCase() === trimmed.toLowerCase(),

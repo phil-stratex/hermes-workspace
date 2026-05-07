@@ -413,15 +413,37 @@ export const Route = createFileRoute('/api/send-stream')({
         let persistedRunReady: Promise<unknown> | null = null
         let unregisterTimer: ReturnType<typeof setTimeout> | null = null
         let streamTimeoutTimer: ReturnType<typeof setTimeout> | null = null
-        let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+        // Two distinct keepalive timers run on every stream: `keepaliveTimer`
+        // pads the SSE stream against Cloudflare idle culling (10s cadence,
+        // hb_signal event); `agentKeepaliveTimer` drives the in-app
+        // 'heartbeat' event so the chat client's no-activity watchdog
+        // doesn't abort during long tool calls (30s cadence). Previously
+        // both intervals were assigned to the same shadowed `let`,
+        // leaking the first one and never cleaning it up on cancel().
+        let keepaliveTimer: ReturnType<typeof setInterval> | null = null
+        let agentKeepaliveTimer: ReturnType<typeof setInterval> | null = null
         const abortController = new AbortController()
         let closeStream = () => {
           streamClosed = true
         }
 
+        // Hoisted out of start() so cancel() can call it on stream
+        // teardown — previously a ReferenceError fired on every browser
+        // navigation/unmount because cancel is a sibling property of the
+        // stream init, not nested inside start().
+        const persistActiveRun = (
+          write: (sessionKey: string, runId: string) => Promise<unknown>,
+        ) => {
+          if (!activeRunId || !activeRunSessionKey) return
+          const runId = activeRunId
+          const runSessionKey = activeRunSessionKey
+          void (persistedRunReady ?? Promise.resolve())
+            .then(() => write(runSessionKey, runId))
+            .catch(() => null)
+        }
+
         const stream = new ReadableStream({
           async start(controller) {
-            let heartbeatTimer: ReturnType<typeof setInterval> | null = null
             let lastClientEventAt = Date.now()
             const enqueueRaw = (payload: string) => {
               if (streamClosed) return
@@ -440,7 +462,7 @@ export const Route = createFileRoute('/api/send-stream')({
             // lightweight recognized event periodically so public Workspace chats
             // do not sit at "Thinking…" until the frontend reports failure.
             enqueueRaw(`: ${' '.repeat(2048)}\n\n`)
-            heartbeatTimer = setInterval(() => {
+            keepaliveTimer = setInterval(() => {
               if (streamClosed) return
               if (Date.now() - lastClientEventAt < 10_000) return
               // Heartbeat to keep Cloudflare/Access from culling the SSE stream.
@@ -454,9 +476,13 @@ export const Route = createFileRoute('/api/send-stream')({
             closeStream = () => {
               if (streamClosed) return
               streamClosed = true
-              if (heartbeatTimer) {
-                clearInterval(heartbeatTimer)
-                heartbeatTimer = null
+              if (keepaliveTimer) {
+                clearInterval(keepaliveTimer)
+                keepaliveTimer = null
+              }
+              if (agentKeepaliveTimer) {
+                clearInterval(agentKeepaliveTimer)
+                agentKeepaliveTimer = null
               }
               if (unregisterTimer) {
                 clearTimeout(unregisterTimer)
@@ -465,10 +491,6 @@ export const Route = createFileRoute('/api/send-stream')({
               if (streamTimeoutTimer) {
                 clearTimeout(streamTimeoutTimer)
                 streamTimeoutTimer = null
-              }
-              if (heartbeatTimer) {
-                clearInterval(heartbeatTimer)
-                heartbeatTimer = null
               }
               if (activeRunId) {
                 unregisterActiveSendRun(activeRunId)
@@ -485,7 +507,7 @@ export const Route = createFileRoute('/api/send-stream')({
             // Keep the SSE stream alive during long agent processing (tool calls,
             // slow LLM responses on large contexts). Without this the client-side
             // no-activity timer fires after 2-3 min and aborts the stream.
-            heartbeatTimer = setInterval(() => {
+            agentKeepaliveTimer = setInterval(() => {
               sendEvent('heartbeat', { timestamp: Date.now() })
             }, 30_000)
 
@@ -501,17 +523,6 @@ export const Route = createFileRoute('/api/send-stream')({
                 sessionKey: runSessionKey,
                 friendlyId,
               }).catch(() => null)
-            }
-
-            const persistActiveRun = (
-              write: (sessionKey: string, runId: string) => Promise<unknown>,
-            ) => {
-              if (!activeRunId || !activeRunSessionKey) return
-              const runId = activeRunId
-              const runSessionKey = activeRunSessionKey
-              void (persistedRunReady ?? Promise.resolve())
-                .then(() => write(runSessionKey, runId))
-                .catch(() => null)
             }
 
             try {
@@ -1507,6 +1518,17 @@ export const Route = createFileRoute('/api/send-stream')({
             // stop enqueueing SSE chunks, but deliberately leave the upstream
             // abortController alone.
             streamClosed = true
+            // Tear down both keepalive intervals on cancel — previously they
+            // kept firing forever against a closed controller (no-ops, but
+            // wasted CPU/handles per disconnected client).
+            if (keepaliveTimer) {
+              clearInterval(keepaliveTimer)
+              keepaliveTimer = null
+            }
+            if (agentKeepaliveTimer) {
+              clearInterval(agentKeepaliveTimer)
+              agentKeepaliveTimer = null
+            }
             if (unregisterTimer) {
               clearTimeout(unregisterTimer)
               unregisterTimer = null

@@ -1,8 +1,36 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import * as yaml from 'yaml'
 import { z } from 'zod'
+import { writeTextAtomic } from './atomic-write'
 import { SWARM_CANONICAL_REPO } from './swarm-environment'
+import { resolveSwarmModelLabel } from './swarm-model-resolver'
+
+/**
+ * Set when readSwarmRoster() encounters a parse failure on disk. While
+ * true, writeSwarmRoster() refuses to overwrite the file — otherwise a
+ * single bad save would silently revert all customisations to the
+ * fallback. Reset on the next clean read.
+ */
+let lastReadFailed = false
+
+/**
+ * Validation for the `model:` field at write boundaries (POST / PATCH).
+ * Read-side schema stays permissive so legacy rosters with unknown labels
+ * never wedge a worker — only inbound user-supplied values are constrained.
+ *
+ * Allowed values: empty string, the literal default `'Worker'`, or any
+ * label that the resolver maps to a concrete provider/model. Anything
+ * else is rejected so a malicious PATCH cannot smuggle quotes, newlines,
+ * or shell metacharacters into downstream consumers.
+ */
+const ValidatedModelLabel = z
+  .string()
+  .max(120, 'model label too long')
+  .refine(
+    (v) => v === '' || v === 'Worker' || resolveSwarmModelLabel(v) !== null,
+    { message: 'unknown model label' },
+  )
 
 export const SWARM_ROSTER_PATH = join(SWARM_CANONICAL_REPO, 'swarm.yaml')
 
@@ -36,6 +64,7 @@ export type SwarmRoster = z.infer<typeof SwarmRosterSchema>
 
 export const SwarmRosterUpsertSchema = SwarmRosterWorkerSchema.extend({
   id: z.string().regex(/^swarm\d+$/i, 'worker id must look like swarm13'),
+  model: ValidatedModelLabel.default('Worker'),
 })
 
 export type SwarmRosterUpsert = z.infer<typeof SwarmRosterUpsertSchema>
@@ -80,12 +109,20 @@ export function fallbackRoster(ids: Array<string> = []): SwarmRoster {
       model: 'Worker',
       mission: 'Awaiting orchestrator dispatch.',
       skills: [],
+      capabilities: [],
+      preferredTaskTypes: [],
+      maxConcurrentTasks: 1,
+      acceptsBroadcast: true,
+      reviewRequired: false,
     })),
   }
 }
 
 export function readSwarmRoster(ids: Array<string> = []): SwarmRoster {
-  if (!existsSync(SWARM_ROSTER_PATH)) return fallbackRoster(ids)
+  if (!existsSync(SWARM_ROSTER_PATH)) {
+    lastReadFailed = false
+    return fallbackRoster(ids)
+  }
   try {
     const raw = yaml.parse(readFileSync(SWARM_ROSTER_PATH, 'utf-8')) as unknown
     const parsed = SwarmRosterSchema.parse(raw)
@@ -93,16 +130,37 @@ export function readSwarmRoster(ids: Array<string> = []): SwarmRoster {
     for (const fallback of fallbackRoster(ids).workers) {
       if (!byId.has(fallback.id)) byId.set(fallback.id, fallback)
     }
+    lastReadFailed = false
     return { version: parsed.version, workers: [...byId.values()] }
-  } catch {
+  } catch (err) {
+    // Surface the failure (used to be swallowed) so writeSwarmRoster can
+    // refuse to overwrite a file we can't parse — a single bad save was
+    // permanently wiping all per-worker customisations.
+    lastReadFailed = true
+    console.error(
+      `swarm-roster: failed to parse ${SWARM_ROSTER_PATH}, falling back to defaults but refusing to overwrite until cleared`,
+      err,
+    )
+    // Best-effort: snapshot the broken file so the operator can recover.
+    try {
+      const backup = `${SWARM_ROSTER_PATH}.broken-${Date.now()}`
+      writeTextAtomic(backup, readFileSync(SWARM_ROSTER_PATH, 'utf-8'))
+    } catch {
+      // ignore — backup is best-effort
+    }
     return fallbackRoster(ids)
   }
 }
 
 export function writeSwarmRoster(roster: SwarmRoster): void {
+  if (lastReadFailed) {
+    throw new Error(
+      'swarm-roster: refusing to overwrite an unparseable swarm.yaml — fix or remove the file first',
+    )
+  }
   const parsed = SwarmRosterSchema.parse(roster)
   const doc = yaml.stringify(parsed, { lineWidth: 0 })
-  writeFileSync(SWARM_ROSTER_PATH, doc)
+  writeTextAtomic(SWARM_ROSTER_PATH, doc)
 }
 
 export function upsertSwarmRosterWorker(input: SwarmRosterUpsert, ids: Array<string> = []): SwarmRoster {
@@ -131,7 +189,8 @@ export const SwarmRosterPatchSchema = z
   .object({
     id: z.string().regex(/^swarm\d+$/i, 'worker id must look like swarm13'),
   })
-  .merge(SwarmRosterWorkerSchema.partial().omit({ id: true }))
+  .merge(SwarmRosterWorkerSchema.partial().omit({ id: true, model: true }))
+  .extend({ model: ValidatedModelLabel.optional() })
 
 export type SwarmRosterPatch = z.infer<typeof SwarmRosterPatchSchema>
 

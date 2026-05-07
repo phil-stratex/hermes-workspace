@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { isAuthenticated } from '../../server/auth-middleware'
+import { requireJsonContentType } from '../../server/rate-limit'
 import { rosterByWorkerId } from '../../server/swarm-roster'
 import { resolveSwarmModelLabel } from '../../server/swarm-model-resolver'
 import { syncSwarmProfileModel } from '../../server/swarm-profile-config'
@@ -161,6 +162,8 @@ export const Route = createFileRoute('/api/swarm-tmux-start')({
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
 
         let body: StartRequest
         try {
@@ -192,9 +195,6 @@ export const Route = createFileRoute('/api/swarm-tmux-start')({
           const resolved = resolveSwarmModelLabel(roster?.model ?? null)
           const bootstrap = await ensureWorkerProfile(
             workerId,
-            resolved
-              ? { provider: resolved.provider, default: resolved.default }
-              : undefined,
             containerOverride,
           )
           if (!bootstrap.ok) {
@@ -204,6 +204,22 @@ export const Route = createFileRoute('/api/swarm-tmux-start')({
               },
               { status: 500 },
             )
+          }
+
+          // Sync the model section in the profile's config.yaml. The
+          // workspace container shares the /opt/data volume, so we can
+          // write the file directly here — no shell, no python, no escape
+          // problem. Best-effort: report the result in the response but
+          // never wedge the worker over a yaml mutation failure.
+          let modelSyncChanged = false
+          let modelSyncError: string | undefined
+          if (resolved) {
+            const sync = syncSwarmProfileModel(profilePath, resolved)
+            if (sync.ok) {
+              modelSyncChanged = sync.changed
+            } else {
+              modelSyncError = sync.error
+            }
           }
 
           // Idempotent: check existing session.
@@ -220,10 +236,11 @@ export const Route = createFileRoute('/api/swarm-tmux-start')({
               started: false,
               modelSync: {
                 attempted: Boolean(resolved),
-                changed: false,
+                changed: modelSyncChanged,
                 target: resolved
                   ? `${resolved.provider}/${resolved.default}`
                   : undefined,
+                error: modelSyncError,
               },
             })
           }
@@ -265,10 +282,11 @@ export const Route = createFileRoute('/api/swarm-tmux-start')({
             cwd: profilePath,
             modelSync: {
               attempted: Boolean(resolved),
-              changed: true,
+              changed: modelSyncChanged,
               target: resolved
                 ? `${resolved.provider}/${resolved.default}`
                 : undefined,
+              error: modelSyncError,
             },
           })
         }

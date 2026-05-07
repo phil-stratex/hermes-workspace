@@ -27,6 +27,24 @@ export type SwarmExecResult = {
   code: number
 }
 
+/** Cap stdout/stderr buffer per exec to prevent OOM from runaway output
+ * (large PDFs, infinite log loops). The hard kill happens once either
+ * stream exceeds this. */
+const MAX_STREAM_BYTES = 4 * 1024 * 1024
+
+/** Allowlist of env vars the docker `-e` flag may forward. Anything else
+ * stays in the workspace process and never lands on the docker argv —
+ * which would otherwise leak secrets to anyone running `ps auxe` on the
+ * host. Adjust deliberately. */
+const DOCKER_ENV_ALLOWLIST = new Set([
+  'HERMES_HOME',
+  'HERMES_CLI_BIN',
+  'HERMES_API_TOKEN',
+  'GH_TOKEN',
+  'GITHUB_TOKEN',
+  'OLLAMA_API_KEY',
+])
+
 /**
  * Run a command — locally if HERMES_VPS_CONTAINER is unset, or via
  * `docker exec <container> <cmd> <args...>` otherwise.
@@ -55,7 +73,9 @@ export function swarmExec(
     const dockerEnvArgs: Array<string> = []
     if (dockerMode && opts.env) {
       for (const [k, v] of Object.entries(opts.env)) {
-        if (typeof v === 'string') dockerEnvArgs.push('-e', `${k}=${v}`)
+        if (typeof v === 'string' && DOCKER_ENV_ALLOWLIST.has(k)) {
+          dockerEnvArgs.push('-e', `${k}=${v}`)
+        }
       }
     }
     const finalArgs = dockerMode
@@ -69,10 +89,27 @@ export function swarmExec(
     })
     let stdout = ''
     let stderr = ''
-    proc.stdout.on('data', (chunk) => {
+    let stdoutCapped = false
+    let stderrCapped = false
+    proc.stdout?.on('data', (chunk) => {
+      if (stdout.length >= MAX_STREAM_BYTES) {
+        if (!stdoutCapped) {
+          stdoutCapped = true
+          stderr += '\n[stdout exceeded cap, killing process]'
+          proc.kill('SIGKILL')
+        }
+        return
+      }
       stdout += chunk.toString()
     })
-    proc.stderr.on('data', (chunk) => {
+    proc.stderr?.on('data', (chunk) => {
+      if (stderr.length >= MAX_STREAM_BYTES) {
+        if (!stderrCapped) {
+          stderrCapped = true
+          proc.kill('SIGKILL')
+        }
+        return
+      }
       stderr += chunk.toString()
     })
     if (opts.input != null && proc.stdin) {
@@ -112,10 +149,14 @@ export const VPS_PROFILES_DIR = '/opt/data/profiles'
 /**
  * Bootstrap a worker profile dir with a minimal config.yaml derived from
  * the global one. Idempotent — does nothing if the profile already exists.
+ *
+ * Model selection is **not** applied here. The shared /opt/data volume
+ * is also visible to the workspace container, so callers should follow
+ * up with `syncSwarmProfileModel(profilePath, resolved)` from
+ * `swarm-profile-config.ts` — pure TS yaml mutation, no shell.
  */
 export async function ensureWorkerProfile(
   workerId: string,
-  modelOverride?: { provider: string; default: string },
   container?: string,
 ): Promise<SwarmExecResult> {
   if (!useDockerExec() && !container) {
@@ -131,17 +172,6 @@ export async function ensureWorkerProfile(
     `[ -f '${profilePath}/.env' ] || cp /opt/data/.env '${profilePath}/.env' 2>/dev/null || true`,
     // sessions/skills/memories dirs.
     `mkdir -p '${profilePath}/sessions' '${profilePath}/memories' '${profilePath}/skills'`,
-    modelOverride
-      ? `python3 -c "
-import re
-p='${profilePath}/config.yaml'
-t=open(p).read()
-t=re.sub(r'^(model:\\n  default: ).+', lambda m: m.group(1)+'${modelOverride.default}', t, count=1, flags=re.M)
-t=re.sub(r'^(model:\\n  default: .+\\n  provider: ).+', lambda m: m.group(1)+'${modelOverride.provider}', t, count=1, flags=re.M)
-open(p,'w').write(t)"`
-      : ``,
-  ]
-    .filter(Boolean)
-    .join(' && ')
+  ].join(' && ')
   return swarmExec('sh', ['-c', script], { timeoutMs: 8_000, container })
 }

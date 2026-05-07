@@ -125,15 +125,19 @@ async function extractPdfTextViaDockerExec(buf: Buffer): Promise<{
   const tmpPath = path.join(tmpDir, `${randomUUID()}.pdf`)
   fs.writeFileSync(tmpPath, buf)
   try {
+    // Pass the PDF path via argv (sys.argv[1]) instead of f-string
+    // interpolation. tmpPath is currently UUID-derived and safe, but
+    // argv-passing closes the entire shell/python interpolation class
+    // so future callers can't accidentally re-introduce an injection.
     const script = `
 import sys, pymupdf
-doc = pymupdf.open('${tmpPath}')
+doc = pymupdf.open(sys.argv[1])
 out = []
 for page in doc:
     out.append(page.get_text())
 sys.stdout.write('\\n\\n'.join(out))
 `.trim()
-    const result = await swarmExec('python3', ['-c', script], {
+    const result = await swarmExec('python3', ['-c', script, tmpPath], {
       timeoutMs: 30_000,
     })
     if (!result.ok) {

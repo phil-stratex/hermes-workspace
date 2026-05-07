@@ -80,4 +80,33 @@ describe('resolveSwarmModelLabel', () => {
     expect(resolveSwarmModelLabel('Unknown 9000')).toBeNull()
     expect(resolveSwarmModelLabel('typo opus')).toBeNull()
   })
+
+  it('rejects shell/python metacharacters in slash-form ids', () => {
+    // Defence-in-depth: even though the resolver only feeds yaml writes
+    // today, an unconstrained slash regex would let a roster PATCH smuggle
+    // newlines / quotes / shell ops downstream.
+    expect(resolveSwarmModelLabel("evil/x'); os.system('id'); #")).toBeNull()
+    expect(resolveSwarmModelLabel('evil/a"b')).toBeNull()
+    expect(resolveSwarmModelLabel('evil/a\nb')).toBeNull()
+    expect(resolveSwarmModelLabel('evil/a;b')).toBeNull()
+    expect(resolveSwarmModelLabel('evil/$(whoami)')).toBeNull()
+    expect(resolveSwarmModelLabel('../../etc/passwd')).toBeNull()
+    expect(resolveSwarmModelLabel('UPPER/foo')).toBeNull() // provider must be lowercase-first
+  })
+
+  it('accepts the 6 Ollama Cloud bare ids', () => {
+    for (const id of [
+      'kimi-k2.6',
+      'deepseek-v4-pro',
+      'qwen3.5:397b',
+      'qwen3-coder:480b',
+      'glm-5.1',
+      'deepseek-v4-flash',
+    ]) {
+      expect(resolveSwarmModelLabel(id)).toEqual({
+        provider: 'ollama-cloud',
+        default: id,
+      })
+    }
+  })
 })
