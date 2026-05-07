@@ -1,79 +1,74 @@
 version: 1
 workers:
-  - id: swarm6
-    name: Reviewer
-    role: Reviewer / Merge Gate
-    specialty: code review, regression detection, test coverage, merge readiness
-    model: Opus 4.7
-    mission: Catch breakage before it reaches Eric. Be the final quality gate.
-    skills:
-      - swarm-pr-worker
-      - swarm-worker-core
-    capabilities:
-      - code-review
-      - regression-analysis
-      - test-planning
-      - quality-gate
-      - merge-readiness
-    preferredTaskTypes:
-      - review
-      - qa
-      - regression
-      - verification
-      - merge-gate
-    reviewRequired: false
-    maxConcurrentTasks: 1
-    acceptsBroadcast: true
-  - id: swarm12
-    name: Triage
-    role: PR / Issues Primary
-    specialty: GitHub triage, issue reproduction, PR review prep, focused fixes
-    model: GPT-5.5
-    mission: Turn repo issues and review feedback into reproductions, plans, and tested PRs.
+  - id: swarm1
+    name: Overflow
+    role: PR / Issues Overflow / Clawsuite (offline for now)
+    specialty: parked broken lane, keep out of rotation until worker runtime is repaired
+    model: deepseek-v4-flash
+    mission: Stay out of active rotation until the swarm1 worker runtime is repaired, then absorb overflow from PR/issues lanes and cover Clawsuite.
     skills:
       - swarm-pr-worker
       - swarm-worker-core
     capabilities:
       - github-triage
+      - small-patches
       - issue-reproduction
-      - pr-patching
-      - review-feedback
-      - gh-cli
+      - clawsuite
     preferredTaskTypes:
       - pr
       - issue
-      - bugfix
-      - github
-      - triage
+      - small-fix
+      - clawsuite
     maxConcurrentTasks: 1
-    acceptsBroadcast: true
-  - id: swarm5
-    name: Builder
-    role: Primary Builder
-    specialty: full-stack implementation across Hermes Workspace and Swarm2
-    model: GPT-5.5
-    mission: Ship focused product slices with tests and clean diffs.
+    acceptsBroadcast: false
+    reviewRequired: false
+  - id: swarm2
+    name: Foundation
+    role: Backend Foundation / Runtime Contracts
+    specialty: ClaudeSwarm runtime contracts, API design, plugin foundations, state
+    model: deepseek-v4-pro
+    mission: Build the backend substrate that keeps swarm state, dispatch, sessions, and plugins coherent.
     skills:
-      - swarm-ui-worker
+      - swarm-dev-runtime
       - swarm-worker-core
     capabilities:
-      - code-editing
-      - ui-implementation
-      - full-stack-integration
-      - build-verification
+      - api-design
+      - runtime-contracts
+      - plugin-foundation
+      - state-management
     preferredTaskTypes:
-      - implementation
-      - ui
-      - frontend
-      - integration
-      - feature
+      - backend
+      - runtime
+      - api
+      - infrastructure
     maxConcurrentTasks: 1
     acceptsBroadcast: true
+    reviewRequired: false
+  - id: swarm3
+    name: Mirror
+    role: Swarm Control Plane / Main-Session Mirror
+    specialty: control-plane state, card parity, main-agent continuity
+    model: kimi-k2.6
+    mission: Keep the swarm control plane operationally useful and visually canonical.
+    skills:
+      - swarm-orchestrator
+      - swarm-worker-core
+    capabilities:
+      - orchestration
+      - main-session-continuity
+      - control-plane-state
+    preferredTaskTypes:
+      - orchestration
+      - coordination
+      - handoff
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    reviewRequired: false
   - id: swarm4
     name: Sage
     role: Research / AI Intelligence / X Content
     specialty: AI/model/runtime research, technical synthesis, X post drafting
-    model: GPT-5.5
+    model: kimi-k2.6
     mission: Produce decision-grade research and copy so builders and Eric stay unblocked.
     skills:
       - swarm-worker-core
@@ -91,11 +86,127 @@ workers:
       - x-post
     maxConcurrentTasks: 1
     acceptsBroadcast: true
+    reviewRequired: false
+  - id: swarm5
+    name: Builder
+    role: Primary Builder
+    specialty: full-stack implementation across Hermes Workspace and Swarm2
+    model: qwen3-coder:480b
+    mission: Ship focused product slices with tests and clean diffs.
+    skills:
+      - swarm-ui-worker
+      - swarm-worker-core
+    capabilities:
+      - code-editing
+      - ui-implementation
+      - full-stack-integration
+      - build-verification
+    preferredTaskTypes:
+      - implementation
+      - ui
+      - frontend
+      - integration
+      - feature
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    reviewRequired: false
+  - id: swarm6
+    name: Reviewer
+    role: Reviewer / Merge Gate
+    specialty: code review, regression detection, test coverage, merge readiness
+    model: kimi-k2.6
+    mission: Catch breakage before it reaches Eric. Be the final quality gate.
+    skills:
+      - swarm-pr-worker
+      - swarm-worker-core
+    capabilities:
+      - code-review
+      - regression-analysis
+      - test-planning
+      - quality-gate
+      - merge-readiness
+    preferredTaskTypes:
+      - review
+      - qa
+      - regression
+      - verification
+      - merge-gate
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    reviewRequired: false
+  - id: swarm7
+    name: Scribe
+    role: Docs / Specs / Handoffs / Memory Hygiene
+    specialty: handoffs, specs, README/docs, skill documentation, memory curation
+    model: glm-5.1
+    mission: Preserve context and make the swarm understandable across sessions.
+    skills:
+      - swarm-worker-core
+    capabilities:
+      - documentation
+      - handoffs
+      - spec-writing
+      - runbooks
+      - memory-curation
+    preferredTaskTypes:
+      - docs
+      - handoff
+      - spec
+      - runbook
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    reviewRequired: false
+  - id: swarm8
+    name: Watch
+    role: Ops / Health / Lifecycle
+    specialty: gateway health, cron, runtime/process status, lifecycle sweeps
+    model: deepseek-v4-pro
+    mission: Keep the local swarm/gateway environment stable and observable.
+    skills:
+      - swarm-dev-runtime
+      - swarm-worker-core
+    capabilities:
+      - ops-health
+      - gateway-status
+      - runtime-monitoring
+      - cron
+      - lifecycle-sweep
+    preferredTaskTypes:
+      - ops
+      - health
+      - monitoring
+      - lifecycle
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    reviewRequired: false
+  - id: swarm9
+    name: Lab
+    role: PC1 Experiments / Local-Model R&D / BenchLoop
+    specialty: PC1 experiments, local model testing, model runtime comparisons
+    model: qwen3.5:397b
+    mission: Explore fast without destabilizing canonical paths.
+    skills:
+      - swarm-ui-worker
+      - swarm-worker-core
+    capabilities:
+      - prototype
+      - experiment
+      - local-model
+      - benchmark-experiment
+      - rapid-build
+    preferredTaskTypes:
+      - prototype
+      - experiment
+      - hackathon
+      - benchmark
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    reviewRequired: false
   - id: swarm10
     name: Sidekick
     role: Secondary Builder / Fast Patch Lane
     specialty: parallel implementation slices, refactors, focused bug fixes
-    model: GPT-5.5
+    model: glm-5.1
     mission: Take decomposed tasks and produce clean patches quickly.
     skills:
       - swarm-ui-worker
@@ -114,116 +225,12 @@ workers:
       - patch
     maxConcurrentTasks: 1
     acceptsBroadcast: true
-  - id: swarm2
-    name: Foundation
-    role: Backend Foundation / Runtime Contracts
-    specialty: ClaudeSwarm runtime contracts, API design, plugin foundations, state
-    model: GPT-5.4
-    mission: Build the backend substrate that keeps swarm state, dispatch, sessions, and plugins coherent.
-    skills:
-      - swarm-dev-runtime
-      - swarm-worker-core
-    capabilities:
-      - api-design
-      - runtime-contracts
-      - plugin-foundation
-      - state-management
-    preferredTaskTypes:
-      - backend
-      - runtime
-      - api
-      - infrastructure
-    maxConcurrentTasks: 1
-    acceptsBroadcast: true
-  - id: swarm3
-    name: Mirror
-    role: Swarm Control Plane / Main-Session Mirror
-    specialty: control-plane state, card parity, main-agent continuity
-    model: GPT-5.4
-    mission: Keep the swarm control plane operationally useful and visually canonical.
-    skills:
-      - swarm-orchestrator
-      - swarm-worker-core
-    capabilities:
-      - orchestration
-      - main-session-continuity
-      - control-plane-state
-    preferredTaskTypes:
-      - orchestration
-      - coordination
-      - handoff
-    maxConcurrentTasks: 1
-    acceptsBroadcast: true
-  - id: swarm8
-    name: Watch
-    role: Ops / Health / Lifecycle
-    specialty: gateway health, cron, runtime/process status, lifecycle sweeps
-    model: GPT-5.4
-    mission: Keep the local swarm/gateway environment stable and observable.
-    skills:
-      - swarm-dev-runtime
-      - swarm-worker-core
-    capabilities:
-      - ops-health
-      - gateway-status
-      - runtime-monitoring
-      - cron
-      - lifecycle-sweep
-    preferredTaskTypes:
-      - ops
-      - health
-      - monitoring
-      - lifecycle
-    maxConcurrentTasks: 1
-    acceptsBroadcast: true
-  - id: swarm7
-    name: Scribe
-    role: Docs / Specs / Handoffs / Memory Hygiene
-    specialty: handoffs, specs, README/docs, skill documentation, memory curation
-    model: GPT-5.5
-    mission: Preserve context and make the swarm understandable across sessions.
-    skills:
-      - swarm-worker-core
-    capabilities:
-      - documentation
-      - handoffs
-      - spec-writing
-      - runbooks
-      - memory-curation
-    preferredTaskTypes:
-      - docs
-      - handoff
-      - spec
-      - runbook
-    maxConcurrentTasks: 1
-    acceptsBroadcast: true
-  - id: swarm9
-    name: Lab
-    role: PC1 Experiments / Local-Model R&D / BenchLoop
-    specialty: PC1 experiments, local model testing, model runtime comparisons
-    model: GPT-5.5
-    mission: Explore fast without destabilizing canonical paths.
-    skills:
-      - swarm-ui-worker
-      - swarm-worker-core
-    capabilities:
-      - prototype
-      - experiment
-      - local-model
-      - benchmark-experiment
-      - rapid-build
-    preferredTaskTypes:
-      - prototype
-      - experiment
-      - hackathon
-      - benchmark
-    maxConcurrentTasks: 1
-    acceptsBroadcast: true
+    reviewRequired: false
   - id: swarm11
     name: QA
     role: Secondary QA / Reviewer Support
     specialty: secondary review, smoke verification, expected-vs-actual checks
-    model: GPT-5.4
+    model: kimi-k2.6
     mission: Review parallel outputs and protect quality gates.
     skills:
       - swarm-pr-worker
@@ -240,24 +247,28 @@ workers:
       - smoke
     maxConcurrentTasks: 1
     acceptsBroadcast: true
-  - id: swarm1
-    name: Overflow
-    role: PR / Issues Overflow / Clawsuite (offline for now)
-    specialty: parked broken lane, keep out of rotation until worker runtime is repaired
-    model: GPT-5.5
-    mission: Stay out of active rotation until the swarm1 worker runtime is repaired, then absorb overflow from PR/issues lanes and cover Clawsuite.
+    reviewRequired: false
+  - id: swarm12
+    name: Triage
+    role: PR / Issues Primary
+    specialty: GitHub triage, issue reproduction, PR review prep, focused fixes
+    model: glm-5.1
+    mission: Turn repo issues and review feedback into reproductions, plans, and tested PRs.
     skills:
       - swarm-pr-worker
       - swarm-worker-core
     capabilities:
       - github-triage
-      - small-patches
       - issue-reproduction
-      - clawsuite
+      - pr-patching
+      - review-feedback
+      - gh-cli
     preferredTaskTypes:
       - pr
       - issue
-      - small-fix
-      - clawsuite
+      - bugfix
+      - github
+      - triage
     maxConcurrentTasks: 1
-    acceptsBroadcast: false
+    acceptsBroadcast: true
+    reviewRequired: false
