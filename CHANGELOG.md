@@ -5,6 +5,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — Federation UI: FederationTab, AddPeerWizard, SyncWizard (Phase B.3, 2026-05-09)
+
+Letzter Block der Federation-Schicht — die UI auf den B.1/B.2-Backend. Gibt Phil + Admins eine geführte 4-Schritt-Wizard zum Hinzufügen eines Peers (inkl. SSH-Keypair-Generation und der exakten `authorized_keys`-Zeile zum Kopieren) und einen 3-Schritt-Sync-Wizard mit **Pflicht-Diff-Preview** vor jedem Apply.
+
+**Neue UI-Komponenten (3)**
+- **`src/screens/workspace-settings/federation-tab.tsx`** — 5. Tab im WorkspaceSettings (`general` | `members` | `roster` | **`federation`** | `audit`). Listet alle Peers mit Status-Badges (`● connected`, `○ disconnected`, `⊘ error`), Host/User/Port, Remote-WS-ID, Synct-Types, letzten Sync-Stand (`12 in / 8 out / 0 conflicts` Style). Pro Peer: Aktionsmenü `Verbinden / Sync starten / Disconnect / Peer löschen`. Empty-State mit Aufforderung zum Hinzufügen wenn keine Peers existieren.
+- **`src/screens/workspace-settings/federation/add-peer-wizard.tsx`** — 4-Step-Modal:
+  - **Step 1**: Anzeigename + Host + SSH-User + SSH-Port + Container-Name auf Peer
+  - **Step 2**: Erklärung zur `command="..."`-Restriction (Plan F4) — warum sie wichtig ist
+  - **Step 4** (vor 3): Remote-Workspace-ID + Sync-Types-Auswahl (Memories / Skills / Shared Sessions / Council / Audit / Roster) + Notes. Slug-Validation mirror serverseitiger Regel.
+  - **Step 3** (Result): zeigt die **EXAKTE `authorized_keys`-Zeile** mit `command="docker exec -i <container> tsx /app/scripts/mcp-federation-stdio.ts --workspace-id <wsId>",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty <ssh-key>` zum Kopieren. Operator pasted das auf seinem VPS — KEIN nackter Public-Key. Inline-Step-Indicator (4-Bar-Progress).
+- **`src/screens/workspace-settings/federation/sync-wizard.tsx`** — 3-Step-Modal mit **Pflicht-Diff-Preview**:
+  - **Step 1 (Connect)**: spinner während `POST /connect/<peerId>` + automatisches `POST /diff/<peerId>`. Bei Failure: Error-Box mit `reason` + `details` (z. B. `unrestricted` falls `command="..."` fehlt).
+  - **Step 2 (Diff-Preview, Pflicht)**: drei Sektionen — **Ankommend** (mit Checkbox-Selektion pro Path), **Ausgehend** (read-only, info), **Konflikte** mit 3-Optionen-Auflösung pro Path (`Lokal behalten` / `Remote übernehmen` / `Manuell` als TBD-Stub). **Mass-Delete-Warning** als prominenter roter Banner mit Akzeptanz-Checkbox wenn `>50` ODER `>30%` Tombstones (Plan B.5). Apply-Button bleibt **disabled** bis (a) alle Konflikte aufgelöst sind UND (b) Mass-Delete-Warning bestätigt ist.
+  - **Step 3 (Apply-Result)**: grüner Erfolgs-Box mit `applied.{add,update,delete}` + `conflictsResolved` Counts. Wenn Items skipped wurden: gelber Box mit den ersten 8 Skipped-Paths + Reason. Tunnel wird automatisch geschlossen (auto-disconnect nach Apply, ein Sync = ein-Shot).
+
+**Integration**
+- `WorkspaceSettings`-Tab-Liste erweitert: `general` → `members` → `roster` → **`federation`** → `audit`. Settings-Screen-Layout unverändert; das neue Tab kommt automatisch via die `TABS`-Konstante.
+- `workspace.$id.settings.$tab.tsx` Switch ergänzt: `case 'federation': return <WorkspaceFederationTab />`.
+- Alle 3 UI-Komponenten nutzen den existierenden `claude-nous`-Theme (gleiche Card/Modal/Button-Styles wie der Members- und Audit-Tab) — keine neuen Style-Tokens nötig.
+
+**Verifikation (harte Zahlen)**
+- **Phase A + B Suite gesamt:** **359 / 359** Cases in **25 Test-Files** (11.15 s). Phase B.3 ist UI-only — keine neuen Test-Files, aber alle bestehenden Tests bleiben grün.
+- **Typecheck:** keine neuen Fehler in B.3-Files.
+- **Build:** `pnpm build` durchgelaufen in 10.66 s, **`/workspace/$id/settings/$tab`** Route erfasst die neue Tab-Variante automatisch (kein neues TanStack-Route-File nötig).
+- **Diff:** 4 files added/modified, +1042 LOC.
+
+**Federation-Schicht damit komplett.** Operator-Workflow von Anfang bis Ende:
+1. Workspace-Owner öffnet `/workspace/<wsId>/settings/federation`
+2. Klickt **+ Peer hinzufügen**, durchläuft den 4-Schritt-Wizard, kopiert die `authorized_keys`-Zeile
+3. Peer-Admin pasted die Zeile auf seinem VPS in `~/.ssh/authorized_keys`
+4. Workspace-Owner klickt **Verbinden** — der Probe-Test prüft die `command="..."`-Restriction (refused unrestricted Shell)
+5. Bei `connected`: klickt **Sync starten** → 3-Schritt-Wizard mit Pflicht-Diff-Preview, Mass-Delete-Schutz, Konflikt-Auflösung
+6. Apply schreibt die ausgewählten Items in `data/workspaces/<wsId>/...` mit Hardcoded-Deny-Filter (Plan B.5), aktualisiert die Baseline für die nächste AK28-Time-Skew-robuste Conflict-Detection
+7. Tunnel wird automatisch geschlossen, alle Lifecycle-Events landen in der Hash-Chain-Audit (Plan F10)
+
 ### Added — Federation Sync-Engine, Audit, API-Routes (Phase B.2, 2026-05-09)
 
 Diff-Engine, Hash-Chain Audit-Helper, **7 neue API-Routes** für die komplette Federation-Lifecycle (Add Peer → Connect → Diff → Apply → Disconnect → Audit). Adressiert Plan-Findings AK28 (Time-Skew-robuste Conflict-Detection via SHA256+Baseline statt Wall-Clock), B.5 (Mass-Delete-Detection + Hardcoded-Deny-Filter beim Apply), F10 (Hash-Chain-Validation auf der Audit-Read-Seite).

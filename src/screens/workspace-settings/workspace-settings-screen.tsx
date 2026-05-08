@@ -8,6 +8,7 @@ const TABS: ReadonlyArray<{ id: string; label: string }> = [
   { id: 'general', label: 'General' },
   { id: 'members', label: 'Members' },
   { id: 'roster', label: 'Roster' },
+  { id: 'federation', label: 'Federation' },
   { id: 'audit', label: 'Audit Log' },
 ]
 
