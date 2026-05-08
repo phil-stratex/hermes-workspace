@@ -5,6 +5,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — Error-Tracking & Trouble-Shooting-Center (2026-05-09)
+
+Neuer globaler Error-Log-Stack mit UI-Viewer, Live-Tail, Frontend-Capture und Builder-Brief-Export. Stack-Admin-only via Auto-Detect (Pre-Migration: jeder authentifizierte User; Post-Migration: nur User in `data/global/settings.json#stackAdmins`). PII-Redaction by default.
+
+- **Strukturierter Logger** (`src/server/logger.ts`) — schreibt parallel nach stdout (für `docker logs`) und JSONL (`data/global/errors/<YYYY-MM-DD>.jsonl`) mit Hash-Chain (`prevHash` ↔ `thisHash`, schemaVersion 1, analog zu `audit-log.ts`). Auto-Pull `requestId` / `userId` / `workspaceId` / `route` aus `AsyncLocalStorage` via neuem `request-context.ts`.
+- **Auto-Redaction** (`src/server/error-redact.ts`) — Cookies, `Authorization`, `x-api-key`, `password`/`token`/`secret` Field-Names, JWT-Pattern (`eyJ…`), bcrypt (`$2[aby]$…`), Postgres-DSN, beliebige 32+-Zeichen-Alnum-Tokens. Stack-Trim auf 4 KB top + 4 KB tail mit Marker. **N4** Rekursions-Guard: depth-Limit 10 + WeakSet gegen Circular-Refs.
+- **Error-Store** (`src/server/error-store.ts`) — `appendErrorEntry` mit Auto-Dedup: identische Errors innerhalb 60 s kollabieren in einen Eintrag mit `occurrences++`. **N1** zusätzliches Field `lastOccurrenceAt` für die UI-Anzeige "erste 3h vor / letzte 5min vor / 247×". Hash-Chain bleibt nach Dedup-Rewrite gültig (Tail-Recompute ohne Cascade). `listErrors`/`getErrorById`/`findRelatedByRequestId`/`getHealthSummary`/`validateChain`.
+- **Retention-Cron** (`src/server/error-retention.ts`) — täglich 03:30 UTC löscht Files älter als `errors.retentionDays` (Default 30) aus `data/global/settings.json`. **I1** race-safe: jeder `unlinkSync` läuft im selben `withMutex(\`errors:\${date}\`)` wie `appendErrorEntry`, damit Retention nicht mit einem konkurrierenden Append kollidiert.
+- **`error-acl.ts`** — Auto-Detect-Modus über `isMultiTenantAuthEnabled()`. `requireStackAdmin(req)` als zentraler Gate-Helper im Stil von `requirePermission` aus `auth-middleware.ts`.
+- **`global-settings.ts`** — neuer mtime-cached Reader/Writer für `data/global/settings.json`. Schema-versioned, mit `withMutex('global-settings')`-serialisierten Writes und Audit-Events bei jedem Stack-Admin-Add/Remove. Lockout-Schutz beim letzten Stack-Admin.
+- **Bootstrap** (`src/server/stack-admin-bootstrap.ts` + `boot-state-check.ts:runStartupTasks()`) — bei Multi-Tenant + leerer Stack-Admin-Liste promoted das System einmalig den ältesten Workspace-Owner zum Stack-Admin (Audit-Event `stack_admin_added` mit `addedVia:'bootstrap'`). Verhindert Lockouts bei bereits-migrierten Stacks ohne manuellen CLI-Add.
+- **CLI-Trio** unter `scripts/admin/` — `add-stack-admin.ts` / `remove-stack-admin.ts` / `list-stack-admins.ts`. Idempotent, mit User-Existence-Check und `_audit.ts`-basiertem Audit-Trail. Aufruf via `docker exec ... npx tsx scripts/admin/<name>.ts <userId>`.
+- **`/errors`-UI** mit Filter-Bar (Severity, Source, Search, includeTest-Toggle), Health-Badge (🟢/🟡/🔴 nach Fatal/Error-Count letzte Stunde) und Multi-Select für Builder-Brief-Export. Sidebar-Eintrag conditional-rendered via `useCanSeeErrors()` Hook (TanStack Query an `/api/errors/health` mit `staleTime: 60_000`). **Default-Filter** blendet `source: 'test'` aus.
+- **`/errors/$id`-Detail-Screen** mit Stack, Context, Browser-Info und Related-Logs-Timeline (alle Einträge derselben `requestId` ±5 s).
+- **Builder-Brief-Modal** — Markdown-Preview + 📋 Clipboard-Copy + 💾 `.md`-Download. Multi-Select erzeugt ein Briefing mit Summary-Header (Counts, Span, Top-Source, betroffene Workspaces/Users) und per-Error-Sektionen (ID, When, Severity, Stack redacted, Context, Related Logs, Browser, heuristisch erkannte involved Files).
+- **Frontend-Capture** — bestehende `ErrorBoundary` (`src/components/error-boundary.tsx`) erweitert um POST an `/api/errors/client`. Production-Build zeigt nur die Report-ID, kein Stack. Dev behält Stack im UI. Plus `src/lib/client-error-reporter.ts` mit `window.error` + `unhandledrejection` Listenern und `trackedFetch`-Wrapper. Token-Bucket-Rate-Limit 10 Errors/min/Tab — die 11. wird client-side gedroppt.
+- **`POST /api/errors/client`** — jeder authentifizierte User (nicht nur Stack-Admin) darf eigene Frontend-Errors melden. `source` ist server-side hardcoded auf `'frontend'` (anti-spoof). Stack-Truncation und Auto-Redaction wie Backend-Pfad.
+- **SSE Live-Tail** unter `GET /api/errors/stream` — Heartbeat-Comment alle 30 s, Auto-Disconnect nach 30 min Idle, Filter via Query-Parameter (`?level=fatal,error&source=backend`). In-Process Pub/Sub via `error-events.ts` mit Cap auf 20 Subscribers.
+- **NotificationBell** (`src/components/notification-bell.tsx`) — Multi-Tenant-only Header-Button mit unread-Counter (Fatal+Error, 24h), Dropdown mit Top-5 + "Alle ansehen". Persistierung via `data/users/<id>/preferences.json` (neue `user-preferences.ts` Helper + `PATCH /api/users/me/preferences` Endpoint). **N3** `staleTime: 60_000` matcht die Sidebar-Visibility-Probe — beide Queries deduplizieren auf demselben Key.
+- **`/api/test-error`** — manueller Smoke-Trigger für die Live-Tail-UI. Disabled in Production (es sei denn `HERMES_ENABLE_TEST_ERROR_ENDPOINT=1`), Stack-Admin-only auch in Dev (Defense-in-Depth), Per-User-Rate-Limit 30/min. Einträge mit `source: 'test'` markiert und im Default-Filter ausgeblendet.
+- **Hermes-Hook-Wave 1** — `chat-event-bus.ts` (Subscriber-Cap), `gateway-capabilities.ts` (override-write-fail, gateway-unreachable), `auth-middleware.ts:loginWithEmailPassword` (Failed-Login zusätzlich zum bestehenden Audit-Channel — `logger.warn` mit IP, UA und reason — plus Lockout-Trigger), `send-stream.ts` Main-Catch + **N2** SSE-Stuck-Watchdog (`setTimeout(30 s)` reset bei jedem `controller.enqueue`; warn-Log wenn Stream silent für >30 s, ohne Auto-Close).
+
+### Changed
+- **`src/routes/__root.tsx`** initialisiert beim Boot `installClientErrorReporter()` und teardown'd im Effect-Cleanup.
+- **`src/components/error-boundary.tsx`** ruft `reportClientError({ message, stack, context })` und zeigt die Server-Report-ID im Fallback.
+- **`src/server/chat-event-bus.ts:69`** nutzt `logger.warn` statt `console.warn` für die Subscriber-Cap-Warnung.
+
+### Hooks deferred — second wave (kein Blocker)
+- `federation-sync-engine.ts` / `federation-tunnel.ts` / `federation-mcp-client.ts` — Sync-Errors / SSH-Tunnel-Fails / MCP-Connection-Drops
+- `migration-symlink-reconcile.ts` — Boot-time Reconcile-Fails
+- `swarm-tmux-*.ts` Worker-Crash via 60 s Health-Probe
+- `swarm-docker-exec.ts` Spawn-Errors
+- `atomic-write.ts` Write-Fail (caller-loggt heute schon)
+
+Diese können in einem Folge-Patch ergänzt werden. Pattern ist überall identisch: `logger.error(msg, { source, ...ctx }, err)` neben dem bestehenden Catch.
+
+### Tests
+- **113 neue Vitest-Cases** in `request-context.test.ts` (5), `error-redact.test.ts` (27 incl. **N4** Recursion-Tests), `error-acl.test.ts` (12, alle drei Auto-Detect-Fixtures), `global-settings.test.ts` (16, incl. 50 parallele `addStackAdmin`), `logger.test.ts` (10), `error-store.test.ts` (25, incl. **N1** Dedup mit `lastOccurrenceAt`, Hash-Chain-Validation, Tampering-Detection), `error-retention.test.ts` (6, incl. **I1** Per-Date-Mutex-Race-Test), `builder-brief.test.ts` (7), `stack-admin-bootstrap.test.ts` (5).
+
 ### Changed — Login akzeptiert User-ID-Slug zusätzlich zur Email (2026-05-09)
 
 Quality-of-life nach der ersten Production-Migration: bei `phil@stratex-ai.com` als Email reicht es jetzt auch nur `phil` einzutippen.

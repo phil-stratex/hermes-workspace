@@ -1,3 +1,4 @@
+import { logger } from './logger'
 import { hasActiveSendRun } from './send-run-tracker'
 
 export interface ChatSSEEvent {
@@ -66,9 +67,11 @@ export function subscribeToChatEvents(
   const bus = getBus()
 
   if (bus.subscribers.size >= MAX_SUBSCRIBERS) {
-    console.warn(
-      `[chat-event-bus] subscriber cap reached (${MAX_SUBSCRIBERS}); rejecting new subscription`,
-    )
+    logger.warn('chat-event-bus subscriber cap reached', {
+      source: 'backend',
+      cap: MAX_SUBSCRIBERS,
+      sessionKeyFilter,
+    })
     return () => {}
   }
 

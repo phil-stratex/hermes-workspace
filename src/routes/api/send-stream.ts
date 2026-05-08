@@ -19,6 +19,7 @@ import {
 } from '../../server/sessions-privacy'
 import { requireJsonContentType } from '../../server/rate-limit'
 import { publishChatEvent } from '../../server/chat-event-bus'
+import { logger } from '../../server/logger'
 import { loadWorkspaceCatalog } from './workspace'
 import {
   registerActiveSendRun,
@@ -619,12 +620,40 @@ export const Route = createFileRoute('/api/send-stream')({
             .catch(() => null)
         }
 
+        // N2 — SSE-Stuck-Watchdog. setTimeout(30s) reset on every enqueue.
+        // If it fires, the controller has gone silent (broken pipe, dead
+        // generator loop, ...). Stream is NOT auto-closed — operator
+        // decides via UI; but the warn entry in the error-log makes the
+        // condition discoverable instead of requiring `docker logs` grep.
+        let stuckTimer: ReturnType<typeof setTimeout> | null = null
+        const STUCK_THRESHOLD_MS = 30_000
+        const resetStuckWatchdog = (): void => {
+          if (stuckTimer) clearTimeout(stuckTimer)
+          stuckTimer = setTimeout(() => {
+            if (streamClosed) return
+            logger.warn('send-stream stuck (no enqueue for >30s)', {
+              source: 'backend',
+              sessionKey,
+              runId: activeRunId,
+              durationMs: STUCK_THRESHOLD_MS,
+            })
+          }, STUCK_THRESHOLD_MS)
+        }
+        const clearStuckWatchdog = (): void => {
+          if (stuckTimer) {
+            clearTimeout(stuckTimer)
+            stuckTimer = null
+          }
+        }
+
         const stream = new ReadableStream({
           async start(controller) {
             let lastClientEventAt = Date.now()
+            resetStuckWatchdog()
             const enqueueRaw = (payload: string) => {
               if (streamClosed) return
               controller.enqueue(encoder.encode(payload))
+              resetStuckWatchdog()
             }
             const sendEvent = (event: string, data: unknown) => {
               if (streamClosed) return
@@ -653,6 +682,7 @@ export const Route = createFileRoute('/api/send-stream')({
             closeStream = () => {
               if (streamClosed) return
               streamClosed = true
+              clearStuckWatchdog()
               if (keepaliveTimer) {
                 clearInterval(keepaliveTimer)
                 keepaliveTimer = null
@@ -1721,6 +1751,19 @@ export const Route = createFileRoute('/api/send-stream')({
                 }
               }, SEND_STREAM_RUN_TIMEOUT_MS)
             } catch (err) {
+              // Surface to the structured error-log alongside the SSE
+              // error event the client receives. We log even if the
+              // stream already closed — operators want to see late
+              // failures (race with end-of-stream) too.
+              logger.error(
+                'send-stream failed',
+                {
+                  source: 'backend',
+                  sessionKey,
+                  runId: activeRunId,
+                },
+                err instanceof Error ? err : new Error(String(err)),
+              )
               // Only send error if stream hasn't already completed successfully
               if (!streamClosed) {
                 const errorMsg = normalizeClaudeErrorMessage(err)
@@ -1740,6 +1783,7 @@ export const Route = createFileRoute('/api/send-stream')({
             // stop enqueueing SSE chunks, but deliberately leave the upstream
             // abortController alone.
             streamClosed = true
+            clearStuckWatchdog()
             // Tear down both keepalive intervals on cancel — previously they
             // kept firing forever against a closed controller (no-ops, but
             // wasted CPU/handles per disconnected client).

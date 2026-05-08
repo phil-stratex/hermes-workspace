@@ -51,8 +51,16 @@ function writeOverrides(next: WorkspaceOverrides): void {
       encoding: 'utf-8',
       mode: 0o600,
     })
-  } catch {
-    console.warn(`[gateway] failed to persist workspace overrides to ${file}`)
+  } catch (err) {
+    // Lazy-import to avoid a module-init cycle: gateway-capabilities is
+    // imported very early at boot (before the data layer is fully wired
+    // for the logger).
+    void import('./logger').then(({ logger }) => {
+      logger.error('gateway: failed to persist workspace overrides', {
+        source: 'gateway',
+        file,
+      }, err instanceof Error ? err : new Error(String(err)))
+    }).catch(() => undefined)
   }
 }
 
@@ -742,6 +750,12 @@ async function autoDetectGatewayUrl(): Promise<void> {
       'set HERMES_API_URL=http://<reachable-host>:8642 in .env and restart. ' +
       'Also set API_SERVER_HOST=0.0.0.0 on the gateway so remote peers can connect.',
   )
+  void import('./logger').then(({ logger }) => {
+    logger.warn('gateway: not reachable on any default port', {
+      source: 'gateway',
+      candidates: ['http://127.0.0.1:8642', 'http://127.0.0.1:8643', 'http://127.0.0.1:8645'],
+    })
+  }).catch(() => undefined)
 }
 
 async function autoDetectDashboardUrl(): Promise<void> {

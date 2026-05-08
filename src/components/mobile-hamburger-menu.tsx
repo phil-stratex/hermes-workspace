@@ -2,6 +2,7 @@ import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   BrainIcon,
+  Bug02Icon,
   Building01Icon,
   Cancel01Icon,
   Castle02Icon,
@@ -21,6 +22,7 @@ import {
   UserGroupIcon,
   UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
+import { useCanSeeErrors } from '@/hooks/use-can-see-errors'
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { hapticTap } from '@/lib/haptics'
@@ -109,6 +111,14 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     match: (p: string) => p.startsWith('/predict'),
   },
   {
+    // Stack-Admin-only — filtered at render-site via useCanSeeErrors.
+    id: 'errors',
+    label: 'Errors',
+    icon: Bug02Icon,
+    to: '/errors',
+    match: (p: string) => p.startsWith('/errors'),
+  },
+  {
     id: 'memory',
     label: 'Memory',
     icon: BrainIcon,
@@ -182,6 +192,10 @@ export function MobileHamburgerMenu() {
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const profileDisplayName = useChatSettingsStore(selectChatProfileDisplayName)
+  const errorsVisibility = useCanSeeErrors()
+  const visibleNavItems = MOBILE_HAMBURGER_NAV_ITEMS.filter(
+    (item) => item.id !== 'errors' || errorsVisibility.canSee,
+  )
   const isChatRoute =
     pathname.startsWith('/chat') || pathname === '/new' || pathname === '/'
 
@@ -269,7 +283,7 @@ export function MobileHamburgerMenu() {
 
         {/* Nav items */}
         <nav className="flex flex-col gap-1 px-3 pt-4 flex-1">
-          {MOBILE_HAMBURGER_NAV_ITEMS.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive = item.match(pathname)
             return (
               <button

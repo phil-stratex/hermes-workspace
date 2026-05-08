@@ -13,6 +13,7 @@ import { dirname, join } from 'node:path'
 import { writeJsonAtomic, withMutex } from './atomic-write'
 import { getDataDir, getUserDir, isValidSlug } from './data-paths'
 import { assertSchemaVersion } from './json-schema-version'
+import { logger } from './logger'
 import { isMigrationCompleted } from './migration-marker'
 import {
   getPasswordHash,
@@ -381,12 +382,29 @@ export async function loginWithEmailPassword(
       ip: ctx.ip ?? 'unknown',
       userAgent: ctx.userAgent,
     })
+    // Mirror to the error-log so brute-force-style activity surfaces
+    // there too — audit is the business-event, error-log holds the
+    // technical context for trouble-shooting (`identifier` is the typed
+    // input; we redact via the standard pipe).
+    logger.warn('login failed', {
+      source: 'auth',
+      reason: 'no-such-user',
+      identifier: lower,
+      ip: ctx.ip ?? 'unknown',
+      userAgent: ctx.userAgent,
+    })
     return { ok: false, reason: 'no-such-user' }
   }
   const profile = getUserProfile(userId)!
   if (profile.status === 'disabled') {
     await appendAuditEvent('global', {
       type: 'login_failed',
+      reason: 'disabled',
+      userId,
+      ip: ctx.ip ?? 'unknown',
+    })
+    logger.warn('login failed', {
+      source: 'auth',
       reason: 'disabled',
       userId,
       ip: ctx.ip ?? 'unknown',
@@ -400,12 +418,19 @@ export async function loginWithEmailPassword(
       userId,
       ip: ctx.ip ?? 'unknown',
     })
+    logger.warn('login failed', {
+      source: 'auth',
+      reason: 'locked',
+      userId,
+      ip: ctx.ip ?? 'unknown',
+      lockedUntil: profile.lockedUntil,
+    })
     return { ok: false, reason: 'locked' }
   }
   const hash = getPasswordHash(userId)
   const valid = hash ? await bcryptVerify(plain, hash) : false
   if (!valid) {
-    await recordFailedLogin(userId)
+    const updated = await recordFailedLogin(userId)
     await appendAuditEvent('global', {
       type: 'login_failed',
       reason: 'invalid-credentials',
@@ -413,6 +438,26 @@ export async function loginWithEmailPassword(
       ip: ctx.ip ?? 'unknown',
       userAgent: ctx.userAgent,
     })
+    logger.warn('login failed', {
+      source: 'auth',
+      reason: 'invalid-credentials',
+      userId,
+      ip: ctx.ip ?? 'unknown',
+      userAgent: ctx.userAgent,
+      failedLoginCount: updated?.failedLoginCount,
+    })
+    // If the failed attempt crossed the lockout threshold, surface a
+    // separate fatal-ish entry so an operator scrolling the error-log
+    // sees the lockout itself, not just the increment.
+    if (updated && updated.status === 'locked' && profile.status !== 'locked') {
+      logger.warn('user locked out after failed-login burst', {
+        source: 'auth',
+        userId,
+        ip: ctx.ip ?? 'unknown',
+        lockedUntil: updated.lockedUntil,
+        failedLoginCount: updated.failedLoginCount,
+      })
+    }
     return { ok: false, reason: 'invalid-credentials' }
   }
   await recordSuccessfulLogin(userId)

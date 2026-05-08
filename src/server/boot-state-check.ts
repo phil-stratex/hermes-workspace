@@ -112,3 +112,29 @@ export function assertCoherentBootState(): BootStateReport {
   }
   return report
 }
+
+/**
+ * Combined startup helper: assert coherence, then run idempotent
+ * bootstraps that should happen on every server start. Designed to be
+ * called once from `server-entry.js` (or any future deploy script)
+ * after the dist/ bundle is ready.
+ *
+ * Today's bootstrap list:
+ *   - Stack-Admin auto-promotion: if multi-tenant + no stack-admins,
+ *     promote the oldest workspace owner so the global error-log
+ *     surface isn't locked out post-migration.
+ *
+ * Returns the merged report so the caller can log a single line.
+ */
+export async function runStartupTasks(): Promise<{
+  bootState: BootStateReport
+  bootstrap: import('./stack-admin-bootstrap').BootstrapResult
+}> {
+  const bootState = assertCoherentBootState()
+  // Lazy import — keeps boot-state-check.ts free of a hard dependency
+  // on workspace-store / global-settings / audit-log when callers only
+  // want describeBootState() (auth.setup, setup-status).
+  const { bootstrapStackAdminsIfNeeded } = await import('./stack-admin-bootstrap')
+  const bootstrap = await bootstrapStackAdminsIfNeeded()
+  return { bootState, bootstrap }
+}

@@ -26,6 +26,7 @@ import { Route as McpRouteImport } from './routes/mcp'
 import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as HermesWorldRouteImport } from './routes/hermes-world'
 import { Route as FilesRouteImport } from './routes/files'
+import { Route as ErrorsRouteImport } from './routes/errors'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CouncilRouteImport } from './routes/council'
 import { Route as ConductorRouteImport } from './routes/conductor'
@@ -37,10 +38,12 @@ import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as ChatIndexRouteImport } from './routes/chat/index'
 import { Route as SettingsProvidersRouteImport } from './routes/settings/providers'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
+import { Route as ErrorsIdRouteImport } from './routes/errors.$id'
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
 import { Route as ApiWorkspacesRouteImport } from './routes/api/workspaces'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
 import { Route as ApiUsageRouteImport } from './routes/api/usage'
+import { Route as ApiTestErrorRouteImport } from './routes/api/test-error'
 import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
 import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
 import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-input'
@@ -99,6 +102,7 @@ import { Route as ApiGatewayReprobeRouteImport } from './routes/api/gateway-repr
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiFileArtifactsRouteImport } from './routes/api/file-artifacts'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
+import { Route as ApiErrorsRouteImport } from './routes/api/errors'
 import { Route as ApiCrewStatusRouteImport } from './routes/api/crew-status'
 import { Route as ApiCouncilRouteImport } from './routes/api/council'
 import { Route as ApiContextUsageRouteImport } from './routes/api/context-usage'
@@ -165,6 +169,11 @@ import { Route as ApiKnowledgeListRouteImport } from './routes/api/knowledge/lis
 import { Route as ApiKnowledgeGraphRouteImport } from './routes/api/knowledge/graph'
 import { Route as ApiKnowledgeConfigRouteImport } from './routes/api/knowledge/config'
 import { Route as ApiFileArtifactsArtifactIdRouteImport } from './routes/api/file-artifacts/$artifactId'
+import { Route as ApiErrorsStreamRouteImport } from './routes/api/errors.stream'
+import { Route as ApiErrorsHealthRouteImport } from './routes/api/errors.health'
+import { Route as ApiErrorsExportRouteImport } from './routes/api/errors.export'
+import { Route as ApiErrorsClientRouteImport } from './routes/api/errors.client'
+import { Route as ApiErrorsIdRouteImport } from './routes/api/errors.$id'
 import { Route as ApiDashboardOverviewRouteImport } from './routes/api/dashboard/overview'
 import { Route as ApiClaudeTasksTaskIdRouteImport } from './routes/api/claude-tasks.$taskId'
 import { Route as ApiClaudeProxySplatRouteImport } from './routes/api/claude-proxy/$'
@@ -181,6 +190,7 @@ import { Route as ApiWorkspacesIdSwitchRouteImport } from './routes/api/workspac
 import { Route as ApiWorkspacesIdMembersRouteImport } from './routes/api/workspaces.$id.members'
 import { Route as ApiWorkspacesIdInvitesRouteImport } from './routes/api/workspaces.$id.invites'
 import { Route as ApiWorkspacesIdAuditRouteImport } from './routes/api/workspaces.$id.audit'
+import { Route as ApiUsersMePreferencesRouteImport } from './routes/api/users.me.preferences'
 import { Route as ApiUsersIdPasswordResetRouteImport } from './routes/api/users.$id.password-reset'
 import { Route as ApiUsersIdEnableRouteImport } from './routes/api/users.$id.enable'
 import { Route as ApiUsersIdDisableRouteImport } from './routes/api/users.$id.disable'
@@ -193,6 +203,7 @@ import { Route as ApiMcpHubSourcesIdRouteImport } from './routes/api/mcp/hub-sou
 import { Route as ApiMcpNameLogsRouteImport } from './routes/api/mcp/$name.logs'
 import { Route as ApiInvitesTokenInfoRouteImport } from './routes/api/invites.$token.info'
 import { Route as ApiInvitesTokenAcceptRouteImport } from './routes/api/invites.$token.accept'
+import { Route as ApiErrorsRelatedRequestIdRouteImport } from './routes/api/errors.related.$requestId'
 import { Route as ApiWorkspacesWsIdFederationPeersRouteImport } from './routes/api/workspaces.$wsId.federation.peers'
 import { Route as ApiWorkspacesWsIdFederationAuditRouteImport } from './routes/api/workspaces.$wsId.federation.audit'
 import { Route as ApiWorkspacesIdMembersUidRouteImport } from './routes/api/workspaces.$id.members.$uid'
@@ -288,6 +299,11 @@ const FilesRoute = FilesRouteImport.update({
   path: '/files',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ErrorsRoute = ErrorsRouteImport.update({
+  id: '/errors',
+  path: '/errors',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -343,6 +359,11 @@ const InviteTokenRoute = InviteTokenRouteImport.update({
   path: '/invite/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ErrorsIdRoute = ErrorsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ErrorsRoute,
+} as any)
 const ChatSessionKeyRoute = ChatSessionKeyRouteImport.update({
   id: '/chat/$sessionKey',
   path: '/chat/$sessionKey',
@@ -361,6 +382,11 @@ const ApiWorkspaceRoute = ApiWorkspaceRouteImport.update({
 const ApiUsageRoute = ApiUsageRouteImport.update({
   id: '/api/usage',
   path: '/api/usage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTestErrorRoute = ApiTestErrorRouteImport.update({
+  id: '/api/test-error',
+  path: '/api/test-error',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTerminalStreamRoute = ApiTerminalStreamRouteImport.update({
@@ -652,6 +678,11 @@ const ApiFileArtifactsRoute = ApiFileArtifactsRouteImport.update({
 const ApiEventsRoute = ApiEventsRouteImport.update({
   id: '/api/events',
   path: '/api/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiErrorsRoute = ApiErrorsRouteImport.update({
+  id: '/api/errors',
+  path: '/api/errors',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiCrewStatusRoute = ApiCrewStatusRouteImport.update({
@@ -985,6 +1016,31 @@ const ApiFileArtifactsArtifactIdRoute =
     path: '/$artifactId',
     getParentRoute: () => ApiFileArtifactsRoute,
   } as any)
+const ApiErrorsStreamRoute = ApiErrorsStreamRouteImport.update({
+  id: '/stream',
+  path: '/stream',
+  getParentRoute: () => ApiErrorsRoute,
+} as any)
+const ApiErrorsHealthRoute = ApiErrorsHealthRouteImport.update({
+  id: '/health',
+  path: '/health',
+  getParentRoute: () => ApiErrorsRoute,
+} as any)
+const ApiErrorsExportRoute = ApiErrorsExportRouteImport.update({
+  id: '/export',
+  path: '/export',
+  getParentRoute: () => ApiErrorsRoute,
+} as any)
+const ApiErrorsClientRoute = ApiErrorsClientRouteImport.update({
+  id: '/client',
+  path: '/client',
+  getParentRoute: () => ApiErrorsRoute,
+} as any)
+const ApiErrorsIdRoute = ApiErrorsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ApiErrorsRoute,
+} as any)
 const ApiDashboardOverviewRoute = ApiDashboardOverviewRouteImport.update({
   id: '/api/dashboard/overview',
   path: '/api/dashboard/overview',
@@ -1066,6 +1122,11 @@ const ApiWorkspacesIdAuditRoute = ApiWorkspacesIdAuditRouteImport.update({
   path: '/audit',
   getParentRoute: () => ApiWorkspacesIdRoute,
 } as any)
+const ApiUsersMePreferencesRoute = ApiUsersMePreferencesRouteImport.update({
+  id: '/api/users/me/preferences',
+  path: '/api/users/me/preferences',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiUsersIdPasswordResetRoute = ApiUsersIdPasswordResetRouteImport.update({
   id: '/api/users/$id/password-reset',
   path: '/api/users/$id/password-reset',
@@ -1128,6 +1189,12 @@ const ApiInvitesTokenAcceptRoute = ApiInvitesTokenAcceptRouteImport.update({
   path: '/api/invites/$token/accept',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiErrorsRelatedRequestIdRoute =
+  ApiErrorsRelatedRequestIdRouteImport.update({
+    id: '/related/$requestId',
+    path: '/related/$requestId',
+    getParentRoute: () => ApiErrorsRoute,
+  } as any)
 const ApiWorkspacesWsIdFederationPeersRoute =
   ApiWorkspacesWsIdFederationPeersRouteImport.update({
     id: '/$wsId/federation/peers',
@@ -1191,6 +1258,7 @@ export interface FileRoutesByFullPath {
   '/conductor': typeof ConductorRoute
   '/council': typeof CouncilRoute
   '/dashboard': typeof DashboardRoute
+  '/errors': typeof ErrorsRouteWithChildren
   '/files': typeof FilesRoute
   '/hermes-world': typeof HermesWorldRoute
   '/jobs': typeof JobsRoute
@@ -1224,6 +1292,7 @@ export interface FileRoutesByFullPath {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/council': typeof ApiCouncilRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
+  '/api/errors': typeof ApiErrorsRouteWithChildren
   '/api/events': typeof ApiEventsRoute
   '/api/file-artifacts': typeof ApiFileArtifactsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
@@ -1282,10 +1351,12 @@ export interface FileRoutesByFullPath {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/test-error': typeof ApiTestErrorRoute
   '/api/usage': typeof ApiUsageRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/api/workspaces': typeof ApiWorkspacesRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
+  '/errors/$id': typeof ErrorsIdRoute
   '/invite/$token': typeof InviteTokenRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
@@ -1300,6 +1371,11 @@ export interface FileRoutesByFullPath {
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
+  '/api/errors/$id': typeof ApiErrorsIdRoute
+  '/api/errors/client': typeof ApiErrorsClientRoute
+  '/api/errors/export': typeof ApiErrorsExportRoute
+  '/api/errors/health': typeof ApiErrorsHealthRoute
+  '/api/errors/stream': typeof ApiErrorsStreamRoute
   '/api/file-artifacts/$artifactId': typeof ApiFileArtifactsArtifactIdRoute
   '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
   '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
@@ -1350,6 +1426,7 @@ export interface FileRoutesByFullPath {
   '/predict/$simulationId/run': typeof PredictSimulationIdRunRoute
   '/preview/$runId/$': typeof PreviewRunIdSplatRoute
   '/workspace/$id/settings': typeof WorkspaceIdSettingsRouteWithChildren
+  '/api/errors/related/$requestId': typeof ApiErrorsRelatedRequestIdRoute
   '/api/invites/$token/accept': typeof ApiInvitesTokenAcceptRoute
   '/api/invites/$token/info': typeof ApiInvitesTokenInfoRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
@@ -1362,6 +1439,7 @@ export interface FileRoutesByFullPath {
   '/api/users/$id/disable': typeof ApiUsersIdDisableRoute
   '/api/users/$id/enable': typeof ApiUsersIdEnableRoute
   '/api/users/$id/password-reset': typeof ApiUsersIdPasswordResetRoute
+  '/api/users/me/preferences': typeof ApiUsersMePreferencesRoute
   '/api/workspaces/$id/audit': typeof ApiWorkspacesIdAuditRoute
   '/api/workspaces/$id/invites': typeof ApiWorkspacesIdInvitesRouteWithChildren
   '/api/workspaces/$id/members': typeof ApiWorkspacesIdMembersRouteWithChildren
@@ -1386,6 +1464,7 @@ export interface FileRoutesByTo {
   '/conductor': typeof ConductorRoute
   '/council': typeof CouncilRoute
   '/dashboard': typeof DashboardRoute
+  '/errors': typeof ErrorsRouteWithChildren
   '/files': typeof FilesRoute
   '/hermes-world': typeof HermesWorldRoute
   '/jobs': typeof JobsRoute
@@ -1418,6 +1497,7 @@ export interface FileRoutesByTo {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/council': typeof ApiCouncilRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
+  '/api/errors': typeof ApiErrorsRouteWithChildren
   '/api/events': typeof ApiEventsRoute
   '/api/file-artifacts': typeof ApiFileArtifactsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
@@ -1476,10 +1556,12 @@ export interface FileRoutesByTo {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/test-error': typeof ApiTestErrorRoute
   '/api/usage': typeof ApiUsageRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/api/workspaces': typeof ApiWorkspacesRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
+  '/errors/$id': typeof ErrorsIdRoute
   '/invite/$token': typeof InviteTokenRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat': typeof ChatIndexRoute
@@ -1494,6 +1576,11 @@ export interface FileRoutesByTo {
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
+  '/api/errors/$id': typeof ApiErrorsIdRoute
+  '/api/errors/client': typeof ApiErrorsClientRoute
+  '/api/errors/export': typeof ApiErrorsExportRoute
+  '/api/errors/health': typeof ApiErrorsHealthRoute
+  '/api/errors/stream': typeof ApiErrorsStreamRoute
   '/api/file-artifacts/$artifactId': typeof ApiFileArtifactsArtifactIdRoute
   '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
   '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
@@ -1543,6 +1630,7 @@ export interface FileRoutesByTo {
   '/predict/$reportId/report': typeof PredictReportIdReportRoute
   '/predict/$simulationId/run': typeof PredictSimulationIdRunRoute
   '/preview/$runId/$': typeof PreviewRunIdSplatRoute
+  '/api/errors/related/$requestId': typeof ApiErrorsRelatedRequestIdRoute
   '/api/invites/$token/accept': typeof ApiInvitesTokenAcceptRoute
   '/api/invites/$token/info': typeof ApiInvitesTokenInfoRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
@@ -1555,6 +1643,7 @@ export interface FileRoutesByTo {
   '/api/users/$id/disable': typeof ApiUsersIdDisableRoute
   '/api/users/$id/enable': typeof ApiUsersIdEnableRoute
   '/api/users/$id/password-reset': typeof ApiUsersIdPasswordResetRoute
+  '/api/users/me/preferences': typeof ApiUsersMePreferencesRoute
   '/api/workspaces/$id/audit': typeof ApiWorkspacesIdAuditRoute
   '/api/workspaces/$id/invites': typeof ApiWorkspacesIdInvitesRouteWithChildren
   '/api/workspaces/$id/members': typeof ApiWorkspacesIdMembersRouteWithChildren
@@ -1580,6 +1669,7 @@ export interface FileRoutesById {
   '/conductor': typeof ConductorRoute
   '/council': typeof CouncilRoute
   '/dashboard': typeof DashboardRoute
+  '/errors': typeof ErrorsRouteWithChildren
   '/files': typeof FilesRoute
   '/hermes-world': typeof HermesWorldRoute
   '/jobs': typeof JobsRoute
@@ -1613,6 +1703,7 @@ export interface FileRoutesById {
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/council': typeof ApiCouncilRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
+  '/api/errors': typeof ApiErrorsRouteWithChildren
   '/api/events': typeof ApiEventsRoute
   '/api/file-artifacts': typeof ApiFileArtifactsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
@@ -1671,10 +1762,12 @@ export interface FileRoutesById {
   '/api/terminal-input': typeof ApiTerminalInputRoute
   '/api/terminal-resize': typeof ApiTerminalResizeRoute
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
+  '/api/test-error': typeof ApiTestErrorRoute
   '/api/usage': typeof ApiUsageRoute
   '/api/workspace': typeof ApiWorkspaceRoute
   '/api/workspaces': typeof ApiWorkspacesRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
+  '/errors/$id': typeof ErrorsIdRoute
   '/invite/$token': typeof InviteTokenRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
@@ -1689,6 +1782,11 @@ export interface FileRoutesById {
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
+  '/api/errors/$id': typeof ApiErrorsIdRoute
+  '/api/errors/client': typeof ApiErrorsClientRoute
+  '/api/errors/export': typeof ApiErrorsExportRoute
+  '/api/errors/health': typeof ApiErrorsHealthRoute
+  '/api/errors/stream': typeof ApiErrorsStreamRoute
   '/api/file-artifacts/$artifactId': typeof ApiFileArtifactsArtifactIdRoute
   '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
   '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
@@ -1739,6 +1837,7 @@ export interface FileRoutesById {
   '/predict/$simulationId/run': typeof PredictSimulationIdRunRoute
   '/preview/$runId/$': typeof PreviewRunIdSplatRoute
   '/workspace/$id/settings': typeof WorkspaceIdSettingsRouteWithChildren
+  '/api/errors/related/$requestId': typeof ApiErrorsRelatedRequestIdRoute
   '/api/invites/$token/accept': typeof ApiInvitesTokenAcceptRoute
   '/api/invites/$token/info': typeof ApiInvitesTokenInfoRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
@@ -1751,6 +1850,7 @@ export interface FileRoutesById {
   '/api/users/$id/disable': typeof ApiUsersIdDisableRoute
   '/api/users/$id/enable': typeof ApiUsersIdEnableRoute
   '/api/users/$id/password-reset': typeof ApiUsersIdPasswordResetRoute
+  '/api/users/me/preferences': typeof ApiUsersMePreferencesRoute
   '/api/workspaces/$id/audit': typeof ApiWorkspacesIdAuditRoute
   '/api/workspaces/$id/invites': typeof ApiWorkspacesIdInvitesRouteWithChildren
   '/api/workspaces/$id/members': typeof ApiWorkspacesIdMembersRouteWithChildren
@@ -1777,6 +1877,7 @@ export interface FileRouteTypes {
     | '/conductor'
     | '/council'
     | '/dashboard'
+    | '/errors'
     | '/files'
     | '/hermes-world'
     | '/jobs'
@@ -1810,6 +1911,7 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/council'
     | '/api/crew-status'
+    | '/api/errors'
     | '/api/events'
     | '/api/file-artifacts'
     | '/api/files'
@@ -1868,10 +1970,12 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/test-error'
     | '/api/usage'
     | '/api/workspace'
     | '/api/workspaces'
     | '/chat/$sessionKey'
+    | '/errors/$id'
     | '/invite/$token'
     | '/settings/providers'
     | '/chat/'
@@ -1886,6 +1990,11 @@ export interface FileRouteTypes {
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
     | '/api/dashboard/overview'
+    | '/api/errors/$id'
+    | '/api/errors/client'
+    | '/api/errors/export'
+    | '/api/errors/health'
+    | '/api/errors/stream'
     | '/api/file-artifacts/$artifactId'
     | '/api/knowledge/config'
     | '/api/knowledge/graph'
@@ -1936,6 +2045,7 @@ export interface FileRouteTypes {
     | '/predict/$simulationId/run'
     | '/preview/$runId/$'
     | '/workspace/$id/settings'
+    | '/api/errors/related/$requestId'
     | '/api/invites/$token/accept'
     | '/api/invites/$token/info'
     | '/api/mcp/$name/logs'
@@ -1948,6 +2058,7 @@ export interface FileRouteTypes {
     | '/api/users/$id/disable'
     | '/api/users/$id/enable'
     | '/api/users/$id/password-reset'
+    | '/api/users/me/preferences'
     | '/api/workspaces/$id/audit'
     | '/api/workspaces/$id/invites'
     | '/api/workspaces/$id/members'
@@ -1972,6 +2083,7 @@ export interface FileRouteTypes {
     | '/conductor'
     | '/council'
     | '/dashboard'
+    | '/errors'
     | '/files'
     | '/hermes-world'
     | '/jobs'
@@ -2004,6 +2116,7 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/council'
     | '/api/crew-status'
+    | '/api/errors'
     | '/api/events'
     | '/api/file-artifacts'
     | '/api/files'
@@ -2062,10 +2175,12 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/test-error'
     | '/api/usage'
     | '/api/workspace'
     | '/api/workspaces'
     | '/chat/$sessionKey'
+    | '/errors/$id'
     | '/invite/$token'
     | '/settings/providers'
     | '/chat'
@@ -2080,6 +2195,11 @@ export interface FileRouteTypes {
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
     | '/api/dashboard/overview'
+    | '/api/errors/$id'
+    | '/api/errors/client'
+    | '/api/errors/export'
+    | '/api/errors/health'
+    | '/api/errors/stream'
     | '/api/file-artifacts/$artifactId'
     | '/api/knowledge/config'
     | '/api/knowledge/graph'
@@ -2129,6 +2249,7 @@ export interface FileRouteTypes {
     | '/predict/$reportId/report'
     | '/predict/$simulationId/run'
     | '/preview/$runId/$'
+    | '/api/errors/related/$requestId'
     | '/api/invites/$token/accept'
     | '/api/invites/$token/info'
     | '/api/mcp/$name/logs'
@@ -2141,6 +2262,7 @@ export interface FileRouteTypes {
     | '/api/users/$id/disable'
     | '/api/users/$id/enable'
     | '/api/users/$id/password-reset'
+    | '/api/users/me/preferences'
     | '/api/workspaces/$id/audit'
     | '/api/workspaces/$id/invites'
     | '/api/workspaces/$id/members'
@@ -2165,6 +2287,7 @@ export interface FileRouteTypes {
     | '/conductor'
     | '/council'
     | '/dashboard'
+    | '/errors'
     | '/files'
     | '/hermes-world'
     | '/jobs'
@@ -2198,6 +2321,7 @@ export interface FileRouteTypes {
     | '/api/context-usage'
     | '/api/council'
     | '/api/crew-status'
+    | '/api/errors'
     | '/api/events'
     | '/api/file-artifacts'
     | '/api/files'
@@ -2256,10 +2380,12 @@ export interface FileRouteTypes {
     | '/api/terminal-input'
     | '/api/terminal-resize'
     | '/api/terminal-stream'
+    | '/api/test-error'
     | '/api/usage'
     | '/api/workspace'
     | '/api/workspaces'
     | '/chat/$sessionKey'
+    | '/errors/$id'
     | '/invite/$token'
     | '/settings/providers'
     | '/chat/'
@@ -2274,6 +2400,11 @@ export interface FileRouteTypes {
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
     | '/api/dashboard/overview'
+    | '/api/errors/$id'
+    | '/api/errors/client'
+    | '/api/errors/export'
+    | '/api/errors/health'
+    | '/api/errors/stream'
     | '/api/file-artifacts/$artifactId'
     | '/api/knowledge/config'
     | '/api/knowledge/graph'
@@ -2324,6 +2455,7 @@ export interface FileRouteTypes {
     | '/predict/$simulationId/run'
     | '/preview/$runId/$'
     | '/workspace/$id/settings'
+    | '/api/errors/related/$requestId'
     | '/api/invites/$token/accept'
     | '/api/invites/$token/info'
     | '/api/mcp/$name/logs'
@@ -2336,6 +2468,7 @@ export interface FileRouteTypes {
     | '/api/users/$id/disable'
     | '/api/users/$id/enable'
     | '/api/users/$id/password-reset'
+    | '/api/users/me/preferences'
     | '/api/workspaces/$id/audit'
     | '/api/workspaces/$id/invites'
     | '/api/workspaces/$id/members'
@@ -2361,6 +2494,7 @@ export interface RootRouteChildren {
   ConductorRoute: typeof ConductorRoute
   CouncilRoute: typeof CouncilRoute
   DashboardRoute: typeof DashboardRoute
+  ErrorsRoute: typeof ErrorsRouteWithChildren
   FilesRoute: typeof FilesRoute
   HermesWorldRoute: typeof HermesWorldRoute
   JobsRoute: typeof JobsRoute
@@ -2394,6 +2528,7 @@ export interface RootRouteChildren {
   ApiContextUsageRoute: typeof ApiContextUsageRoute
   ApiCouncilRoute: typeof ApiCouncilRoute
   ApiCrewStatusRoute: typeof ApiCrewStatusRoute
+  ApiErrorsRoute: typeof ApiErrorsRouteWithChildren
   ApiEventsRoute: typeof ApiEventsRoute
   ApiFileArtifactsRoute: typeof ApiFileArtifactsRouteWithChildren
   ApiFilesRoute: typeof ApiFilesRoute
@@ -2452,6 +2587,7 @@ export interface RootRouteChildren {
   ApiTerminalInputRoute: typeof ApiTerminalInputRoute
   ApiTerminalResizeRoute: typeof ApiTerminalResizeRoute
   ApiTerminalStreamRoute: typeof ApiTerminalStreamRoute
+  ApiTestErrorRoute: typeof ApiTestErrorRoute
   ApiUsageRoute: typeof ApiUsageRoute
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   ApiWorkspacesRoute: typeof ApiWorkspacesRouteWithChildren
@@ -2492,6 +2628,7 @@ export interface RootRouteChildren {
   ApiUsersIdDisableRoute: typeof ApiUsersIdDisableRoute
   ApiUsersIdEnableRoute: typeof ApiUsersIdEnableRoute
   ApiUsersIdPasswordResetRoute: typeof ApiUsersIdPasswordResetRoute
+  ApiUsersMePreferencesRoute: typeof ApiUsersMePreferencesRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -2615,6 +2752,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FilesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/errors': {
+      id: '/errors'
+      path: '/errors'
+      fullPath: '/errors'
+      preLoaderRoute: typeof ErrorsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
@@ -2692,6 +2836,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InviteTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/errors/$id': {
+      id: '/errors/$id'
+      path: '/$id'
+      fullPath: '/errors/$id'
+      preLoaderRoute: typeof ErrorsIdRouteImport
+      parentRoute: typeof ErrorsRoute
+    }
     '/chat/$sessionKey': {
       id: '/chat/$sessionKey'
       path: '/chat/$sessionKey'
@@ -2718,6 +2869,13 @@ declare module '@tanstack/react-router' {
       path: '/api/usage'
       fullPath: '/api/usage'
       preLoaderRoute: typeof ApiUsageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/test-error': {
+      id: '/api/test-error'
+      path: '/api/test-error'
+      fullPath: '/api/test-error'
+      preLoaderRoute: typeof ApiTestErrorRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/terminal-stream': {
@@ -3124,6 +3282,13 @@ declare module '@tanstack/react-router' {
       path: '/api/events'
       fullPath: '/api/events'
       preLoaderRoute: typeof ApiEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/errors': {
+      id: '/api/errors'
+      path: '/api/errors'
+      fullPath: '/api/errors'
+      preLoaderRoute: typeof ApiErrorsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/crew-status': {
@@ -3588,6 +3753,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiFileArtifactsArtifactIdRouteImport
       parentRoute: typeof ApiFileArtifactsRoute
     }
+    '/api/errors/stream': {
+      id: '/api/errors/stream'
+      path: '/stream'
+      fullPath: '/api/errors/stream'
+      preLoaderRoute: typeof ApiErrorsStreamRouteImport
+      parentRoute: typeof ApiErrorsRoute
+    }
+    '/api/errors/health': {
+      id: '/api/errors/health'
+      path: '/health'
+      fullPath: '/api/errors/health'
+      preLoaderRoute: typeof ApiErrorsHealthRouteImport
+      parentRoute: typeof ApiErrorsRoute
+    }
+    '/api/errors/export': {
+      id: '/api/errors/export'
+      path: '/export'
+      fullPath: '/api/errors/export'
+      preLoaderRoute: typeof ApiErrorsExportRouteImport
+      parentRoute: typeof ApiErrorsRoute
+    }
+    '/api/errors/client': {
+      id: '/api/errors/client'
+      path: '/client'
+      fullPath: '/api/errors/client'
+      preLoaderRoute: typeof ApiErrorsClientRouteImport
+      parentRoute: typeof ApiErrorsRoute
+    }
+    '/api/errors/$id': {
+      id: '/api/errors/$id'
+      path: '/$id'
+      fullPath: '/api/errors/$id'
+      preLoaderRoute: typeof ApiErrorsIdRouteImport
+      parentRoute: typeof ApiErrorsRoute
+    }
     '/api/dashboard/overview': {
       id: '/api/dashboard/overview'
       path: '/api/dashboard/overview'
@@ -3700,6 +3900,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkspacesIdAuditRouteImport
       parentRoute: typeof ApiWorkspacesIdRoute
     }
+    '/api/users/me/preferences': {
+      id: '/api/users/me/preferences'
+      path: '/api/users/me/preferences'
+      fullPath: '/api/users/me/preferences'
+      preLoaderRoute: typeof ApiUsersMePreferencesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/users/$id/password-reset': {
       id: '/api/users/$id/password-reset'
       path: '/api/users/$id/password-reset'
@@ -3784,6 +3991,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiInvitesTokenAcceptRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/errors/related/$requestId': {
+      id: '/api/errors/related/$requestId'
+      path: '/related/$requestId'
+      fullPath: '/api/errors/related/$requestId'
+      preLoaderRoute: typeof ApiErrorsRelatedRequestIdRouteImport
+      parentRoute: typeof ApiErrorsRoute
+    }
     '/api/workspaces/$wsId/federation/peers': {
       id: '/api/workspaces/$wsId/federation/peers'
       path: '/$wsId/federation/peers'
@@ -3849,6 +4063,17 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface ErrorsRouteChildren {
+  ErrorsIdRoute: typeof ErrorsIdRoute
+}
+
+const ErrorsRouteChildren: ErrorsRouteChildren = {
+  ErrorsIdRoute: ErrorsIdRoute,
+}
+
+const ErrorsRouteWithChildren =
+  ErrorsRoute._addFileChildren(ErrorsRouteChildren)
 
 interface PredictRouteChildren {
   PredictProjectIdBuildRoute: typeof PredictProjectIdBuildRoute
@@ -3934,6 +4159,28 @@ const ApiClaudeTasksRouteChildren: ApiClaudeTasksRouteChildren = {
 
 const ApiClaudeTasksRouteWithChildren = ApiClaudeTasksRoute._addFileChildren(
   ApiClaudeTasksRouteChildren,
+)
+
+interface ApiErrorsRouteChildren {
+  ApiErrorsIdRoute: typeof ApiErrorsIdRoute
+  ApiErrorsClientRoute: typeof ApiErrorsClientRoute
+  ApiErrorsExportRoute: typeof ApiErrorsExportRoute
+  ApiErrorsHealthRoute: typeof ApiErrorsHealthRoute
+  ApiErrorsStreamRoute: typeof ApiErrorsStreamRoute
+  ApiErrorsRelatedRequestIdRoute: typeof ApiErrorsRelatedRequestIdRoute
+}
+
+const ApiErrorsRouteChildren: ApiErrorsRouteChildren = {
+  ApiErrorsIdRoute: ApiErrorsIdRoute,
+  ApiErrorsClientRoute: ApiErrorsClientRoute,
+  ApiErrorsExportRoute: ApiErrorsExportRoute,
+  ApiErrorsHealthRoute: ApiErrorsHealthRoute,
+  ApiErrorsStreamRoute: ApiErrorsStreamRoute,
+  ApiErrorsRelatedRequestIdRoute: ApiErrorsRelatedRequestIdRoute,
+}
+
+const ApiErrorsRouteWithChildren = ApiErrorsRoute._addFileChildren(
+  ApiErrorsRouteChildren,
 )
 
 interface ApiFileArtifactsRouteChildren {
@@ -4174,6 +4421,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConductorRoute: ConductorRoute,
   CouncilRoute: CouncilRoute,
   DashboardRoute: DashboardRoute,
+  ErrorsRoute: ErrorsRouteWithChildren,
   FilesRoute: FilesRoute,
   HermesWorldRoute: HermesWorldRoute,
   JobsRoute: JobsRoute,
@@ -4207,6 +4455,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiContextUsageRoute: ApiContextUsageRoute,
   ApiCouncilRoute: ApiCouncilRoute,
   ApiCrewStatusRoute: ApiCrewStatusRoute,
+  ApiErrorsRoute: ApiErrorsRouteWithChildren,
   ApiEventsRoute: ApiEventsRoute,
   ApiFileArtifactsRoute: ApiFileArtifactsRouteWithChildren,
   ApiFilesRoute: ApiFilesRoute,
@@ -4265,6 +4514,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTerminalInputRoute: ApiTerminalInputRoute,
   ApiTerminalResizeRoute: ApiTerminalResizeRoute,
   ApiTerminalStreamRoute: ApiTerminalStreamRoute,
+  ApiTestErrorRoute: ApiTestErrorRoute,
   ApiUsageRoute: ApiUsageRoute,
   ApiWorkspaceRoute: ApiWorkspaceRoute,
   ApiWorkspacesRoute: ApiWorkspacesRouteWithChildren,
@@ -4305,6 +4555,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiUsersIdDisableRoute: ApiUsersIdDisableRoute,
   ApiUsersIdEnableRoute: ApiUsersIdEnableRoute,
   ApiUsersIdPasswordResetRoute: ApiUsersIdPasswordResetRoute,
+  ApiUsersMePreferencesRoute: ApiUsersMePreferencesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

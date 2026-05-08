@@ -26,6 +26,7 @@ import {
   ONBOARDING_KEY,
 } from '@/components/onboarding/claude-onboarding'
 import { ErrorBoundary } from '@/components/error-boundary'
+import { installClientErrorReporter } from '@/lib/client-error-reporter'
 import { LoginScreen } from '@/components/auth/login-screen'
 import { WorkspaceHeaderBanner } from '@/components/workspace/workspace-header-banner'
 import { RosterIssuesBanner } from '@/components/workspace/roster-issues-banner'
@@ -277,6 +278,10 @@ function RootLayout() {
   useEffect(() => {
     setMounted(true)
     initializeSettingsAppearance()
+    // Wire window-level error + unhandled-rejection listeners. Idempotent
+    // across HMR and StrictMode double-mount; the install function
+    // returns a teardown so React can clean up on unmount.
+    const teardownErrorReporter = installClientErrorReporter()
 
     const syncOnboardingCompletion = () => {
       try {
@@ -337,6 +342,7 @@ function RootLayout() {
         ONBOARDING_COMPLETE_EVENT,
         handleOnboardingCompleteChanged,
       )
+      teardownErrorReporter()
     }
   }, [])
 
