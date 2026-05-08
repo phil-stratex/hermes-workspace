@@ -192,8 +192,15 @@ import { Route as ApiMcpHubSourcesIdRouteImport } from './routes/api/mcp/hub-sou
 import { Route as ApiMcpNameLogsRouteImport } from './routes/api/mcp/$name.logs'
 import { Route as ApiInvitesTokenInfoRouteImport } from './routes/api/invites.$token.info'
 import { Route as ApiInvitesTokenAcceptRouteImport } from './routes/api/invites.$token.accept'
+import { Route as ApiWorkspacesWsIdFederationPeersRouteImport } from './routes/api/workspaces.$wsId.federation.peers'
+import { Route as ApiWorkspacesWsIdFederationAuditRouteImport } from './routes/api/workspaces.$wsId.federation.audit'
 import { Route as ApiWorkspacesIdMembersUidRouteImport } from './routes/api/workspaces.$id.members.$uid'
 import { Route as ApiWorkspacesIdInvitesTokenRouteImport } from './routes/api/workspaces.$id.invites.$token'
+import { Route as ApiWorkspacesWsIdFederationPeersPeerIdRouteImport } from './routes/api/workspaces.$wsId.federation.peers.$peerId'
+import { Route as ApiWorkspacesWsIdFederationDisconnectPeerIdRouteImport } from './routes/api/workspaces.$wsId.federation.disconnect.$peerId'
+import { Route as ApiWorkspacesWsIdFederationDiffPeerIdRouteImport } from './routes/api/workspaces.$wsId.federation.diff.$peerId'
+import { Route as ApiWorkspacesWsIdFederationConnectPeerIdRouteImport } from './routes/api/workspaces.$wsId.federation.connect.$peerId'
+import { Route as ApiWorkspacesWsIdFederationApplyPeerIdRouteImport } from './routes/api/workspaces.$wsId.federation.apply.$peerId'
 
 const WorldRoute = WorldRouteImport.update({
   id: '/world',
@@ -1115,6 +1122,18 @@ const ApiInvitesTokenAcceptRoute = ApiInvitesTokenAcceptRouteImport.update({
   path: '/api/invites/$token/accept',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWorkspacesWsIdFederationPeersRoute =
+  ApiWorkspacesWsIdFederationPeersRouteImport.update({
+    id: '/$wsId/federation/peers',
+    path: '/$wsId/federation/peers',
+    getParentRoute: () => ApiWorkspacesRoute,
+  } as any)
+const ApiWorkspacesWsIdFederationAuditRoute =
+  ApiWorkspacesWsIdFederationAuditRouteImport.update({
+    id: '/$wsId/federation/audit',
+    path: '/$wsId/federation/audit',
+    getParentRoute: () => ApiWorkspacesRoute,
+  } as any)
 const ApiWorkspacesIdMembersUidRoute =
   ApiWorkspacesIdMembersUidRouteImport.update({
     id: '/$uid',
@@ -1126,6 +1145,36 @@ const ApiWorkspacesIdInvitesTokenRoute =
     id: '/$token',
     path: '/$token',
     getParentRoute: () => ApiWorkspacesIdInvitesRoute,
+  } as any)
+const ApiWorkspacesWsIdFederationPeersPeerIdRoute =
+  ApiWorkspacesWsIdFederationPeersPeerIdRouteImport.update({
+    id: '/$peerId',
+    path: '/$peerId',
+    getParentRoute: () => ApiWorkspacesWsIdFederationPeersRoute,
+  } as any)
+const ApiWorkspacesWsIdFederationDisconnectPeerIdRoute =
+  ApiWorkspacesWsIdFederationDisconnectPeerIdRouteImport.update({
+    id: '/$wsId/federation/disconnect/$peerId',
+    path: '/$wsId/federation/disconnect/$peerId',
+    getParentRoute: () => ApiWorkspacesRoute,
+  } as any)
+const ApiWorkspacesWsIdFederationDiffPeerIdRoute =
+  ApiWorkspacesWsIdFederationDiffPeerIdRouteImport.update({
+    id: '/$wsId/federation/diff/$peerId',
+    path: '/$wsId/federation/diff/$peerId',
+    getParentRoute: () => ApiWorkspacesRoute,
+  } as any)
+const ApiWorkspacesWsIdFederationConnectPeerIdRoute =
+  ApiWorkspacesWsIdFederationConnectPeerIdRouteImport.update({
+    id: '/$wsId/federation/connect/$peerId',
+    path: '/$wsId/federation/connect/$peerId',
+    getParentRoute: () => ApiWorkspacesRoute,
+  } as any)
+const ApiWorkspacesWsIdFederationApplyPeerIdRoute =
+  ApiWorkspacesWsIdFederationApplyPeerIdRouteImport.update({
+    id: '/$wsId/federation/apply/$peerId',
+    path: '/$wsId/federation/apply/$peerId',
+    getParentRoute: () => ApiWorkspacesRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -1314,6 +1363,13 @@ export interface FileRoutesByFullPath {
   '/workspace/$id/settings/': typeof WorkspaceIdSettingsIndexRoute
   '/api/workspaces/$id/invites/$token': typeof ApiWorkspacesIdInvitesTokenRoute
   '/api/workspaces/$id/members/$uid': typeof ApiWorkspacesIdMembersUidRoute
+  '/api/workspaces/$wsId/federation/audit': typeof ApiWorkspacesWsIdFederationAuditRoute
+  '/api/workspaces/$wsId/federation/peers': typeof ApiWorkspacesWsIdFederationPeersRouteWithChildren
+  '/api/workspaces/$wsId/federation/apply/$peerId': typeof ApiWorkspacesWsIdFederationApplyPeerIdRoute
+  '/api/workspaces/$wsId/federation/connect/$peerId': typeof ApiWorkspacesWsIdFederationConnectPeerIdRoute
+  '/api/workspaces/$wsId/federation/diff/$peerId': typeof ApiWorkspacesWsIdFederationDiffPeerIdRoute
+  '/api/workspaces/$wsId/federation/disconnect/$peerId': typeof ApiWorkspacesWsIdFederationDisconnectPeerIdRoute
+  '/api/workspaces/$wsId/federation/peers/$peerId': typeof ApiWorkspacesWsIdFederationPeersPeerIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -1499,6 +1555,13 @@ export interface FileRoutesByTo {
   '/workspace/$id/settings': typeof WorkspaceIdSettingsIndexRoute
   '/api/workspaces/$id/invites/$token': typeof ApiWorkspacesIdInvitesTokenRoute
   '/api/workspaces/$id/members/$uid': typeof ApiWorkspacesIdMembersUidRoute
+  '/api/workspaces/$wsId/federation/audit': typeof ApiWorkspacesWsIdFederationAuditRoute
+  '/api/workspaces/$wsId/federation/peers': typeof ApiWorkspacesWsIdFederationPeersRouteWithChildren
+  '/api/workspaces/$wsId/federation/apply/$peerId': typeof ApiWorkspacesWsIdFederationApplyPeerIdRoute
+  '/api/workspaces/$wsId/federation/connect/$peerId': typeof ApiWorkspacesWsIdFederationConnectPeerIdRoute
+  '/api/workspaces/$wsId/federation/diff/$peerId': typeof ApiWorkspacesWsIdFederationDiffPeerIdRoute
+  '/api/workspaces/$wsId/federation/disconnect/$peerId': typeof ApiWorkspacesWsIdFederationDisconnectPeerIdRoute
+  '/api/workspaces/$wsId/federation/peers/$peerId': typeof ApiWorkspacesWsIdFederationPeersPeerIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -1687,6 +1750,13 @@ export interface FileRoutesById {
   '/workspace/$id/settings/': typeof WorkspaceIdSettingsIndexRoute
   '/api/workspaces/$id/invites/$token': typeof ApiWorkspacesIdInvitesTokenRoute
   '/api/workspaces/$id/members/$uid': typeof ApiWorkspacesIdMembersUidRoute
+  '/api/workspaces/$wsId/federation/audit': typeof ApiWorkspacesWsIdFederationAuditRoute
+  '/api/workspaces/$wsId/federation/peers': typeof ApiWorkspacesWsIdFederationPeersRouteWithChildren
+  '/api/workspaces/$wsId/federation/apply/$peerId': typeof ApiWorkspacesWsIdFederationApplyPeerIdRoute
+  '/api/workspaces/$wsId/federation/connect/$peerId': typeof ApiWorkspacesWsIdFederationConnectPeerIdRoute
+  '/api/workspaces/$wsId/federation/diff/$peerId': typeof ApiWorkspacesWsIdFederationDiffPeerIdRoute
+  '/api/workspaces/$wsId/federation/disconnect/$peerId': typeof ApiWorkspacesWsIdFederationDisconnectPeerIdRoute
+  '/api/workspaces/$wsId/federation/peers/$peerId': typeof ApiWorkspacesWsIdFederationPeersPeerIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1876,6 +1946,13 @@ export interface FileRouteTypes {
     | '/workspace/$id/settings/'
     | '/api/workspaces/$id/invites/$token'
     | '/api/workspaces/$id/members/$uid'
+    | '/api/workspaces/$wsId/federation/audit'
+    | '/api/workspaces/$wsId/federation/peers'
+    | '/api/workspaces/$wsId/federation/apply/$peerId'
+    | '/api/workspaces/$wsId/federation/connect/$peerId'
+    | '/api/workspaces/$wsId/federation/diff/$peerId'
+    | '/api/workspaces/$wsId/federation/disconnect/$peerId'
+    | '/api/workspaces/$wsId/federation/peers/$peerId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -2061,6 +2138,13 @@ export interface FileRouteTypes {
     | '/workspace/$id/settings'
     | '/api/workspaces/$id/invites/$token'
     | '/api/workspaces/$id/members/$uid'
+    | '/api/workspaces/$wsId/federation/audit'
+    | '/api/workspaces/$wsId/federation/peers'
+    | '/api/workspaces/$wsId/federation/apply/$peerId'
+    | '/api/workspaces/$wsId/federation/connect/$peerId'
+    | '/api/workspaces/$wsId/federation/diff/$peerId'
+    | '/api/workspaces/$wsId/federation/disconnect/$peerId'
+    | '/api/workspaces/$wsId/federation/peers/$peerId'
   id:
     | '__root__'
     | '/'
@@ -2248,6 +2332,13 @@ export interface FileRouteTypes {
     | '/workspace/$id/settings/'
     | '/api/workspaces/$id/invites/$token'
     | '/api/workspaces/$id/members/$uid'
+    | '/api/workspaces/$wsId/federation/audit'
+    | '/api/workspaces/$wsId/federation/peers'
+    | '/api/workspaces/$wsId/federation/apply/$peerId'
+    | '/api/workspaces/$wsId/federation/connect/$peerId'
+    | '/api/workspaces/$wsId/federation/diff/$peerId'
+    | '/api/workspaces/$wsId/federation/disconnect/$peerId'
+    | '/api/workspaces/$wsId/federation/peers/$peerId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -3674,6 +3765,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiInvitesTokenAcceptRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/workspaces/$wsId/federation/peers': {
+      id: '/api/workspaces/$wsId/federation/peers'
+      path: '/$wsId/federation/peers'
+      fullPath: '/api/workspaces/$wsId/federation/peers'
+      preLoaderRoute: typeof ApiWorkspacesWsIdFederationPeersRouteImport
+      parentRoute: typeof ApiWorkspacesRoute
+    }
+    '/api/workspaces/$wsId/federation/audit': {
+      id: '/api/workspaces/$wsId/federation/audit'
+      path: '/$wsId/federation/audit'
+      fullPath: '/api/workspaces/$wsId/federation/audit'
+      preLoaderRoute: typeof ApiWorkspacesWsIdFederationAuditRouteImport
+      parentRoute: typeof ApiWorkspacesRoute
+    }
     '/api/workspaces/$id/members/$uid': {
       id: '/api/workspaces/$id/members/$uid'
       path: '/$uid'
@@ -3687,6 +3792,41 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/workspaces/$id/invites/$token'
       preLoaderRoute: typeof ApiWorkspacesIdInvitesTokenRouteImport
       parentRoute: typeof ApiWorkspacesIdInvitesRoute
+    }
+    '/api/workspaces/$wsId/federation/peers/$peerId': {
+      id: '/api/workspaces/$wsId/federation/peers/$peerId'
+      path: '/$peerId'
+      fullPath: '/api/workspaces/$wsId/federation/peers/$peerId'
+      preLoaderRoute: typeof ApiWorkspacesWsIdFederationPeersPeerIdRouteImport
+      parentRoute: typeof ApiWorkspacesWsIdFederationPeersRoute
+    }
+    '/api/workspaces/$wsId/federation/disconnect/$peerId': {
+      id: '/api/workspaces/$wsId/federation/disconnect/$peerId'
+      path: '/$wsId/federation/disconnect/$peerId'
+      fullPath: '/api/workspaces/$wsId/federation/disconnect/$peerId'
+      preLoaderRoute: typeof ApiWorkspacesWsIdFederationDisconnectPeerIdRouteImport
+      parentRoute: typeof ApiWorkspacesRoute
+    }
+    '/api/workspaces/$wsId/federation/diff/$peerId': {
+      id: '/api/workspaces/$wsId/federation/diff/$peerId'
+      path: '/$wsId/federation/diff/$peerId'
+      fullPath: '/api/workspaces/$wsId/federation/diff/$peerId'
+      preLoaderRoute: typeof ApiWorkspacesWsIdFederationDiffPeerIdRouteImport
+      parentRoute: typeof ApiWorkspacesRoute
+    }
+    '/api/workspaces/$wsId/federation/connect/$peerId': {
+      id: '/api/workspaces/$wsId/federation/connect/$peerId'
+      path: '/$wsId/federation/connect/$peerId'
+      fullPath: '/api/workspaces/$wsId/federation/connect/$peerId'
+      preLoaderRoute: typeof ApiWorkspacesWsIdFederationConnectPeerIdRouteImport
+      parentRoute: typeof ApiWorkspacesRoute
+    }
+    '/api/workspaces/$wsId/federation/apply/$peerId': {
+      id: '/api/workspaces/$wsId/federation/apply/$peerId'
+      path: '/$wsId/federation/apply/$peerId'
+      fullPath: '/api/workspaces/$wsId/federation/apply/$peerId'
+      preLoaderRoute: typeof ApiWorkspacesWsIdFederationApplyPeerIdRouteImport
+      parentRoute: typeof ApiWorkspacesRoute
     }
   }
 }
@@ -3948,12 +4088,44 @@ const ApiWorkspacesIdRouteWithChildren = ApiWorkspacesIdRoute._addFileChildren(
   ApiWorkspacesIdRouteChildren,
 )
 
+interface ApiWorkspacesWsIdFederationPeersRouteChildren {
+  ApiWorkspacesWsIdFederationPeersPeerIdRoute: typeof ApiWorkspacesWsIdFederationPeersPeerIdRoute
+}
+
+const ApiWorkspacesWsIdFederationPeersRouteChildren: ApiWorkspacesWsIdFederationPeersRouteChildren =
+  {
+    ApiWorkspacesWsIdFederationPeersPeerIdRoute:
+      ApiWorkspacesWsIdFederationPeersPeerIdRoute,
+  }
+
+const ApiWorkspacesWsIdFederationPeersRouteWithChildren =
+  ApiWorkspacesWsIdFederationPeersRoute._addFileChildren(
+    ApiWorkspacesWsIdFederationPeersRouteChildren,
+  )
+
 interface ApiWorkspacesRouteChildren {
   ApiWorkspacesIdRoute: typeof ApiWorkspacesIdRouteWithChildren
+  ApiWorkspacesWsIdFederationAuditRoute: typeof ApiWorkspacesWsIdFederationAuditRoute
+  ApiWorkspacesWsIdFederationPeersRoute: typeof ApiWorkspacesWsIdFederationPeersRouteWithChildren
+  ApiWorkspacesWsIdFederationApplyPeerIdRoute: typeof ApiWorkspacesWsIdFederationApplyPeerIdRoute
+  ApiWorkspacesWsIdFederationConnectPeerIdRoute: typeof ApiWorkspacesWsIdFederationConnectPeerIdRoute
+  ApiWorkspacesWsIdFederationDiffPeerIdRoute: typeof ApiWorkspacesWsIdFederationDiffPeerIdRoute
+  ApiWorkspacesWsIdFederationDisconnectPeerIdRoute: typeof ApiWorkspacesWsIdFederationDisconnectPeerIdRoute
 }
 
 const ApiWorkspacesRouteChildren: ApiWorkspacesRouteChildren = {
   ApiWorkspacesIdRoute: ApiWorkspacesIdRouteWithChildren,
+  ApiWorkspacesWsIdFederationAuditRoute: ApiWorkspacesWsIdFederationAuditRoute,
+  ApiWorkspacesWsIdFederationPeersRoute:
+    ApiWorkspacesWsIdFederationPeersRouteWithChildren,
+  ApiWorkspacesWsIdFederationApplyPeerIdRoute:
+    ApiWorkspacesWsIdFederationApplyPeerIdRoute,
+  ApiWorkspacesWsIdFederationConnectPeerIdRoute:
+    ApiWorkspacesWsIdFederationConnectPeerIdRoute,
+  ApiWorkspacesWsIdFederationDiffPeerIdRoute:
+    ApiWorkspacesWsIdFederationDiffPeerIdRoute,
+  ApiWorkspacesWsIdFederationDisconnectPeerIdRoute:
+    ApiWorkspacesWsIdFederationDisconnectPeerIdRoute,
 }
 
 const ApiWorkspacesRouteWithChildren = ApiWorkspacesRoute._addFileChildren(

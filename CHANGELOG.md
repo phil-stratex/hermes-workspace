@@ -5,6 +5,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — Federation Sync-Engine, Audit, API-Routes (Phase B.2, 2026-05-09)
+
+Diff-Engine, Hash-Chain Audit-Helper, **7 neue API-Routes** für die komplette Federation-Lifecycle (Add Peer → Connect → Diff → Apply → Disconnect → Audit). Adressiert Plan-Findings AK28 (Time-Skew-robuste Conflict-Detection via SHA256+Baseline statt Wall-Clock), B.5 (Mass-Delete-Detection + Hardcoded-Deny-Filter beim Apply), F10 (Hash-Chain-Validation auf der Audit-Read-Seite).
+
+**Neue Backend-Module (2)**
+- **`src/server/federation-audit.ts`** — typed Event-Emitter `emitFederationEvent(wsId, event)` mit discriminated union über alle 9 Federation-Lifecycle-Events: `peer_added`, `peer_updated`, `peer_deleted`, `connect`, `disconnect` (mit Reason `manual`/`idle-ttl`/`error`), `diff_computed` (mit Summary + Mass-Delete-Warnings), `apply` (mit applied-counts + conflictsResolved), `apply_skipped`, `chain_break_detected`. Events landen im workspace-scoped JSONL `data/workspaces/<wsId>/audit/<YYYY-MM-DD>.jsonl` neben den Member-Events — eine einzige Hash-Chain für alles.
+- **`src/server/federation-sync-engine.ts`** — Pure-Function-First Diff-Computation + selective Apply.
+  - **Read-Side**: `readLocalMemories()`, `readLocalSkills()`, `readLocalSessionSnapshots()` (Pools mit SHA256 pro Pfad). `readRemote(client)` ruft die 3 list-Tools des Peers parallel ab und konvertiert in Maps.
+  - **Diff**: `computeDiff({ wsId, peerId, syncedTypes, remote })` produziert `{ inItems, outItems, conflicts, warnings }`. **AK28** Time-Skew-robuste Conflict-Detection: liest `data/workspaces/<wsId>/federation/peers-baselines/<peerId>.json` (SHA256 pro Pfad vom letzten erfolgreichen Sync). Conflict-Regel: `localHash !== baselineHash && remoteHash !== baselineHash`. Erstem Sync ohne Baseline: jede Divergenz wird zum Conflict (Operator entscheidet).
+  - **Tombstones**: lokale `*.md.deleted`-Marker werden als `<path>#tombstone` in der Local-Map markiert; Remote-only-Pfade die in der Baseline existierten werden zu `incoming-delete`. Tombstoned-local-on-remote-only-Pfade zu `outgoing-delete`.
+  - **Mass-Delete-Warnings (B.5)**: `computeMassDeleteWarnings(...)` flaggt `>50` absolute Tombstones ODER `>30%` des Pools (mit `pool-min 10` gegen False-Positives auf Mini-Pools — bei 1/1 wird ratio = 0.1, nicht 1.0).
+  - **Apply**: `applyDiff({ wsId, peerId, diff, selective, fetchRemoteContent, actorUserId })` schreibt nur explizit-selectierte Items. Stale-Plan-Refusal: wenn `selective[].remoteSha256` nicht zum `diff.remoteSha256` passt (Hash drift seit Diff-Anzeige) → skipped mit `reason: 'stale plan'`. **Hardcoded-Deny-Filter (B.5)**: nur `memories/*.md{,.deleted}`, `skills/<name>/SKILL.md`, `sessions/shared/<id>.json` sind permitted; alles andere (`sessions/<userId>/`, `members.json`, `peers.json`, `meta.json`, `worker-profiles/`, `audit/`, beliebige andere) → skipped mit `reason: 'hardcoded-deny'`. Conflicts werden via `selective[].resolve === 'local' | 'remote'` aufgelöst, alles andere bleibt unaccepted. Baseline wird nach erfolgreichem Apply aktualisiert.
+
+**API-Routes (7 neu)**
+- **`GET /api/workspaces/$wsId/federation/peers`** — gated auf `federation-manage`. Listet Peers OHNE `publicKey` / `sshKeyPath` auf der Wire (private state bleibt server-side).
+- **`POST /api/workspaces/$wsId/federation/peers`** — generiert via `ssh-keygen -t ed25519 -N ''` ein neues Keypair, persistiert den Peer, returnt **EINMALIG** den `publicKey` + die exakte `authorizedKeysLine` für den Wizard. Audit `peer_added`.
+- **`PATCH /api/workspaces/$wsId/federation/peers/$peerId`** — Update Name/Host/User/Port/SyncedTypes/Notes. Audit `peer_updated` mit Patch-Inhalt.
+- **`DELETE /api/workspaces/$wsId/federation/peers/$peerId`** — Audit `peer_deleted`.
+- **`POST /api/workspaces/$wsId/federation/connect/$peerId`** — Probet via `testConnection()`. Bei Probe-Failure: `503` mit `{reason: 'unrestricted' | 'ssh-failed', details}` und `peer.status = 'error'`. Bei Erfolg: `peer.status = 'connected'` + Audit.
+- **`POST /api/workspaces/$wsId/federation/disconnect/$peerId`** — Audit mit `reason: 'manual'`.
+- **`POST /api/workspaces/$wsId/federation/diff/$peerId`** — read-only. Spawned MCP-Client → `readRemote()` → `computeDiff()`. Gibt das volle `DiffResult` zurück für die Pflicht-Diff-Preview im SyncWizard (Phase B.3). Audit `diff_computed` mit Summary + Mass-Delete-Warnings.
+- **`POST /api/workspaces/$wsId/federation/apply/$peerId`** — Body: `{ selective: [{ path, resolve?, remoteSha256? }] }`. Re-spawnt MCP-Client, recomputet Diff (refused stale plans), führt `applyDiff()` aus mit `fetchRemoteContent` der per Pfadtyp die richtigen Tool-Calls macht (`get_memory` / `get_skill` / `get_session_snapshot`). Persistiert Sync-Summary auf `peer.lastSync`. Audit `apply` mit detaillierten Counts.
+- **`GET /api/workspaces/$wsId/federation/audit`** — Filtered Hash-Chain-Read auf `federation_*`-Events. F10 Chain-Validation auf der Read-Seite, `chain_break_detected` self-recording bei Tampering-Verdacht.
+
+**Test-Suite (1 File, 25 Cases)**
+- `federation-sync-engine.test.ts` — Vollständige Coverage:
+  - **Mass-Delete-Warnings (B.5)**: 5 Cases — `>50` absolute, `>30%` Ratio, Pool-Min-Schutz für 1/1 + 2/2 (kein False-Positive), Trigger bei 4/5 (`4/max(5,10)=0.4`), quiet-sync.
+  - **Diff Basic Shape**: 1 Case — add/update/delete + first-encounter-conflict.
+  - **AK28 Time-Skew-Robust**: 1 Case — Baseline-basierte Conflict-Detection: local-only-changed → outgoing; both-changed → conflict.
+  - **Tombstone Detection**: 2 Cases — incoming-delete (baseline kennt path, remote nicht), outgoing-delete (lokales `.md.deleted` + remote-still-live).
+  - **Skills + Sessions Diff**: 1 Case — beide werden gediff'd wenn in `syncedTypes`.
+  - **Apply Selective + Baseline**: 5 Cases — Roundtrip add+baseline, opt-out per `selective[]`, Stale-Plan-Refusal, Hardcoded-Deny-Refusal, Conflict-Resolution `local` (keep + baseline-update) + `remote` (overwrite + baseline-update), unresolved Conflict skipped.
+  - **Hardcoded-Deny-Matrix (B.5)**: 7 Cases — `memories/`, `skills/`, `sessions/shared/` permitted; `sessions/<userId>/`, `members.json`, `peers.json`, `meta.json`, `worker-profiles/`, `random.txt`, `.env` REFUSED.
+  - **Constants**: 1 Case — Threshold-Konstanten matchen Plan B.5 (`50`, `0.3`, `10`).
+
+**Verifikation (harte Zahlen)**
+- **Phase-B.2 Tests:** **25 / 25** Cases passed in 205 ms.
+- **Phase A + B Suite gesamt:** **359 / 359** Cases in **25 Test-Files** (14.18 s). Inkl. AK26 (1000 Tokens p99 <5 ms), F6 50× Failed-Login-Race, R6 50→1 Gateway-Call, L4 Marker-Tampering, L6 Brand-`tsc`-Enforcement, F10 Audit-Chain-Validation, AK28 Time-Skew-robuste Conflict-Detection.
+- **Typecheck:** keine neuen Fehler in B.2-Files.
+- **Build:** `pnpm build` durchgelaufen in 9.58 s, **alle 7 Federation-Routes** im `routeTree.gen.ts` registered.
+- **Diff:** 9 files added, +1450 LOC.
+
 ### Added — Federation MCP-Server, Peers-Store, SSH-Tunnel-Skelett (Phase B.1, 2026-05-09)
 
 Erste Phase der Federation-Schicht (Plan B). Liefert das ganze Substrat unter dem die Sync-Engine in Phase B.2 läuft: per-Workspace Peers-Konfiguration, JSON-RPC-2.0 MCP-Server (no SDK, no extra layer), MCP-Client über `ssh`-child-process, SSH-Key-Lifecycle. **Adressiert Plan-Findings F2 (Workspace-Process-Lock + Path-Traversal-Refusal), F4 (SSH `command="..."`-Restriction), N11 (exakt 7 Tools), B.5 (hardcoded Filter — kein Gateway-Direct, nur shared Sessions).**
