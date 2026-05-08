@@ -44,6 +44,39 @@ export type ProjectDocumentSummary = {
   char_count: number
 }
 
+export type ProjectSummary = {
+  project_id: string
+  prompt: string
+  status: string
+  created_at: string
+  document_count: number
+  build_task: BuildTaskState | null
+  simulation_count: number
+  report_count: number
+}
+
+export type SimulationSummaryRow = {
+  simulation_id: string
+  project_id: string
+  status: string
+  config: SimulationConfig
+  created_at: string
+  persona_count: number
+  has_active_run: boolean
+  has_completed_run: boolean
+}
+
+export type ReportSummaryRow = {
+  report_id: string
+  simulation_id: string
+  status: string
+  progress: number
+  created_at: string
+  finished_at: string | null
+  section_total: number
+  section_completed: number
+}
+
 export type ProjectDetail = {
   project_id: string
   prompt: string
@@ -440,6 +473,25 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const predictClient = {
   health: () => call<PredictHealth>('/healthz'),
+
+  listProjects: (limit = 50) =>
+    call<Array<ProjectSummary>>(`/api/projects?limit=${limit}`),
+
+  listSimulations: (opts: { projectId?: string; limit?: number } = {}) => {
+    const params = new URLSearchParams()
+    if (opts.projectId) params.set('project_id', opts.projectId)
+    if (typeof opts.limit === 'number') params.set('limit', String(opts.limit))
+    const qs = params.toString()
+    return call<Array<SimulationSummaryRow>>(`/api/simulations${qs ? `?${qs}` : ''}`)
+  },
+
+  listReports: (opts: { simulationId?: string; limit?: number } = {}) => {
+    const params = new URLSearchParams()
+    if (opts.simulationId) params.set('simulation_id', opts.simulationId)
+    if (typeof opts.limit === 'number') params.set('limit', String(opts.limit))
+    const qs = params.toString()
+    return call<Array<ReportSummaryRow>>(`/api/reports${qs ? `?${qs}` : ''}`)
+  },
 
   createProjectMultipart: async (files: Array<File>, prompt: string): Promise<CreatedProject> => {
     const form = new FormData()

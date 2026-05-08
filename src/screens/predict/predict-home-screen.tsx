@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { ArrowRight01Icon, RocketIcon, Delete02Icon } from '@hugeicons/core-free-icons'
+import { ArrowRight01Icon, RocketIcon, RefreshIcon, Clock01Icon } from '@hugeicons/core-free-icons'
 import { PredictShell } from './predict-shell'
 import { UploadDropzone } from './components/upload-dropzone'
-import { predictClient, type PredictHealth } from '@/server/predict-client'
-import { usePredictStore, type RecentProject } from '@/stores/predict-store'
+import {
+  predictClient,
+  type PredictHealth,
+  type ProjectSummary,
+} from '@/server/predict-client'
+import { usePredictStore } from '@/stores/predict-store'
 import { cn } from '@/lib/utils'
 
 export function PredictHomeScreen() {
@@ -18,9 +23,18 @@ export function PredictHomeScreen() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const navigate = useNavigate()
   const setPendingUpload = usePredictStore((s) => s.setPendingUpload)
-  const upsertRecent = usePredictStore((s) => s.upsertRecent)
-  const removeRecent = usePredictStore((s) => s.removeRecent)
-  const recentProjects = usePredictStore((s) => s.recentProjects)
+
+  // Server-driven recent projects (replaces the prior client-only zustand cache).
+  const projectsQuery = useQuery({
+    queryKey: ['predict', 'projects-list'],
+    queryFn: () => predictClient.listProjects(20),
+    refetchInterval: 15_000,
+    enabled: !healthError,
+  })
+  const recentProjects = projectsQuery.data ?? []
+  const inFlightProject = recentProjects.find(
+    (p) => p.build_task && (p.build_task.status === 'queued' || p.build_task.status === 'running'),
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -55,15 +69,9 @@ export function PredictHomeScreen() {
       // Cache so the build screen can render before the POST resolves.
       setPendingUpload({ files, prompt })
       const created = await predictClient.createProjectMultipart(files, prompt.trim())
-      const recent: RecentProject = {
-        projectId: created.project_id,
-        prompt: prompt.trim(),
-        documentNames: created.documents,
-        createdAt: Date.now(),
-        status: (created.status as RecentProject['status']) || 'queued',
-      }
-      upsertRecent(recent)
       setPendingUpload(null)
+      // Optimistically refresh history so the new project shows up immediately.
+      void projectsQuery.refetch()
       void navigate({
         to: '/predict/$projectId/build',
         params: { projectId: created.project_id },
@@ -130,56 +138,101 @@ export function PredictHomeScreen() {
         </div>
       </section>
 
+      {inFlightProject ? (
+        <section className="rounded-2xl border-2 border-yellow-500/40 bg-yellow-500/5 p-4">
+          <div className="flex items-start gap-3">
+            <HugeiconsIcon icon={Clock01Icon} size={18} />
+            <div className="flex-1">
+              <div className="text-sm font-semibold">Build läuft im Hintergrund</div>
+              <div className="text-xs text-[var(--theme-muted)] mt-1">
+                Projekt <code>{inFlightProject.project_id.slice(0, 16)}</code> ·
+                {' '}Phase {inFlightProject.build_task?.phase} ·{' '}
+                {Math.round((inFlightProject.build_task?.progress ?? 0) * 100)}%
+              </div>
+            </div>
+            <Link
+              to="/predict/$projectId/build"
+              params={{ projectId: inFlightProject.project_id }}
+              className="rounded-lg bg-[var(--theme-accent)] px-3 py-1.5 text-xs font-semibold text-primary-950"
+            >
+              Fortsetzen
+            </Link>
+          </div>
+        </section>
+      ) : null}
+
       <section>
-        <h3 className="mb-3 text-sm font-semibold">Verlauf</h3>
+        <header className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-semibold">Verlauf</h3>
+          <button
+            type="button"
+            onClick={() => void projectsQuery.refetch()}
+            disabled={projectsQuery.isFetching}
+            className="flex items-center gap-1 rounded-full border border-[var(--theme-border)] px-2 py-1 text-[10px] text-[var(--theme-muted)] hover:text-[var(--theme-text)] disabled:opacity-50"
+          >
+            <HugeiconsIcon icon={RefreshIcon} size={9} />
+            {projectsQuery.isFetching ? 'Lädt…' : 'Aktualisieren'}
+          </button>
+        </header>
         {recentProjects.length === 0 ? (
           <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4 text-xs text-[var(--theme-muted)]">
-            Noch keine Vorhersagen — abgeschlossene Projekte erscheinen hier.
+            {projectsQuery.isLoading
+              ? 'Lade Verlauf…'
+              : 'Noch keine Vorhersagen — abgeschlossene Projekte erscheinen hier.'}
           </div>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {recentProjects.map((project) => (
-              <li key={project.projectId}>
-                <Link
-                  to="/predict/$projectId/build"
-                  params={{ projectId: project.projectId }}
-                  className="block rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3 transition hover:border-[var(--theme-accent)]"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="text-[10px] uppercase text-[var(--theme-muted)]">
-                      {project.projectId.slice(0, 16)}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        removeRecent(project.projectId)
-                      }}
-                      className="text-[var(--theme-muted)] hover:text-red-300"
-                      aria-label="Aus Verlauf entfernen"
-                    >
-                      <HugeiconsIcon icon={Delete02Icon} size={12} />
-                    </button>
-                  </div>
-                  <p className="mt-2 line-clamp-2 text-sm">{project.prompt}</p>
-                  <div className="mt-2 text-[10px] text-[var(--theme-muted)]">
-                    {project.documentNames.slice(0, 3).join(', ')}
-                    {project.documentNames.length > 3 ? '…' : ''}
-                  </div>
-                  <div className="mt-1 flex items-center justify-between text-[10px] text-[var(--theme-muted)]">
-                    <span>{new Date(project.createdAt).toLocaleString()}</span>
-                    <span className="rounded-full border border-[var(--theme-border)] px-2 py-0.5">
-                      {project.status}
-                    </span>
-                  </div>
-                </Link>
+              <li key={project.project_id}>
+                <ProjectCard project={project} />
               </li>
             ))}
           </ul>
         )}
       </section>
     </PredictShell>
+  )
+}
+
+function ProjectCard({ project }: { project: ProjectSummary }) {
+  const buildStatus = project.build_task?.status ?? 'unknown'
+  const buildOk = buildStatus === 'completed'
+  const buildRunning = buildStatus === 'queued' || buildStatus === 'running'
+  const buildFailed = buildStatus === 'failed'
+  return (
+    <Link
+      to="/predict/$projectId/build"
+      params={{ projectId: project.project_id }}
+      className="block rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3 transition hover:border-[var(--theme-accent)]"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-[10px] font-mono uppercase text-[var(--theme-muted)]">
+          {project.project_id.slice(0, 16)}
+        </div>
+        <span
+          className={cn(
+            'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase',
+            buildOk && 'bg-[var(--theme-accent-soft)] text-[var(--theme-accent)]',
+            buildFailed && 'bg-red-500/20 text-red-300',
+            buildRunning && 'bg-yellow-500/15 text-yellow-200',
+            !buildOk && !buildFailed && !buildRunning && 'bg-[var(--theme-bg)] text-[var(--theme-muted)]',
+          )}
+        >
+          {buildStatus}
+        </span>
+      </div>
+      <p className="mt-2 line-clamp-2 text-sm">{project.prompt || '(kein Prompt)'}</p>
+      <div className="mt-2 flex items-center gap-3 text-[10px] text-[var(--theme-muted)]">
+        <span>{project.document_count} {project.document_count === 1 ? 'Datei' : 'Dateien'}</span>
+        <span>·</span>
+        <span>{project.simulation_count} Sims</span>
+        <span>·</span>
+        <span>{project.report_count} Reports</span>
+      </div>
+      <div className="mt-1 text-[10px] text-[var(--theme-muted)]">
+        {new Date(project.created_at).toLocaleString()}
+      </div>
+    </Link>
   )
 }
 
