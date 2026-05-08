@@ -15,9 +15,16 @@ import {
   requireJsonContentType,
 } from '../../server/rate-limit'
 
+// Accept either { email } (legacy clients) or { identifier } (new
+// code path that allows userId-slugs). Both fall through to
+// `loginWithEmailPassword` which inspects whether the value contains
+// an "@" and picks email-vs-id lookup accordingly.
 const LoginSchema = z.object({
-  email: z.string().min(3).max(320),
+  email: z.string().min(1).max(320).optional(),
+  identifier: z.string().min(1).max(320).optional(),
   password: z.string().min(1).max(1000),
+}).refine((d) => Boolean(d.email || d.identifier), {
+  message: 'email or identifier required',
 })
 
 export const Route = createFileRoute('/api/auth/login')({
@@ -47,7 +54,8 @@ export const Route = createFileRoute('/api/auth/login')({
           return json({ ok: false, error: 'Invalid request' }, { status: 400 })
         }
 
-        const result = await loginWithEmailPassword(parsed.data.email, parsed.data.password, {
+        const identifier = parsed.data.identifier ?? parsed.data.email ?? ''
+        const result = await loginWithEmailPassword(identifier, parsed.data.password, {
           ip: getRequestIp(request),
           userAgent: request.headers.get('user-agent') ?? undefined,
         })

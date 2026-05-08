@@ -130,10 +130,12 @@ export async function fetchSetupStatus(): Promise<SetupStatus> {
 export type LoginResponse = { ok: true; userId: string }
 
 export async function loginWithEmailPassword(
-  email: string,
+  identifier: string,
   password: string,
 ): Promise<LoginResponse> {
-  return postJson<LoginResponse>('/api/auth/login', { email, password })
+  // The server endpoint accepts either { email } or { identifier };
+  // we send `identifier` so userId-slug logins work transparently.
+  return postJson<LoginResponse>('/api/auth/login', { identifier, password })
 }
 
 export async function logout(): Promise<void> {

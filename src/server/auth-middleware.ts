@@ -355,22 +355,29 @@ export type LoginResult =
  * cookie via `createSessionCookie(result.token)`.
  */
 export async function loginWithEmailPassword(
-  email: string,
+  emailOrId: string,
   plain: string,
   ctx: { ip?: string; userAgent?: string } = {},
 ): Promise<LoginResult> {
-  const normEmail = email.trim().toLowerCase()
-  // Lookup user by email — O(N) over users, fine at the scale we
-  // target (≤ a few hundred per stack).
-  const userId = listUsers().find((id) => {
-    const profile = getUserProfile(id)
-    return profile?.email.toLowerCase() === normEmail
-  })
+  const trimmed = emailOrId.trim()
+  const lower = trimmed.toLowerCase()
+  // Accept either an email (contains "@") or a userId-slug. Branch
+  // here so a stack with userId="phil" + email="phil@stratex-ai.com"
+  // can be reached either way.
+  let userId: string | undefined
+  if (trimmed.includes('@')) {
+    userId = listUsers().find((id) => {
+      const profile = getUserProfile(id)
+      return profile?.email.toLowerCase() === lower
+    })
+  } else if (isValidSlug(lower)) {
+    userId = listUsers().includes(lower) ? lower : undefined
+  }
   if (!userId) {
     await appendAuditEvent('global', {
       type: 'login_failed',
       reason: 'no-such-user',
-      email: normEmail,
+      identifier: lower,
       ip: ctx.ip ?? 'unknown',
       userAgent: ctx.userAgent,
     })

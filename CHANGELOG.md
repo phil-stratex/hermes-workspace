@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed — Login akzeptiert User-ID-Slug zusätzlich zur Email (2026-05-09)
+
+Quality-of-life nach der ersten Production-Migration: bei `phil@stratex-ai.com` als Email reicht es jetzt auch nur `phil` einzutippen.
+
+- **`loginWithEmailPassword(emailOrId, password, ctx)`** in `auth-middleware.ts` branched: enthält der Input `@`, läuft Email-Lookup; ist es ein gültiger Slug, läuft direkter `userId`-Lookup. Audit-Event-Field `email` → `identifier` umbenannt damit der Log beide Modi abbildet.
+- **`POST /api/auth/login`** akzeptiert jetzt `{ email }` (legacy clients) ODER `{ identifier }` (neuer Pfad). Beide flow durch `loginWithEmailPassword`. Zod-`.refine` stellt sicher dass mindestens eines da ist.
+- **Frontend `loginWithEmailPassword(identifier, password)`** sendet jetzt `{ identifier }`.
+- **`LoginForm`-Label** umbenannt von **„Email"** zu **„Email oder User-ID"**, Placeholder zeigt beide Varianten (`phil  oder  phil@stratex-ai.com`), `autoComplete="username"` (statt `email`), `type="text"` (statt `email`) damit Browser keine Email-Format-Validierung erzwingt.
+
+**Verifikation:** 49 / 49 Auth-Tests passed (auth-middleware: 27, auth-routes-flow: 12, route-auth-helpers: 10), inkl. AK26-Bench.
+
 ### Changed — Phase-B-Followups: Session-Share-UI-Integration + Mass-Route-Refactor + Pre-Existing-Failures-Triage (2026-05-09)
 
 Drei optionale Followups nach dem Plan-Scope-Abschluss. Alle harten Zahlen unten.

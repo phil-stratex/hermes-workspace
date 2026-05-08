@@ -286,12 +286,12 @@ function LoginForm({
       </p>
       <form onSubmit={handleSubmit} className="space-y-4">
         <TextField
-          label="Email"
+          label="Email oder User-ID"
           value={email}
           onChange={setEmail}
-          type="email"
-          placeholder="phil@stratex-ai.com"
-          autoComplete="email"
+          type="text"
+          placeholder="phil  oder  phil@stratex-ai.com"
+          autoComplete="username"
           autoFocus
           disabled={loading}
         />
