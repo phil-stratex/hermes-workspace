@@ -162,6 +162,98 @@ export type PrepareEvent =
   | { type: 'failed'; error: string }
   | { type: 'end'; reason: string }
 
+// --- Phase 3 — Run lifecycle ---------------------------------------------
+
+export type RunTaskState = {
+  id: string
+  progress: number
+  status: 'queued' | 'running' | 'completed' | 'stopped' | 'failed' | string
+  error: string | null
+  current_round: number
+  target_rounds: number
+  stop_requested: boolean
+}
+
+export type RunStartResponse = {
+  simulation_id: string
+  run_task_id: string
+  status: string
+  target_rounds: number
+}
+
+export type SimPostSummary = {
+  id: string
+  persona_id: string
+  persona_name: string
+  round_no: number
+  platform: string
+  parent_id: string | null
+  content: string
+  likes: number
+  dislikes: number
+  reposts: number
+  created_at: string
+}
+
+export type SimActionRow = {
+  id: string
+  round_no: number
+  persona_id: string
+  persona_name: string
+  platform: string
+  action_type: string
+  target_post_id: string | null
+  post_id: string | null
+  content: string | null
+  created_at: string
+}
+
+export type AgentStats = {
+  persona_id: string
+  persona_name: string
+  posts: number
+  replies: number
+  likes_given: number
+  likes_received: number
+  reposts_received: number
+}
+
+export type RunEvent =
+  | {
+      type: 'snapshot'
+      progress: number
+      status: string
+      error: string | null
+      current_round: number
+      target_rounds: number
+      stop_requested: boolean
+    }
+  | {
+      type: 'started'
+      simulation_id: string
+      platforms: Array<string>
+      personas: number
+      max_rounds: number
+    }
+  | { type: 'round_start'; round_no: number; round_id: string }
+  | { type: 'round_end'; round_no: number; actions: number; posts: number }
+  | {
+      type: 'action'
+      action_id: string
+      action_type: string
+      platform: string
+      persona_id: string
+      persona_name: string
+      round_no: number
+      post_id: string | null
+      target_post_id: string | null
+      content: string | null
+    }
+  | { type: 'done'; stats: { actions: number; posts: number } }
+  | { type: 'stopped'; round_no?: number; stats?: { actions: number; posts: number } }
+  | { type: 'failed'; error: string }
+  | { type: 'end'; reason: string }
+
 export type BuildEvent =
   | { type: 'snapshot'; phase: number; progress: number; status: string; error: string | null }
   | { type: 'phase'; phase: number; label: string }
@@ -281,6 +373,63 @@ export const predictClient = {
   openPrepareEventStream: (simulationId: string): EventSource =>
     new EventSource(
       `${PROXY_BASE}/api/simulations/${encodeURIComponent(simulationId)}/prepare/events`,
+    ),
+
+  // --- Phase 3 — Run lifecycle -----------------------------------------
+
+  startSimulation: (simulationId: string) =>
+    call<RunStartResponse>(
+      `/api/simulations/${encodeURIComponent(simulationId)}/start`,
+      { method: 'POST', headers: { 'content-type': 'application/json' } },
+    ),
+
+  stopSimulation: (simulationId: string) =>
+    call<RunTaskState>(
+      `/api/simulations/${encodeURIComponent(simulationId)}/stop`,
+      { method: 'POST', headers: { 'content-type': 'application/json' } },
+    ),
+
+  getRunStatus: (simulationId: string) =>
+    call<RunTaskState | null>(
+      `/api/simulations/${encodeURIComponent(simulationId)}/run-status`,
+    ),
+
+  listSimulationPosts: (
+    simulationId: string,
+    opts: { platform?: string; limit?: number; sinceRound?: number } = {},
+  ) => {
+    const params = new URLSearchParams()
+    if (opts.platform) params.set('platform', opts.platform)
+    if (typeof opts.limit === 'number') params.set('limit', String(opts.limit))
+    if (typeof opts.sinceRound === 'number') params.set('since_round', String(opts.sinceRound))
+    const qs = params.toString()
+    return call<Array<SimPostSummary>>(
+      `/api/simulations/${encodeURIComponent(simulationId)}/posts${qs ? `?${qs}` : ''}`,
+    )
+  },
+
+  listSimulationTimeline: (
+    simulationId: string,
+    opts: { limit?: number; sinceRound?: number } = {},
+  ) => {
+    const params = new URLSearchParams()
+    if (typeof opts.limit === 'number') params.set('limit', String(opts.limit))
+    if (typeof opts.sinceRound === 'number') params.set('since_round', String(opts.sinceRound))
+    const qs = params.toString()
+    return call<Array<SimActionRow>>(
+      `/api/simulations/${encodeURIComponent(simulationId)}/timeline${qs ? `?${qs}` : ''}`,
+    )
+  },
+
+  listAgentStats: (simulationId: string) =>
+    call<Array<AgentStats>>(
+      `/api/simulations/${encodeURIComponent(simulationId)}/agent-stats`,
+    ),
+
+  /** SSE stream for the live simulation run. */
+  openRunEventStream: (simulationId: string): EventSource =>
+    new EventSource(
+      `${PROXY_BASE}/api/simulations/${encodeURIComponent(simulationId)}/run/events`,
     ),
 }
 
