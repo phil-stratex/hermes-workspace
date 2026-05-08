@@ -5,6 +5,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — Federation MCP-Server, Peers-Store, SSH-Tunnel-Skelett (Phase B.1, 2026-05-09)
+
+Erste Phase der Federation-Schicht (Plan B). Liefert das ganze Substrat unter dem die Sync-Engine in Phase B.2 läuft: per-Workspace Peers-Konfiguration, JSON-RPC-2.0 MCP-Server (no SDK, no extra layer), MCP-Client über `ssh`-child-process, SSH-Key-Lifecycle. **Adressiert Plan-Findings F2 (Workspace-Process-Lock + Path-Traversal-Refusal), F4 (SSH `command="..."`-Restriction), N11 (exakt 7 Tools), B.5 (hardcoded Filter — kein Gateway-Direct, nur shared Sessions).**
+
+**Neue Module (5 Backend + 1 CLI)**
+- **`src/server/federation-peers-store.ts`** — Per-Workspace `peers.json` unter `data/workspaces/<wsId>/federation/peers.json` (`schemaVersion: 1`, niemals selbst gesynct). Keypair-Pfade je Peer in `federation/keys/<peerId>.key{,.pub}`. CRUD: `addPeer`, `updatePeer`, `setPeerStatus`, `recordSyncSummary`, `deletePeer`, plus `getPeer` / `readPeers`. Schreibe via `withMutex(\`peers:\${wsId}\`)` (Plan F6). Slug-Validation für `wsId`, `remoteWorkspaceId`, `createdBy`. Refused leerer `host` / `sshUser`. 16-Hex-Char `peerId` via crypto.randomBytes.
+- **`src/server/federation-mcp-server.ts`** — JSON-RPC-2.0-Server (no SDK). `createServerContext(wsId)` wirft bei Slug-Bruch und merkt sich nur den Workspace-Root. **`resolveSafe(ctx, relPath)`** ist die einzige zugelassene Pfadauflösung — refused absolute Pfade, `..`-Traversal, Null-Bytes, leere Strings (Plan F2). **`handleRequest(ctx, raw)`** dispatcht zu den 7 Tools (Plan N11):
+  - `list_memories` — rekursiv Markdown unter `memories/` mit SHA256+size+mtime
+  - `get_memory(path)` — refused alles außerhalb von `memories/`
+  - `list_skills` — eine Zeile pro `skills/<name>/SKILL.md`
+  - `get_skill(name)` — refused path-y names (`/`, `\\`, `..`, NUL)
+  - `list_session_snapshots` — nur `sessions/shared/*.json`, nie Gateway, nie user-private
+  - `get_session_snapshot(id)` — gleiches Filter-Bracket
+  - `list_mission_events_since(sinceIndex)` — Phase-C-Stub, returnt `{ events: [], total: 0 }`
+
+  **Path-Traversal-Versuche werden audit'd** als globaler `mcp_path_traversal_attempt`-Event. JSON-RPC-Error-Codes: `-32700` (parse), `-32600` (invalid request), `-32601` (method not found), `-32602` (invalid params), `-32603` (internal), **`-32001` (PathTraversalRefused)**, `-32004` (NotFound).
+- **`scripts/mcp-federation-stdio.ts`** — CLI-Entry für SSH `command="..."`-Restriction. Parst `--workspace-id <slug>` einmal, fail-fast bei missing/malformed (`exit 2`). Newline-delimited JSON-RPC über stdin/stdout. Workspace-Boundary ist über die Process-Lifetime fixed → ein Peer kann selbst mit Code-Bug nie eine andere `wsId` ansprechen (Plan F2).
+- **`src/server/federation-mcp-client.ts`** — `FederationMcpClient` Klasse spricht JSON-RPC über `ssh`-child-process (`spawn('ssh', ['-i', key, …])`). Newline-Buffer-Logik handhabt fragmentierte stdout-Chunks. 15-min-Timeout pro Call (mirrors Plan B Tunnel-TTL). `spawnImpl`-Override für Tests.
+- **`src/server/federation-tunnel.ts`** — SSH-Lifecycle. **`generateKeypair(wsId, peerId)`** ruft `ssh-keygen -t ed25519 -N ''` (no extra deps), schreibt unter `federation/keys/`, mode 0700. **`buildAuthorizedKeysLine(opts)`** produziert die exakte Zeile die der Peer-Admin auf seinem VPS in `authorized_keys` einfügt (Plan F4):
+
+  ```
+  command="docker exec -i <container> tsx /app/scripts/mcp-federation-stdio.ts --workspace-id <wsId>",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty <ssh-key>
+  ```
+
+  **`testConnection(opts)`** runs `ssh peer 'echo __unrestricted_shell__'` — wenn diese Echo-Zeile in stdout auftaucht, ist die `command="..."`-Restriction NICHT gesetzt → wir liefern `{ ok: false, reason: 'unrestricted', details }` und der Wizard zeigt eine rote Box. Bei korrekter Restriction returnt SSH 0 ohne den Echo (mcp-federation-stdio liest leeren stdin und exit 0) → `{ ok: true }`.
+
+**Test-Suite (3 Files, 38 Cases)**
+- `federation-peers-store.test.ts` — 14 Cases: empty-read, slug-rejection, addPeer-Roundtrip, refuse leere host/user, updatePeer-Atomic, refuse id-change, setPeerStatus + recordSyncSummary persistieren, deletePeer no-op für unknown, **20 parallele addPeer landen alle**, key-paths, Hex-Diversity 100/100.
+- `federation-mcp-server.test.ts` — 19 Cases: createServerContext-slug-rejection, **resolveSafe** mit 5 Traversal-Vektoren (`..`, mehrere Tiefen, `memories/../../`, absolute, NUL, empty), TOOL_NAMES = exakt 7, list_memories rekursiv mit SHA256, get_memory + Path-Traversal-Refusal **inkl. Audit-Event-Verifikation**, get_memory rejected `sessions/shared/...` (außerhalb `memories/`), skills + session-snapshots Round-Trip, get_skill + path-y-name-Refusal, mission-events-Phase-C-Stub, MethodNotFound, ParseError, InvalidParams.
+- `federation-tunnel.test.ts` — 5 Cases: `buildAuthorizedKeysLine` enthält alle 5 Restriktionen + custom appPath, `testConnection` erkennt unrestricted-shell, ok-Fall, ssh-failed-Fall.
+
+**Dependencies**
+- `ssh2@1.17.0` (production) — wird in Phase B.2 vom tunnel.ts genutzt; in B.1 kommt der Skelett-Layer mit `child_process.spawn('ssh', …)` aus.
+- `@types/ssh2` (dev).
+
+**Verifikation (harte Zahlen)**
+- **Phase-B.1 Tests:** **38 / 38** Cases passed in 3 Test-Files (923 ms).
+- **Phase A + B.1 gesamter Sweep:** **334 / 334** Cases passed in **24 Test-Files** (14.21 s). Inkl. AK26 (1000 Tokens p99 < 5 ms), F6 50× Failed-Login-Race, R6 50→1 Gateway-Call, L4 Marker-Tampering, L6 Brand-`tsc`-Enforcement, F10 Audit-Chain-Validation.
+- **Typecheck:** keine neuen Fehler in den B.1-Files.
+- **Build:** `pnpm build` durchgelaufen in 10.60 s, kein Routes-Tree-Update nötig (B.1 hat noch keine API-Routes — die kommen in B.2).
+- **Diff:** 8 files added, +1148 LOC.
+
 ### Changed — Existing-Routes-Refactor (Phase A.8, 2026-05-09)
 
 **Auth-Schicht-Migration der Bestandsrouten** (Plan A.3.1). 15 Routes auf den neuen `requirePermission` / `requireWorkspaceAction`-Pattern umgestellt; verbleibende ~95 nutzen weiterhin den `@deprecated isAuthenticated`-Wrapper bis sie einzeln migriert werden.
