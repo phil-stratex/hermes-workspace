@@ -5,6 +5,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — Sessions-Privacy, Snapshot, Roster-Validator, Symlink-Reconcile (Phase A.4, 2026-05-08)
+
+**Sessions-Privacy + Snapshot (D1 Hybrid)**
+- **`src/server/sessions-privacy.ts`** — workspace-scoped Sessions-Mapping unter `data/workspaces/<wsId>/sessions-meta.json` (`schemaVersion: 1`). Helpers: `tagSession`, `recordActivity`, `shareSession`, `unshareSession`, `transferSessionsOwnership`, `listSessionsOwnedBy`, `readSessionsMeta`, `updateSessionsMeta`. **`filterVisibleSessions()`** ist die einzige legitime Quelle des `FilteredSessions`-Brands aus `sessions-types.ts` — `tsc` weigert sich, Sessions-Returns ohne diesen Filter zu kompilieren (Plan-Finding L6). Visibilität: own + shared, untagged → fail-closed. Sentinel `userId: '*'` für Audit-View. Atomic-Patches via `withMutex`.
+- **`src/server/sessions-snapshot.ts`** — Lazy-Re-Snapshot in `data/workspaces/<wsId>/sessions/shared/<sid>.json`. **`ensureFreshSnapshot()`** mit `withMutex(\`snapshot:\${wsId}:\${sid}\`)` — 50 parallele Reads auf eine veraltete shared Session erzeugen genau **1** Gateway-Roundtrip (Plan-Finding R6 + N7-Cleanup verifiziert via Test). Stale-Tolerance: bei Gateway-Failure wird der alte Snapshot mit `stale: true` zurückgegeben statt eine Exception zu werfen. **`captureInitialSnapshot()`** für synchronen Snapshot-Write beim Share, damit non-owner-Viewer keine first-read latency haben. Freshness: 10 min ODER `lastActivityAt > snapshotUpdatedAt`.
+- **Bug-Fix:** Mutex-Read war initial **außerhalb** des Mutex und liefere stale Meta — gefixed: `readSessionsMeta` läuft jetzt **innerhalb** der Mutex-Region, damit Queue-Caller das Resultat des in-progress Refresh sehen.
+
+**Sessions Share/Unshare API (2 Routes)**
+- **`POST /api/sessions/$id/share`** — gated auf `session-share`. Owner darf immer; non-Owner muss `members-manage` haben. Untagged Sessions werden auto-tagged (Caller wird als Owner gesetzt). Synchrone Initial-Snapshot-Capture, Failure ist non-fatal (lazy refresh holt nach). Audit-Event `session_shared`.
+- **`POST /api/sessions/$id/unshare`** — Owner oder Admin. Snapshot bleibt für eine Cleanup-Cycle auf Disk (Sweep durch späteren Member-Removal). Audit-Event `session_unshared`.
+
+**Roster-Re-Validation (L3)**
+- **`src/server/swarm-yaml-validator.ts`** — Save-Time + Boot-Time + package.json-Hash-Trigger Validation aller `data/workspaces/<id>/swarm.yaml` Files. **`validateRosterContent()`** flaggt: parse errors, fehlende `workers[]`, fehlende/leere `id`, duplicate ids, **unknown worker-id** (nicht in der Code-Implementation). Code-Implementations werden aus `HERMES_KNOWN_WORKER_IDS` env (semicolon-separiert) ODER aus dem Repo-Default `swarm.yaml` gelesen. **`revalidateAllWorkspaceRosters()`** schreibt `data/global/swarm-yaml-issues.json` (`schemaVersion: 1`) — gelesen vom `RosterIssuesBanner` UI-Komponenten. **`revalidateIfPackageChanged()`** vergleicht den package.json-SHA256 mit dem aus dem letzten Report → no-op bei unverändertem Hash, vollständiger Re-Scan sonst. Cheap genug für Boot-Hook.
+
+**Migration Boot-Time Symlink-Reconcile (N1)**
+- **`src/server/migration-symlink-reconcile.ts`** — idempotenter Boot-Hook nach `assertCoherentBootState()` und `isMigrationCompleted()`. Erstellt Symlink von `data/workspaces/<wsId>/memories/swarm` → `~/.openclaw/workspace/memory/swarm` (override via `HERMES_LEGACY_SWARM_MEMORY_ROOT`) WENN das Workspace-Target fehlt UND der Legacy-Pfad existiert UND content hat. Idempotent (already-present nach erstem Run). Audit-Event `legacy_symlink_reconciled`. Skipped Workspaces mit echtem (non-symlink) `memories/swarm`-Dir — kein Bulldoze. **Cross-Platform:** auf Windows wird `junction` als Fallback genutzt wenn `symlinkSync(_, _, 'dir')` mangels Admin-Rechten fehlschlägt.
+
+**Test-Suite (4 Files, 47 Cases — alle grün)**
+- `sessions-privacy.test.ts` — 16 Cases: Tag-no-op, Filter (own + shared + sentinel), Fail-Closed-für-Untagged, Share/Unshare Round-Trip, Refusal für untagged Share, Transfer-Ownership, F9 Cross-WS-Isolation (sessions in WS-A unsichtbar von WS-B mapping), atomic 30 parallele tagSession.
+- `sessions-snapshot.test.ts` — 10 Cases: Initial-Snapshot, Refusal-für-Untagged, Returns-existing-when-fresh (zero fetcher calls), Refresh-when-stale, **Thundering-Herd 50 parallel → 1 fetcher call**, Stale-Tolerance bei Gateway-Failure, **N7 Mutex-Cleanup mit 25 unique session-ids**.
+- `swarm-yaml-validator.test.ts` — 15 Cases: HERMES_KNOWN_WORKER_IDS env, valid roster, unknown-worker-id flag, duplicate-id flag, missing-id, missing-workers, malformed-yaml, no-Custom-roster=ok, ws-scope-validation, package.json-Hash-Trigger no-op + erstmaliger Scan.
+- `migration-symlink-reconcile.test.ts` — 6 Cases: First-create + content-deref, idempotent already-present, audit-event, no-legacy bei empty/missing, skip-real-dir (kein Bulldoze), iteration nur über aktive Workspaces.
+
+### Changed
+- `src/routeTree.gen.ts` — auto-regenerated, 2 neue Routes (`/api/sessions/$id/share`, `/api/sessions/$id/unshare`).
+
 ### Added — Multi-Tenant Auth, Routes & CLI (Phase A.2/A.3, 2026-05-08)
 
 **Backend-Foundation (4 neue Module + erweiterte auth-middleware)**

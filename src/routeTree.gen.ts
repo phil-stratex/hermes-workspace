@@ -178,6 +178,8 @@ import { Route as ApiUsersIdEnableRouteImport } from './routes/api/users.$id.ena
 import { Route as ApiUsersIdDisableRouteImport } from './routes/api/users.$id.disable'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
+import { Route as ApiSessionsIdUnshareRouteImport } from './routes/api/sessions.$id.unshare'
+import { Route as ApiSessionsIdShareRouteImport } from './routes/api/sessions.$id.share'
 import { Route as ApiMcpHubSourcesIdRouteImport } from './routes/api/mcp/hub-sources.$id'
 import { Route as ApiMcpNameLogsRouteImport } from './routes/api/mcp/$name.logs'
 import { Route as ApiInvitesTokenInfoRouteImport } from './routes/api/invites.$token.info'
@@ -1034,6 +1036,16 @@ const ApiSessionsSessionKeyActiveRunRoute =
     path: '/$sessionKey/active-run',
     getParentRoute: () => ApiSessionsRoute,
   } as any)
+const ApiSessionsIdUnshareRoute = ApiSessionsIdUnshareRouteImport.update({
+  id: '/$id/unshare',
+  path: '/$id/unshare',
+  getParentRoute: () => ApiSessionsRoute,
+} as any)
+const ApiSessionsIdShareRoute = ApiSessionsIdShareRouteImport.update({
+  id: '/$id/share',
+  path: '/$id/share',
+  getParentRoute: () => ApiSessionsRoute,
+} as any)
 const ApiMcpHubSourcesIdRoute = ApiMcpHubSourcesIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -1233,6 +1245,8 @@ export interface FileRoutesByFullPath {
   '/api/invites/$token/info': typeof ApiInvitesTokenInfoRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
+  '/api/sessions/$id/share': typeof ApiSessionsIdShareRoute
+  '/api/sessions/$id/unshare': typeof ApiSessionsIdUnshareRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/users/$id/disable': typeof ApiUsersIdDisableRoute
@@ -1409,6 +1423,8 @@ export interface FileRoutesByTo {
   '/api/invites/$token/info': typeof ApiInvitesTokenInfoRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
+  '/api/sessions/$id/share': typeof ApiSessionsIdShareRoute
+  '/api/sessions/$id/unshare': typeof ApiSessionsIdUnshareRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/users/$id/disable': typeof ApiUsersIdDisableRoute
@@ -1587,6 +1603,8 @@ export interface FileRoutesById {
   '/api/invites/$token/info': typeof ApiInvitesTokenInfoRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
+  '/api/sessions/$id/share': typeof ApiSessionsIdShareRoute
+  '/api/sessions/$id/unshare': typeof ApiSessionsIdUnshareRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
   '/api/users/$id/disable': typeof ApiUsersIdDisableRoute
@@ -1766,6 +1784,8 @@ export interface FileRouteTypes {
     | '/api/invites/$token/info'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
+    | '/api/sessions/$id/share'
+    | '/api/sessions/$id/unshare'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/users/$id/disable'
@@ -1942,6 +1962,8 @@ export interface FileRouteTypes {
     | '/api/invites/$token/info'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
+    | '/api/sessions/$id/share'
+    | '/api/sessions/$id/unshare'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/users/$id/disable'
@@ -2119,6 +2141,8 @@ export interface FileRouteTypes {
     | '/api/invites/$token/info'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
+    | '/api/sessions/$id/share'
+    | '/api/sessions/$id/unshare'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
     | '/api/users/$id/disable'
@@ -3452,6 +3476,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSessionsSessionKeyActiveRunRouteImport
       parentRoute: typeof ApiSessionsRoute
     }
+    '/api/sessions/$id/unshare': {
+      id: '/api/sessions/$id/unshare'
+      path: '/$id/unshare'
+      fullPath: '/api/sessions/$id/unshare'
+      preLoaderRoute: typeof ApiSessionsIdUnshareRouteImport
+      parentRoute: typeof ApiSessionsRoute
+    }
+    '/api/sessions/$id/share': {
+      id: '/api/sessions/$id/share'
+      path: '/$id/share'
+      fullPath: '/api/sessions/$id/share'
+      preLoaderRoute: typeof ApiSessionsIdShareRouteImport
+      parentRoute: typeof ApiSessionsRoute
+    }
     '/api/mcp/hub-sources/$id': {
       id: '/api/mcp/hub-sources/$id'
       path: '/$id'
@@ -3660,12 +3698,16 @@ const ApiMemoryRouteWithChildren = ApiMemoryRoute._addFileChildren(
 
 interface ApiSessionsRouteChildren {
   ApiSessionsSendRoute: typeof ApiSessionsSendRoute
+  ApiSessionsIdShareRoute: typeof ApiSessionsIdShareRoute
+  ApiSessionsIdUnshareRoute: typeof ApiSessionsIdUnshareRoute
   ApiSessionsSessionKeyActiveRunRoute: typeof ApiSessionsSessionKeyActiveRunRoute
   ApiSessionsSessionKeyStatusRoute: typeof ApiSessionsSessionKeyStatusRoute
 }
 
 const ApiSessionsRouteChildren: ApiSessionsRouteChildren = {
   ApiSessionsSendRoute: ApiSessionsSendRoute,
+  ApiSessionsIdShareRoute: ApiSessionsIdShareRoute,
+  ApiSessionsIdUnshareRoute: ApiSessionsIdUnshareRoute,
   ApiSessionsSessionKeyActiveRunRoute: ApiSessionsSessionKeyActiveRunRoute,
   ApiSessionsSessionKeyStatusRoute: ApiSessionsSessionKeyStatusRoute,
 }
