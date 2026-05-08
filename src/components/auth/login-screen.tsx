@@ -290,7 +290,6 @@ function LoginForm({
           value={email}
           onChange={setEmail}
           type="text"
-          placeholder="phil  oder  phil@stratex-ai.com"
           autoComplete="username"
           autoFocus
           disabled={loading}
