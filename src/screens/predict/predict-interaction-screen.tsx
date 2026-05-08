@@ -11,15 +11,19 @@ import {
 import { PhasePlaceholder, PredictShell } from './predict-shell'
 import { ChatConversation } from './components/chat-conversation'
 import { useBatchProgress } from './hooks/use-batch-progress'
+import { useChatThread, type ChatThreadHandle } from './hooks/use-chat-thread'
 import {
   predictClient,
-  type ChatHistoryMessage,
   type PersonaSummary,
 } from '@/server/predict-client'
 import { Markdown } from '@/components/prompt-kit/markdown'
 import { cn } from '@/lib/utils'
 
 type Tab = 'agent' | 'persona' | 'survey'
+
+// F-M3: server caps batch surveys at 50 personas — keep the UI in sync so
+// users do not get a surprise rejection from the API.
+const MAX_BATCH_PERSONAS = 50
 
 export function PredictInteractionScreen({ reportId }: { reportId: string }) {
   if (!reportId || reportId === 'tbd') {
@@ -58,6 +62,19 @@ function PredictInteractionContent({ reportId }: { reportId: string }) {
 
   const personas = personasQuery.data ?? []
 
+  // F-H1/F-H2/F-M1: chat-thread hooks live at the parent so state survives
+  // tab-switches and the persona-keyed map persists across persona switches.
+  const [personaId, setPersonaId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!personaId && personas.length > 0) {
+      setPersonaId(personas[0]?.id ?? null)
+    }
+  }, [personas, personaId])
+
+  const agentThread = useChatThread(reportId, 'agent')
+  const personaThread = useChatThread(reportId, 'persona', personaId)
+
   return (
     <PredictShell
       step={5}
@@ -93,8 +110,15 @@ function PredictInteractionContent({ reportId }: { reportId: string }) {
         ))}
       </nav>
 
-      {tab === 'agent' ? <AgentChatTab reportId={reportId} /> : null}
-      {tab === 'persona' ? <PersonaChatTab reportId={reportId} personas={personas} /> : null}
+      {tab === 'agent' ? <AgentChatTab thread={agentThread} /> : null}
+      {tab === 'persona' ? (
+        <PersonaChatTab
+          personas={personas}
+          personaId={personaId}
+          onPersonaChange={setPersonaId}
+          thread={personaThread}
+        />
+      ) : null}
       {tab === 'survey' ? <BatchSurveyTab reportId={reportId} personas={personas} /> : null}
     </PredictShell>
   )
@@ -102,53 +126,7 @@ function PredictInteractionContent({ reportId }: { reportId: string }) {
 
 // --- Tab 1: ReportAgent chat ---------------------------------------------
 
-function AgentChatTab({ reportId }: { reportId: string }) {
-  const [chatId, setChatId] = useState<string | null>(null)
-  const [messages, setMessages] = useState<Array<ChatHistoryMessage>>([])
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const handleSend = async (text: string) => {
-    setBusy(true)
-    setError(null)
-    const userId = `temp-user-${Date.now()}`
-    const optimistic: ChatHistoryMessage = {
-      id: userId,
-      role: 'user',
-      content: text,
-      created_at: new Date().toISOString(),
-    }
-    setMessages((prev) => [...prev, optimistic])
-    try {
-      const turn = await predictClient.postChatTurn(reportId, {
-        mode: 'agent',
-        message: text,
-        chatId,
-      })
-      setChatId(turn.chat_id)
-      setMessages((prev) => [
-        ...prev.filter((m) => m.id !== userId),
-        {
-          id: turn.user_message_id,
-          role: 'user',
-          content: text,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: turn.assistant_message_id,
-          role: 'assistant',
-          content: turn.answer,
-          created_at: new Date().toISOString(),
-        },
-      ])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-      setMessages((prev) => prev.filter((m) => m.id !== userId))
-    } finally {
-      setBusy(false)
-    }
-  }
-
+function AgentChatTab({ thread }: { thread: ChatThreadHandle }) {
   return (
     <div className="space-y-3">
       <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3 text-xs text-[var(--theme-muted)]">
@@ -156,16 +134,16 @@ function AgentChatTab({ reportId }: { reportId: string }) {
         Frag nach Begründungen, alternativen Szenarien, oder lass dir Stellen aus
         dem Report neu interpretieren.
       </div>
-      {error ? (
-        <div className="rounded-xl border border-red-500 bg-red-500/10 p-3 text-xs text-red-200">{error}</div>
+      {thread.error ? (
+        <div className="rounded-xl border border-red-500 bg-red-500/10 p-3 text-xs text-red-200">{thread.error}</div>
       ) : null}
       <div className="h-[520px]">
         <ChatConversation
           title="ReportAgent"
           subtitle="Senior-Analyst der diese Vorhersage geschrieben hat"
-          messages={messages}
-          busy={busy}
-          onSend={handleSend}
+          messages={thread.messages}
+          busy={thread.busy}
+          onSend={thread.send}
           inputPlaceholder="z.B. 'Welche Annahme im Stakeholder-Lager ist am brüchigsten?'"
         />
       </div>
@@ -176,93 +154,20 @@ function AgentChatTab({ reportId }: { reportId: string }) {
 // --- Tab 2: 1:1 persona chat ---------------------------------------------
 
 function PersonaChatTab({
-  reportId,
   personas,
+  personaId,
+  onPersonaChange,
+  thread,
 }: {
-  reportId: string
   personas: Array<PersonaSummary>
+  personaId: string | null
+  onPersonaChange: (id: string | null) => void
+  thread: ChatThreadHandle
 }) {
-  const [personaId, setPersonaId] = useState<string | null>(null)
-  const [chatsByPersona, setChatsByPersona] = useState<
-    Record<string, { chatId: string | null; messages: Array<ChatHistoryMessage> }>
-  >({})
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
   const persona = useMemo(
     () => personas.find((p) => p.id === personaId) ?? null,
     [personas, personaId],
   )
-
-  useEffect(() => {
-    if (!personaId && personas.length > 0) {
-      setPersonaId(personas[0]?.id ?? null)
-    }
-  }, [personas, personaId])
-
-  const current = personaId
-    ? chatsByPersona[personaId] ?? { chatId: null, messages: [] }
-    : { chatId: null, messages: [] }
-
-  const handleSend = async (text: string) => {
-    if (!personaId) return
-    setBusy(true)
-    setError(null)
-    const userId = `temp-user-${Date.now()}`
-    const optimistic: ChatHistoryMessage = {
-      id: userId,
-      role: 'user',
-      content: text,
-      created_at: new Date().toISOString(),
-    }
-    setChatsByPersona((prev) => ({
-      ...prev,
-      [personaId]: {
-        ...(prev[personaId] ?? { chatId: null, messages: [] }),
-        messages: [...(prev[personaId]?.messages ?? []), optimistic],
-      },
-    }))
-    try {
-      const turn = await predictClient.postChatTurn(reportId, {
-        mode: 'persona',
-        message: text,
-        chatId: chatsByPersona[personaId]?.chatId ?? null,
-        personaId,
-      })
-      setChatsByPersona((prev) => {
-        const previous = prev[personaId]?.messages ?? []
-        return {
-          ...prev,
-          [personaId]: {
-            chatId: turn.chat_id,
-            messages: [
-              ...previous.filter((m) => m.id !== userId),
-              {
-                id: turn.user_message_id,
-                role: 'user',
-                content: text,
-                created_at: new Date().toISOString(),
-              },
-              {
-                id: turn.assistant_message_id,
-                role: 'assistant',
-                content: turn.answer,
-                created_at: new Date().toISOString(),
-              },
-            ],
-          },
-        }
-      })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-      setChatsByPersona((prev) => {
-        const messages = (prev[personaId]?.messages ?? []).filter((m) => m.id !== userId)
-        return { ...prev, [personaId]: { ...(prev[personaId] ?? { chatId: null }), messages } }
-      })
-    } finally {
-      setBusy(false)
-    }
-  }
 
   return (
     <div className="space-y-3">
@@ -271,7 +176,7 @@ function PersonaChatTab({
           <span className="font-semibold text-[var(--theme-muted)]">Persona auswählen</span>
           <select
             value={personaId ?? ''}
-            onChange={(e) => setPersonaId(e.target.value || null)}
+            onChange={(e) => onPersonaChange(e.target.value || null)}
             disabled={personas.length === 0}
             className="mt-1 w-full rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] px-2 py-1.5 text-sm focus:border-[var(--theme-accent)] focus:outline-none disabled:opacity-60"
           >
@@ -292,17 +197,17 @@ function PersonaChatTab({
           </div>
         ) : null}
       </div>
-      {error ? (
-        <div className="rounded-xl border border-red-500 bg-red-500/10 p-3 text-xs text-red-200">{error}</div>
+      {thread.error ? (
+        <div className="rounded-xl border border-red-500 bg-red-500/10 p-3 text-xs text-red-200">{thread.error}</div>
       ) : null}
       <div className="h-[520px]">
         <ChatConversation
           title={persona ? persona.name : 'Persona auswählen'}
           subtitle={persona ? persona.role : undefined}
-          messages={current.messages}
-          busy={busy}
+          messages={thread.messages}
+          busy={thread.busy}
           disabled={!persona}
-          onSend={handleSend}
+          onSend={thread.send}
           inputPlaceholder={
             persona ? `Frage an ${persona.name}…` : 'Erst eine Persona auswählen'
           }
@@ -349,7 +254,10 @@ function BatchSurveyTab({
     })
   }
 
-  const selectAll = () => setSelectedIds(new Set(personas.map((p) => p.id)))
+  const selectAll = () =>
+    setSelectedIds(
+      new Set(personas.slice(0, MAX_BATCH_PERSONAS).map((p) => p.id)),
+    )
   const clearAll = () => setSelectedIds(new Set())
 
   const handleSubmit = async () => {
@@ -393,7 +301,7 @@ function BatchSurveyTab({
           <h3 className="text-sm font-semibold">Frage an mehrere Personas</h3>
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
             <span className="text-[var(--theme-muted)]">
-              {selectedIds.size} / {personas.length} ausgewählt
+              {selectedIds.size} / {Math.min(personas.length, MAX_BATCH_PERSONAS)} ausgewählt
             </span>
             <div className="flex gap-2">
               <button
@@ -412,6 +320,11 @@ function BatchSurveyTab({
               </button>
             </div>
           </div>
+          {personas.length > MAX_BATCH_PERSONAS ? (
+            <div className="rounded-xl border border-yellow-500 bg-yellow-500/10 p-2 text-[11px] text-yellow-200">
+              Maximal {MAX_BATCH_PERSONAS} Personas pro Survey.
+            </div>
+          ) : null}
           <ul className="grid max-h-40 gap-1 overflow-auto sm:grid-cols-2 lg:grid-cols-3">
             {personas.map((persona) => {
               const active = selectedIds.has(persona.id)
@@ -461,7 +374,12 @@ function BatchSurveyTab({
           <div className="flex justify-end">
             <button
               type="button"
-              disabled={selectedIds.size === 0 || question.trim().length === 0 || creating}
+              disabled={
+                selectedIds.size === 0 ||
+                selectedIds.size > MAX_BATCH_PERSONAS ||
+                question.trim().length === 0 ||
+                creating
+              }
               onClick={handleSubmit}
               className="inline-flex items-center gap-2 rounded-xl bg-[var(--theme-accent)] px-4 py-2 text-sm font-semibold text-primary-950 hover:bg-[var(--theme-accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
             >
