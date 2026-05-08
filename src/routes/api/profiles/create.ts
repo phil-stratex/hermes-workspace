@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { isAuthenticated } from '../../../server/auth-middleware'
+import { requireAuthenticated } from '../../../server/route-auth-helpers'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 import { createProfile } from '../../../server/profiles-browser'
 import { requireJsonContentType } from '../../../server/rate-limit'
 
@@ -8,9 +9,8 @@ export const Route = createFileRoute('/api/profiles/create')({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
         try {

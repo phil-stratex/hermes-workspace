@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { requireAuthenticated } from '../../server/route-auth-helpers'
 import {
   SESSIONS_API_UNAVAILABLE_MESSAGE,
   ensureGatewayProbed,
@@ -9,16 +10,15 @@ import {
   toChatMessage,
 } from '../../server/claude-api'
 import { resolveSessionKey } from '../../server/session-utils'
-import { isAuthenticated } from '@/server/auth-middleware'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 import { getLocalSession, getLocalMessages } from '../../server/local-session-store'
 
 export const Route = createFileRoute('/api/history')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
         await ensureGatewayProbed()
         if (!getGatewayCapabilities().sessions) {
           return json({

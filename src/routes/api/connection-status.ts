@@ -7,13 +7,14 @@ import path from 'node:path'
 import os from 'node:os'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { requireAuthenticated } from '../../server/route-auth-helpers'
 import YAML from 'yaml'
 import {
   CLAUDE_API,
   ensureGatewayProbed,
   getChatMode,
 } from '../../server/gateway-capabilities'
-import { isAuthenticated } from '../../server/auth-middleware'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 
 const CONFIG_PATH = path.join(
   process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes'),
@@ -56,9 +57,8 @@ export const Route = createFileRoute('/api/connection-status')({
         // isAuthenticated() returns boolean. The previous "return authResult as
         // unknown as Response" cast silenced TypeScript but threw at runtime
         // because the framework received `false`, not a Response. See #261, #263.
-        if (!isAuthenticated(request)) {
-          return json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
 
         const caps = await ensureGatewayProbed()
         const activeModel = readActiveModel()

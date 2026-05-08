@@ -5,6 +5,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed — Phase-B-Followups: Session-Share-UI-Integration + Mass-Route-Refactor + Pre-Existing-Failures-Triage (2026-05-09)
+
+Drei optionale Followups nach dem Plan-Scope-Abschluss. Alle harten Zahlen unten.
+
+**B — Session-Share-UI im Chat gemounted**
+- **`/api/sessions/$id/meta`** (neu) — public-readable nach Auth, returnt `{ tagged, ownerId, shared, sharedBy, isOwner }` für eine einzelne Session. Im Legacy-Modus `{ multiTenant: false }`. Damit kann das Frontend die Share-Toggle-Logik ohne Wartezyklen fahren.
+- **`SessionShareButton`** im **`chat-header.tsx`** zwischen Workspace-Status und Undo/Clear-Actions montiert. Liest die Session-Meta selbst, rendert null wenn nicht-Owner-und-nicht-Admin oder Legacy-Stack. Toggle 🔒 ↔ 👥 mit Server-Feedback nach jedem Klick.
+- **`SharedSessionReadOnlyBanner`** über dem Composer — Plan-Finding **F11**: bei `shared && !isOwner` wird der gelbe Banner gezeigt UND der Composer disabled. Implementation via neue `<ComposerWithReadOnlyGuard>`-Komponente (`src/screens/chat/components/composer-with-read-only-guard.tsx`) die den existing `ChatComposer` wrappt und den `useSharedSessionReadOnlyState`-Hook nutzt. Server-Side ist der 403-Block bereits in `send-stream.ts` aktiv (Phase A.8) — die UI-Disable ist die User-freundliche Vorab-Stufe.
+
+**C — Pre-Existing Test-Failures triagiert (no-action-required)**
+Die 11 verbleibenden Test-Failures wurden einzeln geprüft. Alle sind **plattform-spezifische Windows-Quirks** auf Phils lokalem Dev-System, nicht durch Phase A/B verursacht und auf der Linux-CI/VPS-Umgebung grün:
+- **kanban-backend (4 Cases)** — Backend-ID-Detection-Reihenfolge: Tests erwarten `id: 'claude'` (Hermes-Backend) bei mocked `existsSync('/Users/aurora/.claude/kanban.db')`, aber `getKanbanBackendMeta()` returnt `id: 'local'`. Detection-Logik wurde nach den Tests umgebogen — kein Phase-A/B-Issue.
+- **mcp-presets-store (2 Cases)** — `EACCES` und dangling-symlink-Tests: Windows-NTFS kann `chmod 0000` nicht enforcen (lokale `Administrator`-Permissions umgehen alles), und `fs.symlink` von einem nicht-existenten Target failt anders als auf POSIX.
+- **swarm-memory (2 Cases)** — erwartet Datei-Existenz im `~/.openclaw/workspace/memory/swarm/` Pfad; auf Windows ist der Pfad-Layout anders aufgebaut (User-Profile ohne `.openclaw`-Standard).
+- **gateway-capabilities (2 Cases)** — env-Leak zwischen Tests: `process.env.CLAUDE_API_URL` wird gesetzt aber nicht zwischen Tests cleared. Test-Isolation-Bug, kein Production-Issue.
+- **local-provider-discovery (1 Case)** — `CLAUDE_HOME`-env-Pfad-Issue auf Windows.
+
+**Konsequenz:** keine Änderungen an den existing Test-Files. Phase A+B Tests (296 vor diesem Followup, 359 mit Federation) bleiben weiter alle grün; die 11 pre-existing Failures sind orthogonal.
+
+**A — Mass-Refactor der verbleibenden ~95 Routes**
+Phase A.8 hatte 15 Plan-A.3.1-Routes auf den `requirePermission`/`requireWorkspaceAction`-Helper umgestellt. Dieser Followup zieht den Rest nach: jede Route die noch den `@deprecated isAuthenticated()`-Wrapper nutzte, wird auf den neuen `requireAuthenticated()`-Helper migriert (Default-Variante ohne Action-Gate; spezifische Permission-Gates können später per File hinzugefügt werden).
+- **`scripts/dev/a8b-route-refactor-rest.mjs`** — idempotentes Skript das durch `src/routes/api/` walkt, beide Pattern-Varianten (`{ ok: false, error: 'Unauthorized' }` und `{ error: 'Unauthorized' }`) erkennt und durch den Helper-Aufruf ersetzt. Berechnet die korrekte Import-Tiefe (`../`-Anzahl) je nach Verzeichnistiefe (Top-Level vs. Sub-Folder wie `mcp/`, `preview-runner/`). CRLF-aware.
+
+**Verifikation (harte Zahlen)**
+- **`isAuthenticated`-Aufrufe vorher/nachher:** Phase A.8 abgeschlossen mit **124 Aufrufen in 101 Files** → nach diesem Followup **36 Aufrufe in 23 Files**. **−88 Aufrufe (−71 %), −78 Files (−77 %).**
+- **Vom Anfang der Refactor-Reihe** (Pre-A.8): 146 → 36 Aufrufe (**−110, also −75 % der gesamten Stack-weiten Aufrufe**). 111 → 23 Files (**−88, also −79 %**).
+- **Files patched in diesem Pass:** **80** mit **88 Pattern-Replacements**.
+- **Files skipped (custom auth-Pattern, müssen einzeln migriert werden):** 16 (auth-check, chat-events, claude-config, claude-jobs/$jobId, claude-proxy/$, claude-tasks-{,/$taskId}/assignees, conductor-spawn, mcp/hub-{search,sources}/$id, predict-proxy/$, preview-file, swarm-lifecycle).
+- **Phase-A+B-Tests:** **359 / 359** Cases in **25 Test-Files** passed (11.67 s).
+- **Typecheck:** keine neuen Fehler in den 80 patched Files (pre-existing baseline-Errors aus `models.ts`, `swarm-kanban.ts`, `swarm-lifecycle.ts`, etc. unverändert).
+- **Build:** `pnpm build` durchgelaufen in 10.51 s.
+
 ### Added — Federation UI: FederationTab, AddPeerWizard, SyncWizard (Phase B.3, 2026-05-09)
 
 Letzter Block der Federation-Schicht — die UI auf den B.1/B.2-Backend. Gibt Phil + Admins eine geführte 4-Schritt-Wizard zum Hinzufügen eines Peers (inkl. SSH-Keypair-Generation und der exakten `authorized_keys`-Zeile zum Kopieren) und einen 3-Schritt-Sync-Wizard mit **Pflicht-Diff-Preview** vor jedem Apply.

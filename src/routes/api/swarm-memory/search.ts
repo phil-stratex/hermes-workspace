@@ -1,15 +1,15 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { isAuthenticated } from '../../../server/auth-middleware'
+import { requireAuthenticated } from '../../../server/route-auth-helpers'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 import { searchSwarmMemory } from '../../../server/swarm-memory'
 
 export const Route = createFileRoute('/api/swarm-memory/search')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
         const url = new URL(request.url)
         const workerId = url.searchParams.get('workerId')
         const query = url.searchParams.get('q') || url.searchParams.get('query') || ''

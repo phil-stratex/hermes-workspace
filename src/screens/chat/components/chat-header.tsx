@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { openHamburgerMenu } from '@/components/mobile-hamburger-menu'
+import { SessionShareButton } from '@/components/workspace/session-share-button'
 
 function toTitleCase(value: string): string {
   return value
@@ -544,6 +545,8 @@ function ChatHeaderComponent({
             </TooltipRoot>
           </TooltipProvider>
         ) : null}
+        {/* Workspace share toggle (multi-tenant only — renders null in legacy mode) */}
+        {activeFriendlyId && <SessionShareButton sessionId={activeFriendlyId} />}
         {/* Undo / Clear actions */}
         {onUndo && (
           <TooltipProvider>

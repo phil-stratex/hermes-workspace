@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { isAuthenticated } from '../../../server/auth-middleware'
+import { requireAuthenticated } from '../../../server/route-auth-helpers'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 import {
   readKnowledgeBaseConfig,
   type KnowledgeBaseConfig,
@@ -11,9 +12,8 @@ export const Route = createFileRoute('/api/knowledge/sync')({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
 
         // Optional: allow body to override source temporarily for one-shot use
         let config: KnowledgeBaseConfig | null = null
@@ -49,9 +49,8 @@ export const Route = createFileRoute('/api/knowledge/sync')({
         }
       },
       GET: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
         const config = readKnowledgeBaseConfig()
         return json({ source: config.source })
       },

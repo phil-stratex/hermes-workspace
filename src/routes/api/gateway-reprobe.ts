@@ -10,21 +10,21 @@
  */
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { requireAuthenticated } from '../../server/route-auth-helpers'
 import {
   CLAUDE_API,
   CLAUDE_DASHBOARD_URL,
   forceReprobeGateway,
   getGatewayMode,
 } from '../../server/gateway-capabilities'
-import { isAuthenticated } from '../../server/auth-middleware'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 
 export const Route = createFileRoute('/api/gateway-reprobe')({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
 
         const capabilities = await forceReprobeGateway()
         return json({

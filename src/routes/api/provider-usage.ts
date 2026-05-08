@@ -1,7 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { requireAuthenticated } from '../../server/route-auth-helpers'
 import { getProviderUsage } from '../../server/provider-usage'
-import { isAuthenticated } from '../../server/auth-middleware'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 
 const REQUEST_TIMEOUT_MS = 5000 // 5 second timeout
 
@@ -32,9 +33,8 @@ export const Route = createFileRoute('/api/provider-usage')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
         try {
           const url = new URL(request.url)
           const force = url.searchParams.get('force') === '1'

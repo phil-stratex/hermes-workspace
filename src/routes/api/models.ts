@@ -3,8 +3,9 @@ import path from 'node:path'
 import os from 'node:os'
 import YAML from 'yaml'
 import { json } from '@tanstack/react-start'
+import { requireAuthenticated } from '../../server/route-auth-helpers'
 import { createFileRoute } from '@tanstack/react-router'
-import { isAuthenticated } from '../../server/auth-middleware'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 import {
   ensureGatewayProbed,
   getGatewayCapabilities,
@@ -193,9 +194,8 @@ export const Route = createFileRoute('/api/models')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
         await ensureGatewayProbed()
 
         try {

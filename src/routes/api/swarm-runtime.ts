@@ -1,10 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { requireAuthenticated } from '../../server/route-auth-helpers'
 import { execFile } from 'node:child_process'
 import { swarmExec, useDockerExec } from '../../server/swarm-docker-exec'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { isAuthenticated } from '../../server/auth-middleware'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 import { getProfilesDir } from '../../server/claude-paths'
 import {
   buildSwarmDispatchMetadata,
@@ -250,9 +251,8 @@ export const Route = createFileRoute('/api/swarm-runtime')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
         const ids = listWorkerIds()
         const tmuxAvailable = await tmuxIsInstalled()
         const entries = await Promise.all(ids.map((id) => buildEntry(id, tmuxAvailable)))
@@ -266,9 +266,8 @@ export const Route = createFileRoute('/api/swarm-runtime')({
         })
       },
       POST: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
         let body: { mode?: unknown }
         try {
           body = (await request.json()) as { mode?: unknown }

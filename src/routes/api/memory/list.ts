@@ -1,15 +1,15 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { isAuthenticated } from '../../../server/auth-middleware'
+import { requireAuthenticated } from '../../../server/route-auth-helpers'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 import { listMemoryFiles } from '../../../server/memory-browser'
 
 export const Route = createFileRoute('/api/memory/list')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
         // Memory is sourced entirely from local filesystem via memory-browser.ts
         // (reads $HERMES_HOME/MEMORY.md + $HERMES_HOME/memory/ + /memories/). No
         // remote gateway endpoint is required, so no capability gate is needed.

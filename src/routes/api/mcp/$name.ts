@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { isAuthenticated } from '../../../server/auth-middleware'
+import { requireAuthenticated } from '../../../server/route-auth-helpers'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 import {
   BEARER_TOKEN,
   CLAUDE_API,
@@ -31,9 +32,8 @@ export const Route = createFileRoute('/api/mcp/$name')({
   server: {
     handlers: {
       DELETE: async ({ request, params }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
         // DELETE has no body, so requireJsonContentType allows it through.
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck

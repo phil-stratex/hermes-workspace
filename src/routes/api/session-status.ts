@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { requireAuthenticated } from '../../server/route-auth-helpers'
 import {
   ensureGatewayProbed,
   getConfig,
@@ -8,16 +9,15 @@ import {
   listSessions,
 } from '../../server/claude-api'
 import { isSyntheticSessionKey } from '../../server/session-utils'
-import { isAuthenticated } from '@/server/auth-middleware'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 import { readContextUsage } from '@/server/context-usage'
 
 export const Route = createFileRoute('/api/session-status')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
         await ensureGatewayProbed()
         try {
           const capabilities = getGatewayCapabilities()

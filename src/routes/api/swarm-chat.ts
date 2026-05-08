@@ -1,7 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { requireAuthenticated } from '../../server/route-auth-helpers'
 import { join } from 'node:path'
-import { isAuthenticated } from '../../server/auth-middleware'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 import { getProfilesDir } from '../../server/claude-paths'
 import { readWorkerMessages, type SwarmChatMessage } from '../../server/swarm-chat-reader'
 
@@ -26,9 +27,8 @@ export const Route = createFileRoute('/api/swarm-chat')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
         const url = new URL(request.url)
         const workerIdRaw = (url.searchParams.get('workerId') ?? '').trim()
         if (!workerIdRaw || !isValidWorkerId(workerIdRaw)) {

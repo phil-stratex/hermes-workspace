@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { isAuthenticated } from '../../../server/auth-middleware'
+import { requireAuthenticated } from '../../../server/route-auth-helpers'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 import { readPresets } from '../../../server/mcp-presets-store'
 import { safeErrorMessage } from '../../../server/rate-limit'
 
@@ -8,9 +9,8 @@ export const Route = createFileRoute('/api/mcp/presets')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
         try {
           const result = await readPresets()
           // Always 200 — the UI distinguishes user-file/seed/invalid via the

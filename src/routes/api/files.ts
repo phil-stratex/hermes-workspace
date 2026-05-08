@@ -4,10 +4,8 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import {
-  isAuthenticated,
-  requireLocalOrAuth,
-} from '../../server/auth-middleware'
+import { requireAuthenticated } from '../../server/route-auth-helpers'
+import { requireLocalOrAuth } from '../../server/auth-middleware'
 import {
   getClientIp,
   rateLimit,
@@ -250,9 +248,8 @@ export const Route = createFileRoute('/api/files')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
         try {
           const url = new URL(request.url)
           const action = url.searchParams.get('action') || 'list'
@@ -323,9 +320,8 @@ export const Route = createFileRoute('/api/files')({
         }
       },
       POST: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
         const ip = getClientIp(request)
         if (!rateLimit(`files:${ip}`, 30, 60_000)) {
           return rateLimitResponse()

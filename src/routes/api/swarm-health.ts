@@ -1,9 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { requireAuthenticated } from '../../server/route-auth-helpers'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import * as yaml from 'yaml'
-import { isAuthenticated } from '../../server/auth-middleware'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 import { getLocalBinDir, getProfilesDir } from '../../server/claude-paths'
 
 type WorkerHealth = {
@@ -110,9 +111,8 @@ export const Route = createFileRoute('/api/swarm-health')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
 
         const workspaceModel = formatModelDisplay(process.env.HERMES_DEFAULT_MODEL ?? process.env.CLAUDE_DEFAULT_MODEL ?? 'unknown', (process.env.HERMES_API_URL ?? process.env.CLAUDE_API_URL)?.includes('anthropic') ? 'anthropic' : 'unknown')
         const apiUrl = process.env.HERMES_API_URL ?? process.env.CLAUDE_API_URL ?? null

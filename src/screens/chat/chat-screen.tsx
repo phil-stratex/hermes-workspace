@@ -35,6 +35,7 @@ import {
 } from './chat-queries'
 import { ChatHeader } from './components/chat-header'
 import { ChatMessageList } from './components/chat-message-list'
+import { ComposerWithReadOnlyGuard } from './components/composer-with-read-only-guard'
 import { ChatEmptyState } from './components/chat-empty-state'
 import { ChatComposer } from './components/chat-composer'
 import { ConnectionStatusMessage } from './components/connection-status-message'
@@ -2772,22 +2773,22 @@ export function ChatScreen({
             />
           )}
           {showComposer ? (
-            <ChatComposer
+            <ComposerWithReadOnlyGuard
+              activeFriendlyId={activeFriendlyId}
+              isNewChat={isNewChat}
+              forcedSessionKey={forcedSessionKey}
+              resolvedSessionKey={resolvedSessionKey}
+              activeSessionKey={activeSessionKey}
+              activeCanonicalKey={activeCanonicalKey}
+              composerRef={composerRef}
+              composerHandleRef={composerHandleRef}
+              embedded={embedded}
+              hideUi={hideUi}
+              sending={sending}
+              waitingForResponse={waitingForResponse}
+              thinkingLevel={thinkingLevel}
               onSubmit={send}
               onAbort={handleAbortStreaming}
-              isLoading={sending || waitingForResponse}
-              disabled={sending || hideUi}
-              sessionKey={
-                isNewChat
-                  ? undefined
-                  : forcedSessionKey || resolvedSessionKey || activeSessionKey
-              }
-              wrapperRef={composerRef}
-              composerRef={composerHandleRef}
-              embedded={embedded}
-              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
-              focusKey={`${isNewChat ? 'new' : activeFriendlyId}:${activeCanonicalKey ?? ''}`}
-              thinkingLevel={thinkingLevel}
               onThinkingLevelChange={handleThinkingLevelChange}
             />
           ) : null}

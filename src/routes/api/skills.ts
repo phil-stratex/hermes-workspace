@@ -3,7 +3,8 @@ import path from 'node:path'
 import fs from 'node:fs/promises'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { isAuthenticated } from '../../server/auth-middleware'
+import { requireAuthenticated } from '../../server/route-auth-helpers'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 import {
   BEARER_TOKEN,
   CLAUDE_API,
@@ -418,9 +419,8 @@ export const Route = createFileRoute('/api/skills')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
         const capabilities = await ensureGatewayProbed()
         if (!capabilities.skills) {
           return json({
@@ -525,9 +525,8 @@ export const Route = createFileRoute('/api/skills')({
         }
       },
       POST: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
         const capabilities = await ensureGatewayProbed()
         if (!capabilities.skills) {
           return json(

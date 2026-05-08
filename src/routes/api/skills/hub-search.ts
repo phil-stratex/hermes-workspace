@@ -4,7 +4,8 @@ import path from 'node:path'
 import { promisify } from 'node:util'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { isAuthenticated } from '../../../server/auth-middleware'
+import { requireAuthenticated } from '../../../server/route-auth-helpers'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 
 const execFileAsync = promisify(execFile)
 
@@ -155,9 +156,8 @@ export const Route = createFileRoute('/api/skills/hub-search')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
         try {
           const url = new URL(request.url)
           const query = (url.searchParams.get('q') || '').trim()

@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { isAuthenticated } from '../../../server/auth-middleware'
+import { requireAuthenticated } from '../../../server/route-auth-helpers'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 import { requireJsonContentType } from '../../../server/rate-limit'
 import {
   SESSIONS_API_UNAVAILABLE_MESSAGE,
@@ -15,9 +16,8 @@ export const Route = createFileRoute('/api/sessions/send')({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
         const capabilities = await ensureGatewayProbed()

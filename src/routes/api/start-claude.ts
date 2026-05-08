@@ -1,6 +1,7 @@
 import { json } from '@tanstack/react-start'
+import { requireAuthenticated } from '../../server/route-auth-helpers'
 import { createFileRoute } from '@tanstack/react-router'
-import { isAuthenticated } from '../../server/auth-middleware'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 import { startClaudeAgent } from '../../server/claude-agent'
 
 export const Route = createFileRoute('/api/start-claude')({
@@ -8,9 +9,8 @@ export const Route = createFileRoute('/api/start-claude')({
     handlers: {
       POST: async ({ request }) => {
         try {
-          if (!isAuthenticated(request)) {
-            return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-          }
+          const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
 
           const result = await startClaudeAgent()
           return json(result, { status: result.ok ? 200 : 500 })
