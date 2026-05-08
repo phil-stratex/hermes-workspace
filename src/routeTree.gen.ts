@@ -35,6 +35,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as ChatIndexRouteImport } from './routes/chat/index'
 import { Route as SettingsProvidersRouteImport } from './routes/settings/providers'
+import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
 import { Route as ApiWorkspacesRouteImport } from './routes/api/workspaces'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
@@ -69,6 +70,7 @@ import { Route as ApiSwarmChatRouteImport } from './routes/api/swarm-chat'
 import { Route as ApiStartClaudeRouteImport } from './routes/api/start-claude'
 import { Route as ApiStartAgentRouteImport } from './routes/api/start-agent'
 import { Route as ApiSkillsRouteImport } from './routes/api/skills'
+import { Route as ApiSetupStatusRouteImport } from './routes/api/setup-status'
 import { Route as ApiSessionsRouteImport } from './routes/api/sessions'
 import { Route as ApiSessionStatusRouteImport } from './routes/api/session-status'
 import { Route as ApiSessionSendRouteImport } from './routes/api/session-send'
@@ -317,6 +319,11 @@ const SettingsProvidersRoute = SettingsProvidersRouteImport.update({
   path: '/providers',
   getParentRoute: () => SettingsRoute,
 } as any)
+const InviteTokenRoute = InviteTokenRouteImport.update({
+  id: '/invite/$token',
+  path: '/invite/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ChatSessionKeyRoute = ChatSessionKeyRouteImport.update({
   id: '/chat/$sessionKey',
   path: '/chat/$sessionKey',
@@ -486,6 +493,11 @@ const ApiStartAgentRoute = ApiStartAgentRouteImport.update({
 const ApiSkillsRoute = ApiSkillsRouteImport.update({
   id: '/api/skills',
   path: '/api/skills',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSetupStatusRoute = ApiSetupStatusRouteImport.update({
+  id: '/api/setup-status',
+  path: '/api/setup-status',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSessionsRoute = ApiSessionsRouteImport.update({
@@ -1145,6 +1157,7 @@ export interface FileRoutesByFullPath {
   '/api/session-send': typeof ApiSessionSendRoute
   '/api/session-status': typeof ApiSessionStatusRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
+  '/api/setup-status': typeof ApiSetupStatusRoute
   '/api/skills': typeof ApiSkillsRouteWithChildren
   '/api/start-agent': typeof ApiStartAgentRoute
   '/api/start-claude': typeof ApiStartClaudeRoute
@@ -1179,6 +1192,7 @@ export interface FileRoutesByFullPath {
   '/api/workspace': typeof ApiWorkspaceRoute
   '/api/workspaces': typeof ApiWorkspacesRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
@@ -1323,6 +1337,7 @@ export interface FileRoutesByTo {
   '/api/session-send': typeof ApiSessionSendRoute
   '/api/session-status': typeof ApiSessionStatusRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
+  '/api/setup-status': typeof ApiSetupStatusRoute
   '/api/skills': typeof ApiSkillsRouteWithChildren
   '/api/start-agent': typeof ApiStartAgentRoute
   '/api/start-claude': typeof ApiStartClaudeRoute
@@ -1357,6 +1372,7 @@ export interface FileRoutesByTo {
   '/api/workspace': typeof ApiWorkspaceRoute
   '/api/workspaces': typeof ApiWorkspacesRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat': typeof ChatIndexRoute
   '/settings': typeof SettingsIndexRoute
@@ -1503,6 +1519,7 @@ export interface FileRoutesById {
   '/api/session-send': typeof ApiSessionSendRoute
   '/api/session-status': typeof ApiSessionStatusRoute
   '/api/sessions': typeof ApiSessionsRouteWithChildren
+  '/api/setup-status': typeof ApiSetupStatusRoute
   '/api/skills': typeof ApiSkillsRouteWithChildren
   '/api/start-agent': typeof ApiStartAgentRoute
   '/api/start-claude': typeof ApiStartClaudeRoute
@@ -1537,6 +1554,7 @@ export interface FileRoutesById {
   '/api/workspace': typeof ApiWorkspaceRoute
   '/api/workspaces': typeof ApiWorkspacesRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
@@ -1684,6 +1702,7 @@ export interface FileRouteTypes {
     | '/api/session-send'
     | '/api/session-status'
     | '/api/sessions'
+    | '/api/setup-status'
     | '/api/skills'
     | '/api/start-agent'
     | '/api/start-claude'
@@ -1718,6 +1737,7 @@ export interface FileRouteTypes {
     | '/api/workspace'
     | '/api/workspaces'
     | '/chat/$sessionKey'
+    | '/invite/$token'
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
@@ -1862,6 +1882,7 @@ export interface FileRouteTypes {
     | '/api/session-send'
     | '/api/session-status'
     | '/api/sessions'
+    | '/api/setup-status'
     | '/api/skills'
     | '/api/start-agent'
     | '/api/start-claude'
@@ -1896,6 +1917,7 @@ export interface FileRouteTypes {
     | '/api/workspace'
     | '/api/workspaces'
     | '/chat/$sessionKey'
+    | '/invite/$token'
     | '/settings/providers'
     | '/chat'
     | '/settings'
@@ -2041,6 +2063,7 @@ export interface FileRouteTypes {
     | '/api/session-send'
     | '/api/session-status'
     | '/api/sessions'
+    | '/api/setup-status'
     | '/api/skills'
     | '/api/start-agent'
     | '/api/start-claude'
@@ -2075,6 +2098,7 @@ export interface FileRouteTypes {
     | '/api/workspace'
     | '/api/workspaces'
     | '/chat/$sessionKey'
+    | '/invite/$token'
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
@@ -2221,6 +2245,7 @@ export interface RootRouteChildren {
   ApiSessionSendRoute: typeof ApiSessionSendRoute
   ApiSessionStatusRoute: typeof ApiSessionStatusRoute
   ApiSessionsRoute: typeof ApiSessionsRouteWithChildren
+  ApiSetupStatusRoute: typeof ApiSetupStatusRoute
   ApiSkillsRoute: typeof ApiSkillsRouteWithChildren
   ApiStartAgentRoute: typeof ApiStartAgentRoute
   ApiStartClaudeRoute: typeof ApiStartClaudeRoute
@@ -2255,6 +2280,7 @@ export interface RootRouteChildren {
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
   ApiWorkspacesRoute: typeof ApiWorkspacesRouteWithChildren
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
+  InviteTokenRoute: typeof InviteTokenRoute
   ChatIndexRoute: typeof ChatIndexRoute
   ApiClaudeProxySplatRoute: typeof ApiClaudeProxySplatRoute
   ApiDashboardOverviewRoute: typeof ApiDashboardOverviewRoute
@@ -2474,6 +2500,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings/providers'
       preLoaderRoute: typeof SettingsProvidersRouteImport
       parentRoute: typeof SettingsRoute
+    }
+    '/invite/$token': {
+      id: '/invite/$token'
+      path: '/invite/$token'
+      fullPath: '/invite/$token'
+      preLoaderRoute: typeof InviteTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/chat/$sessionKey': {
       id: '/chat/$sessionKey'
@@ -2711,6 +2744,13 @@ declare module '@tanstack/react-router' {
       path: '/api/skills'
       fullPath: '/api/skills'
       preLoaderRoute: typeof ApiSkillsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/setup-status': {
+      id: '/api/setup-status'
+      path: '/api/setup-status'
+      fullPath: '/api/setup-status'
+      preLoaderRoute: typeof ApiSetupStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/sessions': {
@@ -3868,6 +3908,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSessionSendRoute: ApiSessionSendRoute,
   ApiSessionStatusRoute: ApiSessionStatusRoute,
   ApiSessionsRoute: ApiSessionsRouteWithChildren,
+  ApiSetupStatusRoute: ApiSetupStatusRoute,
   ApiSkillsRoute: ApiSkillsRouteWithChildren,
   ApiStartAgentRoute: ApiStartAgentRoute,
   ApiStartClaudeRoute: ApiStartClaudeRoute,
@@ -3902,6 +3943,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWorkspaceRoute: ApiWorkspaceRoute,
   ApiWorkspacesRoute: ApiWorkspacesRouteWithChildren,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
+  InviteTokenRoute: InviteTokenRoute,
   ChatIndexRoute: ChatIndexRoute,
   ApiClaudeProxySplatRoute: ApiClaudeProxySplatRoute,
   ApiDashboardOverviewRoute: ApiDashboardOverviewRoute,

@@ -5,6 +5,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — Multi-Tenant UI Core (Phase A.6, 2026-05-08)
+
+**Auth-Surface Refactor**
+- **`src/components/auth/login-screen.tsx`** — komplette Neufassung. Liest `/api/setup-status` einmal beim Mount und routet in einen von 5 Sub-Modi: `loading`, `inconsistent` (Boot-State F1 mit Operator-Hinweis), `setup` (First-Run-SetupWizard), `multi-tenant` (Email + Password), `multi-tenant-must-change-password` (Force-Change nach Temp-PW), `legacy` (Single-Password-Fallback). Erkennt auch `/invite/<token>` in der URL und überlädt mit `InviteAcceptForm`. Deutsche UI-Strings, dunkler-tolerant, identische Karten-Optik wie das alte LoginScreen.
+- **SetupWizard (in login-screen.tsx)** — 2-Step-Flow: Owner-Account (id, email, name, password+confirm mit ≥8 Zeichen) → Workspace (id auto-suggested aus name, name, primaryColor mit Color-Picker). POST `/api/auth/setup` → Auto-Login und Redirect auf `/`.
+- **ForceChangePasswordForm** — wird vom LoginScreen aufgerufen wenn `/api/auth/me` `mustChangePassword: true` zurückgibt. Verifiziert altes Passwort, setzt neues (≥8 Zeichen, Bestätigung), revoked alle anderen Tokens, issued frischen Token, lädt Seite.
+- **InviteAcceptForm** — public, vom LoginScreen via URL-Pattern `/invite/<token>` getriggert. Lädt `/api/invites/$token/info`, zeigt Workspace-Branding-Bar + Rolle, Form: userId (Slug), name, password+confirm. POST `/api/invites/$token/accept` → Auto-Login → Redirect auf `/`.
+
+**Workspace-Komponenten**
+- **`src/components/workspace/workspace-switcher.tsx`** — Plan A.5 Footer-Switcher in der `chat-sidebar`. Zeigt aktiven Workspace mit Branding-Color-Bar + Name + Username, Click öffnet Dropdown mit allen Memberships (Color-Bar pro Eintrag), Account-Link, optional Workspace-Settings-Link (für Admin/Owner), Logout-Button. Kollabiert auf Color-Block wenn Sidebar collapsed. Returnt `null` im Legacy-Modus.
+- **`src/components/workspace/workspace-header-banner.tsx`** — dünner farbiger Streifen oben auf jeder Seite mit `meta.branding.primaryColor`. Verhindert dass User versehentlich glaubt, im falschen Workspace zu sein. Sticky-top, z-40, returnt null im Legacy-Modus.
+- **`src/routes/invite.$token.tsx`** — public TanStack-Route die `LoginScreen` rendert. Macht `/invite/<token>` URL-stable; LoginScreen erkennt Path und switcht auf InviteAcceptForm.
+
+**Shared Frontend Helper + Endpoint**
+- **`src/lib/workspace-auth.ts`** — `fetchSetupStatus`, `loginWithEmailPassword`, `logout`, `fetchCurrentUser`, `performSetup`, `fetchInviteInfo`, `acceptInvite`, `changePassword`, `switchWorkspace`. Typisierte `AuthError` mit `kind`-Discriminator. `SLUG_RE` mirror-validiert serverseitige Regel + `suggestSlug(name)` Helper.
+- **`GET /api/setup-status`** — public, no auth. Returnt `{ mode: 'fresh-stack' | 'multi-tenant' | 'legacy' | 'inconsistent' }`.
+
+**Integration in `__root.tsx`**
+- `<WorkspaceHeaderBanner />` wird oben gemounted wenn `rootSurfaceState.showWorkspaceShell` aktiv ist.
+
+### Changed
+- `src/screens/chat/components/chat-sidebar.tsx` — `<WorkspaceSwitcher />` als neues Element vor der bestehenden User-Card im Footer. Pure additive: bei Legacy-Modus oder noch nicht eingeloggtem Multi-Tenant-User returnt der Switcher null und die Sidebar sieht aus wie vorher.
+- `src/routeTree.gen.ts` — auto-regenerated, 2 neue Routes (`/api/setup-status`, `/invite/$token`).
+
 ### Added — Single→Multi-Tenant Migration (Phase A.5, 2026-05-08)
 
 **Migration-Engine (3 neue Backend-Module)**

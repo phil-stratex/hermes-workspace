@@ -66,6 +66,7 @@ import {
   MenuTrigger,
 } from '@/components/ui/menu'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
+import { WorkspaceSwitcher } from '@/components/workspace/workspace-switcher'
 
 type WorkspaceStats = Record<string, unknown>
 
@@ -1184,7 +1185,9 @@ function ChatSidebarComponent({
       {/* end scrollable body */}
 
       {/* ── Footer with User Menu ─────────────────────────────────── */}
-      <div className="px-2 py-2.5 border-t shrink-0 theme-border theme-panel">
+      <div className="px-0 py-2 border-t shrink-0 theme-border theme-panel">
+        {/* Multi-tenant workspace switcher (renders null in legacy mode) */}
+        <WorkspaceSwitcher collapsed={isVisuallyCollapsed} />
         {/* User card + actions */}
         <div
           className={cn(
