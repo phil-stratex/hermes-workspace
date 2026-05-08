@@ -53,7 +53,10 @@ function PredictBuildContent({ projectId }: { projectId: string }) {
   })
 
   const graphQuery = useQuery({
-    queryKey: ['predict', 'graph', projectId, buildHook.state.nodesTotal, buildHook.state.edgesTotal],
+    // Stable key — `refetchInterval` already drives polling; including totals
+    // here invalidated the cache on every chunk_done event and caused
+    // refetch-loops, plus the cache stayed unstable post-completion.
+    queryKey: ['predict', 'graph', projectId],
     queryFn: () => predictClient.getProjectGraph(projectId, 200),
     refetchInterval:
       buildHook.state.status === 'completed' || buildHook.state.status === 'failed' ? false : 6_000,

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -14,9 +14,6 @@ import { usePredictStore } from '@/stores/predict-store'
 import { cn } from '@/lib/utils'
 
 export function PredictHomeScreen() {
-  const [health, setHealth] = useState<PredictHealth | null>(null)
-  const [healthError, setHealthError] = useState<string | null>(null)
-  const [healthLoading, setHealthLoading] = useState(true)
   const [files, setFiles] = useState<Array<File>>([])
   const [prompt, setPrompt] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -24,40 +21,26 @@ export function PredictHomeScreen() {
   const navigate = useNavigate()
   const setPendingUpload = usePredictStore((s) => s.setPendingUpload)
 
+  // Periodic health probe — keeps the badge honest if the backend goes down
+  // mid-session (previous mount-only check could remain falsely green).
+  const healthQuery = useQuery({
+    queryKey: ['predict', 'health'],
+    queryFn: predictClient.health,
+    refetchInterval: 30_000,
+    staleTime: 10_000,
+  })
+
   // Server-driven recent projects (replaces the prior client-only zustand cache).
   const projectsQuery = useQuery({
     queryKey: ['predict', 'projects-list'],
     queryFn: () => predictClient.listProjects(20),
     refetchInterval: 15_000,
-    enabled: !healthError,
+    enabled: !healthQuery.error,
   })
   const recentProjects = projectsQuery.data ?? []
   const inFlightProject = recentProjects.find(
     (p) => p.build_task && (p.build_task.status === 'queued' || p.build_task.status === 'running'),
   )
-
-  useEffect(() => {
-    let cancelled = false
-    setHealthLoading(true)
-    predictClient
-      .health()
-      .then((res) => {
-        if (cancelled) return
-        setHealth(res)
-        setHealthError(null)
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return
-        setHealth(null)
-        setHealthError(err instanceof Error ? err.message : String(err))
-      })
-      .finally(() => {
-        if (!cancelled) setHealthLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   const canSubmit = files.length > 0 && prompt.trim().length > 0 && !submitting
 
@@ -89,7 +72,13 @@ export function PredictHomeScreen() {
       step={null}
       title="Predict"
       subtitle="Multi-Agent-Vorhersage-Engine — Upload, Graph, Simulation, Report, Interaktion."
-      rightSlot={<HealthBadge health={health} error={healthError} loading={healthLoading} />}
+      rightSlot={
+        <HealthBadge
+          health={healthQuery.data ?? null}
+          error={healthQuery.error ? (healthQuery.error instanceof Error ? healthQuery.error.message : String(healthQuery.error)) : null}
+          loading={healthQuery.isLoading}
+        />
+      }
     >
       <section className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6">
         <h2 className="text-base font-semibold">Neue Vorhersage starten</h2>

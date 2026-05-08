@@ -17,6 +17,10 @@ import { useRunProgress } from './hooks/use-run-progress'
 import { predictClient } from '@/server/predict-client'
 import { cn } from '@/lib/utils'
 
+// Module-level constant — referencing the same array across renders keeps
+// downstream useMemo identities stable when `sim?.config.platforms` is undefined.
+const DEFAULT_PLATFORMS: ReadonlyArray<string> = ['plaza']
+
 export function PredictRunScreen({ simulationId }: { simulationId: string }) {
   if (!simulationId || simulationId === 'tbd') {
     return (
@@ -70,7 +74,7 @@ function PredictRunContent({ simulationId }: { simulationId: string }) {
   })
 
   const sim = simulationQuery.data
-  const platforms = sim?.config.platforms ?? ['plaza']
+  const platforms = sim?.config.platforms ?? DEFAULT_PLATFORMS
 
   const postsByPlatform = useMemo(() => {
     const out: Record<string, typeof postsQuery.data> = {}

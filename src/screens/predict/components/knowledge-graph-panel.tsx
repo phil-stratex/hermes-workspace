@@ -11,7 +11,7 @@
  * screen can show a side-panel with the full summary.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { GraphEdge, GraphNode } from '@/server/predict-client'
 import { cn } from '@/lib/utils'
 
@@ -246,14 +246,27 @@ function truncate(text: string, max: number): string {
 
 function useResizeRef(setSize: (s: { width: number; height: number }) => void) {
   const [el, setEl] = useState<HTMLDivElement | null>(null)
+  const debounceRef = useRef<number | null>(null)
   useEffect(() => {
     if (!el || typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver((entries) => {
       const rect = entries[0]?.contentRect
-      if (rect) setSize({ width: Math.max(280, rect.width), height: Math.max(320, rect.height) })
+      if (!rect) return
+      // Debounce — ResizeObserver fires rapidly during window drag; running the
+      // 80–120 iter Fruchterman-Reingold simulation on every tick is wasteful.
+      if (debounceRef.current) window.clearTimeout(debounceRef.current)
+      debounceRef.current = window.setTimeout(() => {
+        setSize({ width: Math.max(280, rect.width), height: Math.max(320, rect.height) })
+      }, 200)
     })
     observer.observe(el)
-    return () => observer.disconnect()
+    return () => {
+      observer.disconnect()
+      if (debounceRef.current) {
+        window.clearTimeout(debounceRef.current)
+        debounceRef.current = null
+      }
+    }
   }, [el, setSize])
   return setEl
 }
