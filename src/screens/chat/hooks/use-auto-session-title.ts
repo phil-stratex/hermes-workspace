@@ -15,9 +15,12 @@ const GENERIC_TITLE_PATTERNS = [
   /^a new session/i,
   /^new session/i,
   /^untitled/i,
-  /^session \d/i,
+  /^session(\s|$)/i, // matches "Session", "Session 1", "Session fcd3af8a", "session abc"
   /^conversation$/i,
   /^chat$/i,
+  /^local chat$/i,
+  /^naming…?$/i,
+  /^hermes$/i,
   /^[0-9a-f]{6,}/i,
   /^\w{8} \(\d{4}-\d{2}-\d{2}\)$/,
 ]
@@ -79,30 +82,48 @@ export function useAutoSessionTitle({
   }, [messages])
 
   const shouldGenerate = useMemo(() => {
-    if (!enabled) return false
-    if (!friendlyId || friendlyId === 'new') return false
-    if (!sessionKey || sessionKey === 'new') return false
-    if (!proposedTitle) return false
-    if (!hasAssistantResponse(messages)) return false
+    const trace = (reason: string) => {
+      if (typeof window !== 'undefined' && import.meta.env.DEV) {
+        console.debug('[auto-title] skip:', reason, {
+          friendlyId,
+          sessionKey,
+          proposedTitle,
+          activeLabel: activeSession?.label,
+          activeTitle: activeSession?.title,
+          activeDerivedTitle: activeSession?.derivedTitle,
+          titleStatus: titleInfo.status,
+          titleSource: titleInfo.source,
+          messageCount: messages.length,
+        })
+      }
+      return false
+    }
+    if (!enabled) return trace('disabled (likely isNewChat or history not loaded)')
+    if (!friendlyId || friendlyId === 'new') return trace('no friendlyId')
+    if (!sessionKey || sessionKey === 'new') return trace('no sessionKey')
+    if (!proposedTitle) return trace('no first user message')
+    if (!hasAssistantResponse(messages)) return trace('no assistant response yet')
     if (activeSession?.label && !isGenericTitle(activeSession.label))
-      return false
+      return trace(`label is non-generic: "${activeSession.label}"`)
     if (activeSession?.title && !isGenericTitle(activeSession.title))
-      return false
+      return trace(`title is non-generic: "${activeSession.title}"`)
     if (
       activeSession?.derivedTitle &&
       !isGenericTitle(activeSession.derivedTitle)
     ) {
-      return false
+      return trace(`derivedTitle is non-generic: "${activeSession.derivedTitle}"`)
     }
-    if (titleInfo.source === 'manual' && titleInfo.title) return false
+    if (titleInfo.source === 'manual' && titleInfo.title)
+      return trace('stored title is manual')
     if (
       titleInfo.status === 'ready' &&
       titleInfo.title &&
       !isGenericTitle(titleInfo.title)
     ) {
-      return false
+      return trace(`stored title already ready: "${titleInfo.title}"`)
     }
-    return titleInfo.status !== 'generating'
+    if (titleInfo.status === 'generating') return trace('already generating')
+    return true
   }, [
     activeSession?.derivedTitle,
     activeSession?.label,
@@ -176,6 +197,10 @@ export function useAutoSessionTitle({
       void queryClient.invalidateQueries({ queryKey: chatQueryKeys.sessions })
     },
     onError: (error, payload) => {
+      // Clear the attempt signature so a retry on the same (sessionKey, message)
+      // pair is not silently blocked. Without this, a single failed PATCH would
+      // wedge auto-rename until a full page reload.
+      delete lastAttemptRef.current[payload.friendlyId]
       updateSessionTitleState(payload.friendlyId, {
         status: 'error',
         error: error instanceof Error ? error.message : String(error ?? ''),
