@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import type { InterviewEvent } from '@/server/predict-client'
 import { predictClient } from '@/server/predict-client'
 
@@ -42,6 +42,7 @@ function patch(state: BatchProgressState, key: string, fields: Partial<BatchProg
 }
 
 function reduceBatchEvent(state: BatchProgressState, event: InterviewEvent): BatchProgressState {
+  if ((event as { type: string }).type === 'reset') return initial
   switch (event.type) {
     case 'snapshot':
       return { ...state, status: event.status }
@@ -93,11 +94,17 @@ export function useBatchProgress(reportId: string | null, batchId: string | null
   const [connection, setConnection] = useState<BatchConnection>('idle')
   const [generation, setGeneration] = useState(0)
 
+  const stateRef = useRef(state)
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
+
   useEffect(() => {
     if (!reportId || !batchId) {
       setConnection('idle')
       return
     }
+    dispatch({ type: 'reset' } as never)
     setConnection('connecting')
     const source = predictClient.openBatchEventStream(reportId, batchId)
     source.addEventListener('open', () => setConnection('open'))
@@ -126,6 +133,11 @@ export function useBatchProgress(reportId: string | null, batchId: string | null
       source.addEventListener(kind, handler(kind) as EventListener)
     }
     source.onerror = () => {
+      const s = stateRef.current.status
+      if (s === 'completed' || s === 'failed') {
+        setConnection('closed')
+        return
+      }
       setConnection((current) => (current === 'open' ? 'error' : current))
     }
     return () => {

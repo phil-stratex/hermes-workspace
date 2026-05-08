@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import type { BuildEvent } from '@/server/predict-client'
 import { predictClient } from '@/server/predict-client'
 import {
@@ -14,15 +14,27 @@ export function useBuildProgress(projectId: string | null): {
   connection: ConnectionState
   reconnect: () => void
 } {
-  const [state, dispatch] = useReducer((s: BuildState, ev: BuildEvent) => reduceBuildEvent(s, ev), initialBuildState)
+  const [state, dispatch] = useReducer(
+    (s: BuildState, ev: BuildEvent): BuildState => {
+      if ((ev as { type: string }).type === 'reset') return initialBuildState
+      return reduceBuildEvent(s, ev)
+    },
+    initialBuildState,
+  )
   const [connection, setConnection] = useState<ConnectionState>('idle')
   const [generation, setGeneration] = useState(0)
+
+  const stateRef = useRef(state)
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
 
   useEffect(() => {
     if (!projectId) {
       setConnection('idle')
       return
     }
+    dispatch({ type: 'reset' } as never)
     setConnection('connecting')
     const source = predictClient.openBuildEventStream(projectId)
 
@@ -57,6 +69,13 @@ export function useBuildProgress(projectId: string | null): {
     source.onerror = () => {
       // EventSource auto-reconnects unless we close it. We surface the
       // 'error' state for the UI badge but keep the connection open.
+      // F-M5: After a terminal status, Cloudflare/proxies will close the
+      // idle SSE — that's a normal close, not an error.
+      const s = stateRef.current.status
+      if (s === 'completed' || s === 'failed') {
+        setConnection('closed')
+        return
+      }
       setConnection((current) => (current === 'open' ? 'error' : current))
     }
 

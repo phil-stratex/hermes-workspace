@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import type { PrepareEvent } from '@/server/predict-client'
 import { predictClient } from '@/server/predict-client'
 
@@ -39,6 +39,7 @@ const initialState: PrepareProgressState = {
 }
 
 function reducePrepare(state: PrepareProgressState, event: PrepareEvent): PrepareProgressState {
+  if ((event as { type: string }).type === 'reset') return initialState
   switch (event.type) {
     case 'snapshot':
       return {
@@ -112,11 +113,17 @@ export function usePrepareProgress(simulationId: string | null): {
   const [connection, setConnection] = useState<PrepareConnection>('idle')
   const [generation, setGeneration] = useState(0)
 
+  const stateRef = useRef(state)
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
+
   useEffect(() => {
     if (!simulationId) {
       setConnection('idle')
       return
     }
+    dispatch({ type: 'reset' } as never)
     setConnection('connecting')
     const source = predictClient.openPrepareEventStream(simulationId)
     source.addEventListener('open', () => setConnection('open'))
@@ -146,6 +153,11 @@ export function usePrepareProgress(simulationId: string | null): {
       source.addEventListener(kind, handler(kind) as EventListener)
     }
     source.onerror = () => {
+      const s = stateRef.current.status
+      if (s === 'completed' || s === 'failed') {
+        setConnection('closed')
+        return
+      }
       setConnection((current) => (current === 'open' ? 'error' : current))
     }
     return () => {

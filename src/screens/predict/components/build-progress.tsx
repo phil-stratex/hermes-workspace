@@ -19,6 +19,8 @@ export type BuildState = {
   nodesTotal: number
   edgesTotal: number
   lastChunkDoc: string | null
+  lastChunkFailureDoc: string | null
+  lastChunkFailureError: string | null
   recentEvents: Array<BuildEvent>
 }
 
@@ -31,6 +33,8 @@ export const initialBuildState: BuildState = {
   nodesTotal: 0,
   edgesTotal: 0,
   lastChunkDoc: null,
+  lastChunkFailureDoc: null,
+  lastChunkFailureError: null,
   recentEvents: [],
 }
 
@@ -69,7 +73,13 @@ export function reduceBuildEvent(state: BuildState, event: BuildEvent): BuildSta
         recentEvents,
       }
     case 'chunk_failed':
-      return { ...state, lastChunkDoc: event.doc, recentEvents }
+      return {
+        ...state,
+        lastChunkDoc: event.doc,
+        lastChunkFailureDoc: event.doc,
+        lastChunkFailureError: event.error,
+        recentEvents,
+      }
     case 'done':
       return {
         ...state,
@@ -200,6 +210,16 @@ export function BuildProgress({ state }: { state: BuildState }) {
             ) : null}
           </div>
         </details>
+      ) : null}
+
+      {state.lastChunkFailureDoc ? (
+        <div className="flex items-start gap-2 rounded-xl border border-yellow-500 bg-yellow-500/10 p-3 text-xs text-yellow-200">
+          <HugeiconsIcon icon={AlertCircleIcon} size={14} />
+          <span>
+            Ein Chunk ist fehlgeschlagen — {state.lastChunkFailureDoc}
+            {state.lastChunkFailureError ? `: ${state.lastChunkFailureError}` : ''}. Build läuft trotzdem weiter.
+          </span>
+        </div>
       ) : null}
 
       {state.error ? (

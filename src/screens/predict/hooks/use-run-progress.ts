@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import type { RunEvent } from '@/server/predict-client'
 import { predictClient } from '@/server/predict-client'
 
@@ -41,6 +41,7 @@ const initial: RunProgressState = {
 }
 
 function reduceRunEvent(state: RunProgressState, event: RunEvent): RunProgressState {
+  if ((event as { type: string }).type === 'reset') return initial
   switch (event.type) {
     case 'snapshot':
       return {
@@ -132,11 +133,17 @@ export function useRunProgress(simulationId: string | null): {
   const [connection, setConnection] = useState<RunConnection>('idle')
   const [generation, setGeneration] = useState(0)
 
+  const stateRef = useRef(state)
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
+
   useEffect(() => {
     if (!simulationId) {
       setConnection('idle')
       return
     }
+    dispatch({ type: 'reset' } as never)
     setConnection('connecting')
     let source: EventSource
     try {
@@ -174,6 +181,11 @@ export function useRunProgress(simulationId: string | null): {
     }
 
     source.onerror = () => {
+      const s = stateRef.current.status
+      if (s === 'completed' || s === 'failed' || s === 'stopped') {
+        setConnection('closed')
+        return
+      }
       setConnection((current) => (current === 'open' ? 'error' : current))
     }
 

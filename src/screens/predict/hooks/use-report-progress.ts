@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import type { ReportEvent } from '@/server/predict-client'
 import { predictClient } from '@/server/predict-client'
 
@@ -45,6 +45,7 @@ function patchSection(
 }
 
 function reduceReportEvent(state: ReportProgressState, event: ReportEvent): ReportProgressState {
+  if ((event as { type: string }).type === 'reset') return initial
   switch (event.type) {
     case 'snapshot':
       return {
@@ -131,11 +132,17 @@ export function useReportProgress(reportId: string | null): {
   const [connection, setConnection] = useState<ReportConnection>('idle')
   const [generation, setGeneration] = useState(0)
 
+  const stateRef = useRef(state)
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
+
   useEffect(() => {
     if (!reportId) {
       setConnection('idle')
       return
     }
+    dispatch({ type: 'reset' } as never)
     setConnection('connecting')
     const source = predictClient.openReportEventStream(reportId)
     source.addEventListener('open', () => setConnection('open'))
@@ -166,6 +173,11 @@ export function useReportProgress(reportId: string | null): {
     }
 
     source.onerror = () => {
+      const s = stateRef.current.status
+      if (s === 'completed' || s === 'failed') {
+        setConnection('closed')
+        return
+      }
       setConnection((current) => (current === 'open' ? 'error' : current))
     }
 
