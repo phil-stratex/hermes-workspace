@@ -18,7 +18,12 @@ import {
   updateSession,
 } from '../../server/claude-api'
 import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
-import { deleteLocalSession, getLocalSession, listLocalSessions } from '../../server/local-session-store'
+import {
+  deleteLocalSession,
+  getLocalMessages,
+  getLocalSession,
+  listLocalSessions,
+} from '../../server/local-session-store'
 
 // Local patch: persistent session titles for zero-fork mode where the
 // upstream gateway doesn't accept session label updates.
@@ -71,6 +76,50 @@ function applyStoredTitles<T extends Record<string, unknown>>(
   })
 }
 
+// Derive a sidebar-friendly title from the first user message of a local
+// session whose backend-side title is still the placeholder "Local Chat".
+// Frontend's auto-title hook can race with the listSessions refetch and the
+// sidebar fallback shows "Session <hex>" until the hook lands its PATCH —
+// doing this server-side guarantees a real title on the very next refetch
+// and persists it via writeSessionTitle so applyStoredTitles handles it
+// from then on.
+const MAX_DERIVED_TITLE_LENGTH = 50
+const PLACEHOLDER_TITLES = new Set(['', 'Local Chat'])
+
+function truncateForTitle(text: string): string {
+  const normalized = text.replace(/\s+/g, ' ').trim()
+  if (normalized.length === 0) return ''
+  if (normalized.length <= MAX_DERIVED_TITLE_LENGTH) return normalized
+  return `${normalized.slice(0, MAX_DERIVED_TITLE_LENGTH - 1).trimEnd()}…`
+}
+
+function withDerivedLocalTitles<T extends Record<string, unknown>>(
+  sessions: Array<T>,
+): Array<T> {
+  return sessions.map((s) => {
+    if (s.source !== 'local') return s
+    const titleStr = typeof s.title === 'string' ? s.title.trim() : ''
+    const labelStr = typeof s.label === 'string' ? s.label.trim() : ''
+    if (labelStr && !PLACEHOLDER_TITLES.has(labelStr)) return s
+    if (titleStr && !PLACEHOLDER_TITLES.has(titleStr) && labelStr) return s
+
+    const sessionId = typeof s.id === 'string' ? s.id : typeof s.key === 'string' ? s.key : ''
+    if (!sessionId) return s
+    const messages = getLocalMessages(sessionId)
+    const firstUser = messages.find((m) => m.role === 'user')
+    if (!firstUser) return s
+    const content = typeof firstUser.content === 'string' ? firstUser.content : ''
+    const derived = truncateForTitle(content)
+    if (!derived) return s
+
+    // Fire-and-forget persistence — next GET reads it via applyStoredTitles
+    // (which serialises read-modify-write under withMutex).
+    void writeSessionTitle(sessionId, derived)
+
+    return { ...s, label: derived, title: derived, derivedTitle: derived }
+  })
+}
+
 export const Route = createFileRoute('/api/sessions')({
   server: {
     handlers: {
@@ -111,7 +160,9 @@ export const Route = createFileRoute('/api/sessions')({
             }
           }
 
-          return json({ sessions: applyStoredTitles(gatewaySessions) })
+          return json({
+            sessions: withDerivedLocalTitles(applyStoredTitles(gatewaySessions)),
+          })
         } catch (err) {
           return json(
             {
