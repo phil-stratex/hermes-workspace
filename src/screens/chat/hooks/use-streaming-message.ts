@@ -617,6 +617,56 @@ export function useStreamingMessage(options: UseStreamingMessageOptions = {}) {
           onTool?.(payload)
           break
         }
+        case 'fileArtifact': {
+          markActivity()
+          try {
+            const artifactId =
+              typeof payload.artifactId === 'string' ? payload.artifactId : ''
+            const sessionId =
+              typeof payload.sessionId === 'string' ? payload.sessionId : ''
+            const path = typeof payload.path === 'string' ? payload.path : ''
+            const version =
+              typeof payload.version === 'number' ? payload.version : 0
+            if (!artifactId || !sessionId || !path) break
+            const toolCallId =
+              typeof payload.toolCallId === 'string'
+                ? payload.toolCallId
+                : undefined
+            const toolName =
+              typeof payload.toolName === 'string' ? payload.toolName : undefined
+            const kind =
+              payload.kind === 'file_write' ||
+              payload.kind === 'file_edit' ||
+              payload.kind === 'file_create' ||
+              payload.kind === 'patch'
+                ? payload.kind
+                : undefined
+            // Mirror the neighboring `case 'artifact'` so file writes show up
+            // in the live activity feed (Inspector). Without this, file
+            // writes were silently captured but invisible in the Activity tab.
+            pushActivity({
+              type: 'fileArtifact',
+              time: new Date().toLocaleTimeString(),
+              text: toolName ? `${toolName} — ${path} (v${version})` : `${path} (v${version})`,
+            })
+            processStoreEvent({
+              type: 'fileArtifact',
+              artifactId,
+              sessionId,
+              path,
+              version,
+              toolCallId,
+              toolName,
+              kind,
+              runId: activeRunIdRef.current ?? undefined,
+              sessionKey: activeSessionKeyRef.current,
+              transport: 'send-stream',
+            })
+          } catch {
+            // Defensive — never break the stream on bad artifact payloads.
+          }
+          break
+        }
         case 'artifact': {
           markActivity()
           const title =

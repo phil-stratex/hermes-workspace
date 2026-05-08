@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { usePreviewPanelStore } from './preview-panel-store'
 import type {
   ChatMessage,
   MessageContent,
@@ -6,6 +7,22 @@ import type {
   ThinkingContent,
   ToolCallContent,
 } from '../screens/chat/types'
+
+export type FileArtifactKind =
+  | 'file_write'
+  | 'file_edit'
+  | 'file_create'
+  | 'patch'
+
+export type FileArtifactMeta = {
+  artifactId: string
+  sessionId: string
+  path: string
+  version: number
+  toolName?: string
+  kind?: FileArtifactKind
+  createdAt: number
+}
 
 let _streamingPersistTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -64,6 +81,19 @@ export type ChatStreamEvent =
   | {
       type: 'status' | 'lifecycle'
       text: string
+      sessionKey: string
+      runId?: string
+      transport?: 'chat-events' | 'send-stream'
+    }
+  | {
+      type: 'fileArtifact'
+      artifactId: string
+      sessionId: string
+      path: string
+      version: number
+      toolCallId?: string
+      toolName?: string
+      kind?: FileArtifactKind
       sessionKey: string
       runId?: string
       transport?: 'chat-events' | 'send-stream'
@@ -140,6 +170,26 @@ type ChatState = {
   clearSessionWaiting: (sessionKey: string) => void
   /** Check if a session is waiting for a response */
   isSessionWaiting: (sessionKey: string) => boolean
+
+  /**
+   * File artifacts captured during the current chat session keyed by the
+   * tool-call id that produced them. Lets message renderers look up the
+   * artifact metadata for the inline ArtifactCard when the corresponding
+   * tool-call is rendered.
+   */
+  fileArtifactsByToolCall: Record<string, FileArtifactMeta>
+  /** Look up the artifact metadata associated with a given tool-call id. */
+  getFileArtifactByToolCall: (
+    toolCallId: string | undefined,
+  ) => FileArtifactMeta | undefined
+  /**
+   * Fetch persisted FileArtifacts for the given session and populate
+   * `fileArtifactsByToolCall` so old assistant messages (loaded from
+   * history after a refresh) can render their inline ArtifactCards.
+   * Best-effort; failures are logged and swallowed so history loading
+   * never breaks because the artifact endpoint is unavailable.
+   */
+  hydrateFileArtifacts: (sessionId: string) => Promise<void>
 }
 
 const createEmptyStreamingState = (): StreamingState => ({
@@ -641,6 +691,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendStreamRunIds: new Set(),
   waitingSessionKeys: _restoredWaiting.keys,
   waitingSessionMeta: _restoredWaiting.meta,
+  fileArtifactsByToolCall: {},
 
   setConnectionState: (connectionState, error) => {
     set({ connectionState, lastError: error ?? null })
@@ -685,6 +736,63 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   isSessionWaiting: (sessionKey) => {
     return get().waitingSessionKeys.has(sessionKey)
+  },
+
+  getFileArtifactByToolCall: (toolCallId) => {
+    if (!toolCallId) return undefined
+    return get().fileArtifactsByToolCall[toolCallId]
+  },
+
+  hydrateFileArtifacts: async (sessionId) => {
+    const trimmed = sessionId.trim()
+    if (!trimmed) return
+    try {
+      const params = new URLSearchParams({ sessionId: trimmed, limit: '500' })
+      const res = await fetch(`/api/file-artifacts?${params.toString()}`, {
+        headers: { accept: 'application/json' },
+      })
+      if (!res.ok) return
+      const json = (await res.json()) as {
+        ok?: boolean
+        artifacts?: Array<{
+          id: string
+          sessionId: string
+          toolCallId?: string
+          toolName?: string
+          kind?: FileArtifactKind
+          path: string
+          version: number
+          createdAt: number
+        }>
+      }
+      if (!json.ok || !Array.isArray(json.artifacts)) return
+
+      // Pick the latest version per toolCallId. Multiple artifacts can share
+      // a tool-call id when the dedup write-pass missed (e.g. legacy data
+      // from before the dedup fix landed).
+      const next: Record<string, FileArtifactMeta> = {
+        ...get().fileArtifactsByToolCall,
+      }
+      for (const artifact of json.artifacts) {
+        if (!artifact.toolCallId) continue
+        const existing = next[artifact.toolCallId]
+        if (existing && existing.version >= artifact.version) continue
+        next[artifact.toolCallId] = {
+          artifactId: artifact.id,
+          sessionId: artifact.sessionId,
+          path: artifact.path,
+          version: artifact.version,
+          toolName: artifact.toolName,
+          kind: artifact.kind,
+          createdAt: artifact.createdAt,
+        }
+      }
+      set({ fileArtifactsByToolCall: next })
+    } catch (error) {
+      // Best-effort hydration. Network failures, auth blips, missing endpoint
+      // — none of these should break history loading.
+      console.warn('[chat-store] hydrateFileArtifacts failed', error)
+    }
   },
 
   processEvent: (event) => {
@@ -1141,6 +1249,64 @@ export const useChatStore = create<ChatState>((set, get) => ({
         set({ streamingState: streamingMap, lastEventAt: now })
         if (typeof sessionStorage !== 'undefined') {
           sessionStorage.removeItem(`claude_streaming_${sessionKey}`)
+        }
+        break
+      }
+
+      case 'fileArtifact': {
+        try {
+          const meta: FileArtifactMeta = {
+            artifactId: event.artifactId,
+            sessionId: event.sessionId,
+            path: event.path,
+            version: event.version,
+            toolName: event.toolName,
+            kind: event.kind,
+            createdAt: now,
+          }
+
+          // Auto-open the right-side preview panel and add/refresh a tab.
+          // Cross-store call is wrapped so panel-store failures (e.g. during
+          // SSR/hydration races) cannot break the chat stream.
+          try {
+            usePreviewPanelStore.getState().openArtifact({
+              artifactId: meta.artifactId,
+              sessionId: meta.sessionId,
+              path: meta.path,
+              version: meta.version,
+              toolName: meta.toolName,
+            })
+          } catch (error) {
+            // Log so panel-store failures (e.g. crypto unavailable, persist
+            // storage full) are visible during debugging, but never let them
+            // propagate up and break the chat stream.
+            console.error(
+              '[chat-store] failed to open artifact in preview panel',
+              error,
+            )
+          }
+
+          // Index by tool-call id so message-item can render the inline card
+          // alongside the tool-activity row.
+          if (event.toolCallId) {
+            const nextArtifacts = {
+              ...state.fileArtifactsByToolCall,
+              [event.toolCallId]: meta,
+            }
+            set({
+              fileArtifactsByToolCall: nextArtifacts,
+              lastEventAt: now,
+            })
+          } else {
+            set({ lastEventAt: now })
+          }
+        } catch (error) {
+          // Defensive — never let an artifact event break the surrounding
+          // stream, but log so silent failures are diagnosable.
+          console.error(
+            '[chat-store] failed to process fileArtifact event',
+            error,
+          )
         }
         break
       }

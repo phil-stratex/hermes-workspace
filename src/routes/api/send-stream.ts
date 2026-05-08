@@ -1,6 +1,10 @@
+import { readFileSync } from 'node:fs'
+import { isAbsolute, join as joinPath } from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { buildResolvedSessionHeaders } from '../../lib/send-stream-session-headers'
 import { buildWorkspaceScopedTextMessage } from '../../lib/workspace-message-scope'
+import { FILE_WRITE_TOOL_NAMES_SET } from '../../lib/file-artifact-tool-names'
+import { createFileArtifact } from '../../server/file-artifact-store'
 import {
   collectSyntheticLiveToolEvents,
   createSyntheticLiveToolTracker,
@@ -277,6 +281,142 @@ function getToolResultPreview(data: Record<string, unknown>): string {
     return JSON.stringify(raw, null, 2)
   } catch {
     return String(raw)
+  }
+}
+
+function readArgsRecord(args: unknown): Record<string, unknown> | null {
+  if (!args || typeof args !== 'object') return null
+  return args as Record<string, unknown>
+}
+
+function pickArgString(
+  args: Record<string, unknown>,
+  keys: ReadonlyArray<string>,
+): string | undefined {
+  for (const key of keys) {
+    const value = args[key]
+    if (typeof value === 'string') return value
+  }
+  return undefined
+}
+
+function readWorkspaceFile(relativePath: string): string | undefined {
+  const workspaceRoot =
+    process.env.HERMES_WORKSPACE_DIR || '/opt/data/workspace'
+  const absolute = isAbsolute(relativePath)
+    ? relativePath
+    : joinPath(workspaceRoot, relativePath)
+  try {
+    return readFileSync(absolute, 'utf-8')
+  } catch {
+    return undefined
+  }
+}
+
+type FileArtifactCaptureContext = {
+  sessionId: string
+  messageId?: string
+  toolCallId?: string
+  toolName: string
+  args: unknown
+  result?: string
+}
+
+type EmitFileArtifactEvent = (payload: {
+  artifactId: string
+  path: string
+  version: number
+  toolCallId?: string
+  sessionId: string
+}) => void
+
+async function tryCaptureFileArtifact(
+  ctx: FileArtifactCaptureContext,
+  emit: EmitFileArtifactEvent,
+): Promise<void> {
+  try {
+    const lowerName = ctx.toolName.toLowerCase()
+    if (!FILE_WRITE_TOOL_NAMES_SET.has(lowerName)) return
+    const argsRecord = readArgsRecord(ctx.args)
+    if (!argsRecord) return
+
+    const rawPath = pickArgString(argsRecord, [
+      'path',
+      'file_path',
+      'filename',
+      'filepath',
+    ])
+    if (!rawPath) return
+
+    let content = pickArgString(argsRecord, [
+      'content',
+      'new_content',
+      'file_text',
+      'new_str',
+      'updated_content',
+    ])
+    let previousContent = pickArgString(argsRecord, [
+      'previous_content',
+      'old_content',
+      'old_str',
+      'old_string',
+    ])
+
+    // For string-replace style edits, reconstruct full content from disk.
+    if (
+      (lowerName === 'str_replace_editor' ||
+        lowerName === 'edit_file' ||
+        lowerName === 'edit' ||
+        lowerName === 'strreplace') &&
+      previousContent &&
+      typeof content === 'string'
+    ) {
+      const onDisk = readWorkspaceFile(rawPath)
+      if (onDisk !== undefined) {
+        if (onDisk.includes(previousContent)) {
+          content = onDisk.replace(previousContent, content)
+          previousContent = onDisk
+        } else {
+          // Snippet not found in file — we can't reconstruct full content
+          // reliably. Skip rather than persist a misleading fragment.
+          return
+        }
+      }
+    }
+
+    if (typeof content !== 'string' && lowerName === 'apply_patch') {
+      const patchText = pickArgString(argsRecord, ['patch', 'diff'])
+      if (patchText) content = patchText
+    }
+
+    if (typeof content !== 'string') return
+
+    if (previousContent === undefined) {
+      const existing = readWorkspaceFile(rawPath)
+      if (existing !== undefined) previousContent = existing
+    }
+
+    const artifact = await createFileArtifact({
+      sessionId: ctx.sessionId,
+      messageId: ctx.messageId,
+      toolCallId: ctx.toolCallId,
+      toolName: ctx.toolName,
+      path: rawPath,
+      content,
+      previousContent,
+    })
+
+    if (!artifact) return
+
+    emit({
+      artifactId: artifact.id,
+      path: artifact.path,
+      version: artifact.version,
+      toolCallId: ctx.toolCallId,
+      sessionId: ctx.sessionId,
+    })
+  } catch {
+    // Swallow — artifact capture must never break the stream.
   }
 }
 
@@ -703,6 +843,16 @@ export const Route = createFileRoute('/api/send-stream')({
                             sessionKey: portableSessionKey,
                             runId,
                           })
+                          await tryCaptureFileArtifact(
+                            {
+                              sessionId: portableSessionKey,
+                              toolCallId: ev.callId,
+                              toolName: name,
+                              args: argsForCard ?? state?.args,
+                              result: ev.output,
+                            },
+                            (payload) => sendEvent('fileArtifact', payload),
+                          )
                           continue
                         }
                         if (ev.kind === 'completed') {
@@ -989,6 +1139,18 @@ export const Route = createFileRoute('/api/send-stream')({
                     }
                     for (const synthetic of syntheticEvents) {
                       sendEvent('tool', synthetic)
+                      if (synthetic.phase === 'complete') {
+                        await tryCaptureFileArtifact(
+                          {
+                            sessionId: sessionKey,
+                            toolCallId: synthetic.toolCallId,
+                            toolName: synthetic.name,
+                            args: synthetic.args,
+                            result: synthetic.result,
+                          },
+                          (payload) => sendEvent('fileArtifact', payload),
+                        )
+                      }
                     }
                   } catch {
                     // Best-effort polling; ignore transient errors.
@@ -1236,6 +1398,16 @@ export const Route = createFileRoute('/api/send-stream')({
                       )
                       sendEvent('tool', translated)
                       skipPublish || publishChatEvent('tool', translated)
+                      await tryCaptureFileArtifact(
+                        {
+                          sessionId: sessionKeyFromEvent,
+                          toolCallId: translated.toolCallId,
+                          toolName,
+                          args: translated.args,
+                          result: translated.result,
+                        },
+                        (payload) => sendEvent('fileArtifact', payload),
+                      )
                       return
                     }
 
@@ -1455,6 +1627,19 @@ export const Route = createFileRoute('/api/send-stream')({
                               sendEvent('tool', synthetic)
                               skipPublish ||
                                 publishChatEvent('tool', synthetic)
+                              if (synthetic.phase === 'complete') {
+                                await tryCaptureFileArtifact(
+                                  {
+                                    sessionId: sessionKeyFromEvent,
+                                    toolCallId: synthetic.toolCallId,
+                                    toolName: synthetic.name,
+                                    args: synthetic.args,
+                                    result: synthetic.result,
+                                  },
+                                  (payload) =>
+                                    sendEvent('fileArtifact', payload),
+                                )
+                              }
                             }
                           }
                         }

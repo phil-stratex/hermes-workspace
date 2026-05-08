@@ -45,6 +45,50 @@ upstream `outsourc-e/hermes-workspace`.
 - `predict-store` simplified to the in-memory `pendingUpload` slice; the previously-persisted `recentProjects` cache was replaced by the server-driven list.
 - `DEFAULT_PLATFORMS` now a module constant in `predict-run-screen` so `useMemo` reference equality holds across renders.
 
+### Added — Preview-Panel (Artifacts/Canvas, Phase 1)
+- **Right-side Preview-Panel** — opens automatically when Hermes writes a file via `write_file`/`edit_file`/`create_file`/`apply_patch` tool calls. Like Claude Artifacts / ChatGPT Canvas. Auto-versioned snapshots per `(sessionId, path)`.
+- **Multi-tab UI** — every opened artifact gets a tab; click switches, X closes. Resizable (320–900 px width, persisted via `preview-panel-store.ts`).
+- **Inline `<ArtifactCard>`** in chat messages — appears under the tool-activity card whenever a file-write tool ran. Click opens the file in the panel. Color-coded by kind (blue=write, amber=edit, emerald=create, purple=patch).
+- **Code-View** — Shiki syntax-highlighting (vitesse-light/dark, dynamic language loading) with line numbers + copy-to-clipboard. Read-only.
+- **Markdown-View** — rendered via existing `react-markdown` + `remark-gfm` + `remark-breaks`, toggle to source via the view-mode-switcher.
+- **Iframe-View** — `.html` artifacts rendered live in sandboxed iframe (`allow-scripts allow-forms`, no `allow-same-origin`). Auto-injects Tailwind CDN if utility classes detected and no script tag present.
+- **Diff-View** — Monaco DiffEditor compares the current version against the previous one for the same path. Read-only, side-by-side. Theme follows `useResolvedTheme()`.
+- **History tab** — lists all versions of the active file with timestamps + tool name + size. "View" jumps to that version, "Diff vs latest" opens the diff view.
+- **Server-side artifact store** — `src/server/file-artifact-store.ts` persists snapshots to `.runtime/file-artifacts/<sessionId>/<sanitized-slug>__v<n>.json` plus a metadata index. Path-traversal protection rejects `..`, drive prefixes, colons, leading slashes.
+- **REST API** — `GET /api/file-artifacts?sessionId=&path=&limit=` (metadata list) and `GET /api/file-artifacts/$artifactId` (full content with diff). Auth pattern mirrors `/api/artifacts`.
+- **Streaming hook** — `tryCaptureFileArtifact` in `src/routes/api/send-stream.ts` fires for the four tool-completion paths (portable responses-API, synthetic-poller, vanilla `tool.completed`, `run.completed` backfill). Emits a `'fileArtifact'` SSE event the client routes through `chat-store.processEvent`.
+- **Layout** — `src/screens/chat/chat-screen.tsx` grid extended to `auto_minmax(0,1fr)_auto_auto` so `<PreviewPanel />` lives next to `<AgentViewPanel />` without breaking either.
+
+### Added — Project-Runner (Phase 2)
+- **Live preview for full-stack projects** — when Hermes scaffolds a Next.js / Vite / Astro / SvelteKit / CRA / static-HTML project, the user clicks "▶ Run" in the Preview-Panel and the Workspace-Container spawns `pnpm install && pnpm dev` inside the Hermes-Container, then proxies `/preview/<runId>/*` to `hermes-agent:<port>` so the iframe shows the running app.
+- **Framework detector** (`src/server/framework-detector.ts`) — reads `package.json` deps + `scripts.dev`, falls back to `python3 -m http.server` for static HTML.
+- **Port pool** (`src/server/preview-port-pool.ts`) — allocates from `4001-4020`, persists to `.runtime/preview-ports.json` via atomic rename. Throws `PortPoolExhaustedError` when full. In-process async-mutex serializes allocation calls.
+- **Project-Runner core** (`src/server/project-runner.ts`) — `startPreview` / `stopPreview` / `getPreviewStatus` / `listRunningPreviews` / `getPreviewLogs`. Health-checks `http://hermes-agent:<port>/` every 1 s for up to 60 s. State mirrored to `.runtime/preview-runs.json`. Uses existing `swarmExec()` helper from `src/server/swarm-docker-exec.ts` to drive the Hermes-Container.
+- **Sub-path proxy route** (`src/routes/preview.$runId.$.ts`) — TanStack Start catch-all that forwards every method (GET/POST/PUT/DELETE/PATCH/OPTIONS) to the spawned dev-server. Hop-by-hop headers stripped per RFC 7230 §6.1. Streams body in/out with `duplex: 'half'`.
+- **Project registry** (`src/server/preview-projects-registry.ts`) — every `package.json` write is registered (sessionId-keyed) so the frontend can show a "Run App" tab without the user having to remember which folder is the project root.
+- **REST API** — `POST /api/preview-runner/start`, `POST /api/preview-runner/stop`, `GET /api/preview-runner/status`, `GET /api/preview-runner/list`, `GET /api/preview-runner/logs?runId=&tail=`, `GET /api/preview-projects?sessionId=`.
+- **Frontend Run-App tab** (`src/components/preview-panel/run-app-tab.tsx`) — five states (idle / installing / starting / ready / error). React-Query polls `status` every 2 s while installing/starting; once `ready`, the iframe takes over. Toolbar: refresh, open-in-new-tab, restart, logs drawer, stop.
+- **Iframe-View extended** with `mode: 'srcdoc' | 'live'` discriminated union — live mode loads `/preview/<runId>/`, no Tailwind injection (the running app handles its own CSS), more permissive sandbox (`allow-scripts allow-forms allow-popups allow-modals`, still no `allow-same-origin`).
+- **VPS deployment guide** (`docs/PHASE_2_DEPLOYMENT.md`, 276 lines) — pre-deploy checklist, `start-all.sh` patch, container-restart cycle, smoke-test walkthrough, known limitations (HMR over sub-path, Next.js `basePath` snippet), cleanup + rollback recipes.
+
+### Fixed — Preview-Panel hardening pass
+- **Claude tool names not detected (C4)** — `Write`, `Edit`, `MultiEdit`, `NotebookEdit` (lowercased: `write`, `edit`, `multiedit`, `notebookedit`) added to `FILE_WRITE_TOOL_NAMES_SET`. Without this fix the entire feature was a no-op for the standard Claude code-edit path. Constants centralised in `src/lib/file-artifact-tool-names.ts` (consumed by both server `send-stream.ts` and client `message-item.tsx`).
+- **Mobile dead-end click (C6)** — inline `<ArtifactCard>` no longer renders on mobile; the `<PreviewPanel />` itself is desktop-only, so the click would otherwise update store state invisibly.
+- **Snippet stored as full file (H3)** — when `str_replace_editor` fires with an `old_str` that doesn't exist in the on-disk file, `tryCaptureFileArtifact` now aborts the capture instead of persisting the snippet as if it were the full file.
+- **Concurrent version race (C1)** — `createFileArtifact` now async + per-`(sessionId, path)` async-mutex around version increment + index/content write. Two parallel writes can no longer collide on the same artifact id.
+- **Path traversal hardening (C2)** — Windows drive prefixes (`C:\...`) and colon segments rejected; slug regex tightened to `[^a-zA-Z0-9_.-]`. `createFileArtifact` returns `null` instead of throwing on invalid paths.
+- **Duplicate artifacts from poller + backfill (C3)** — content-hash dedup keyed on `(sessionId, toolCallId, contentHash)`. The metadata now carries `contentHash` so the dedup check is O(1).
+- **Old messages lost their cards on refresh (C5)** — `chat-store.hydrateFileArtifacts(sessionId)` is invoked from `chat-screen.tsx` after history loads. The `fileArtifactsByToolCall` map is rebuilt by listing all artifacts for the session and keeping the latest version per tool-call id.
+- **Iframe panel could eat the chat at small viewports (H1/M1)** — `MAX_PANEL_WIDTH = 900` clamp moved into `setPanelWidth`. Resize handle additionally clamps to `min(viewport * 0.6, MAX)` so the panel never takes more than 60 % of viewport.
+- **LCS table OOM at 4000×4000 (H6)** — diff cap reduced to 1500 lines, switched to `Uint16Array` (≈ 4.5 MB instead of ≈ 128 MB). Above the cap, `diff` is left `undefined` instead of fabricating an "all-old / all-new" stand-in.
+- **`index.json` corruption silently wiped data (H7)** — saves are now `.tmp` + `renameSync`. On `JSON.parse` failure, the corrupt file is copied to `index.json.corrupt-<timestamp>` before the in-memory state resets.
+- **Cross-store error swallowed silently (H4)** — `usePreviewPanelStore.getState().openArtifact()` failures (e.g. `crypto.randomUUID` unavailable) now log via `console.error` instead of being swallowed.
+- **`fileArtifact` events missed the activity feed (H8)** — `pushActivity({ type: 'fileArtifact', ... })` now mirrors the existing `'artifact'` case in `use-streaming-message.ts`.
+- **Resize-handle pointer cleanup (H5)** — removed misleading `dragStateRef.pointerId` (it was `event.button`, not a pointer id). Added `pointercancel` listener so alt-tabbing mid-drag cleans up.
+- **Version switch lost tool-name badge (M2)** — `updateTabVersion` now also accepts `toolName` and `kind`; the History tab passes them so the tab badge stays accurate after restoring an older version.
+- **Lint pass on Phase-1 files** — auto-fixed import-order + sort-imports issues; manually fixed shadowed `handleResizeStart`, redundant `if (activeTab)` checks (covered by an earlier `tabs.length === 0` guard), and silenced two intentional defensive null-checks with reason comments.
+- **JSDoc header blocks stripped** from preview-panel files to match project's "default to no comments" policy.
+
 ---
 
 ## [2.0.0] — 2026-04-20

@@ -36,6 +36,9 @@ import {
   shouldAutoExpandHermesActivityCard,
 } from './streaming-activity-ui'
 import { TuiActivityCard } from './tui-activity-card'
+import { ArtifactCard } from '@/components/preview-panel'
+import { useChatStore } from '@/stores/chat-store'
+import { FILE_WRITE_TOOL_NAMES_SET } from '@/lib/file-artifact-tool-names'
 
 const WORDS_PER_TICK = 4
 const TICK_INTERVAL_MS = 50
@@ -2040,6 +2043,18 @@ function MessageItemComponent({
     return () => window.clearTimeout(timer)
   }, [])
 
+  // PreviewPanel is gated on !isMobile in chat-screen, so the panel never
+  // mounts on mobile. Mirror that here so ArtifactCard clicks aren't a
+  // confusing dead-end (they'd update store state but show nothing).
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 768px)')
+    const update = () => setIsMobile(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+
   useEffect(() => {
     if (remoteStreamingActive) {
       setDisplayText(remoteStreamingText ?? fullText)
@@ -2389,6 +2404,45 @@ function MessageItemComponent({
     [inlineRenderPlan],
   )
   const hasToolCalls = finalToolSections.length > 0
+
+  // Look up file-artifact metadata for tool sections that wrote/edited a file.
+  // Subscribing to the entire map (rather than per-key) keeps the hook count
+  // constant across renders even as new artifacts stream in.
+  const fileArtifactsByToolCall = useChatStore(
+    (state) => state.fileArtifactsByToolCall,
+  )
+  const fileArtifactCards = useMemo(() => {
+    if (isUser) return []
+    const cards: Array<{
+      key: string
+      artifactId: string
+      sessionId: string
+      path: string
+      version: number
+      toolName?: string
+      kind?: 'file_write' | 'file_edit' | 'file_create' | 'patch'
+    }> = []
+    const seen = new Set<string>()
+    for (const section of finalToolSections) {
+      const lowerType =
+        typeof section.type === 'string' ? section.type.toLowerCase() : ''
+      if (!FILE_WRITE_TOOL_NAMES_SET.has(lowerType)) continue
+      const meta = fileArtifactsByToolCall[section.key]
+      if (!meta) continue
+      if (seen.has(meta.artifactId)) continue
+      seen.add(meta.artifactId)
+      cards.push({
+        key: section.key,
+        artifactId: meta.artifactId,
+        sessionId: meta.sessionId,
+        path: meta.path,
+        version: meta.version,
+        toolName: meta.toolName ?? section.type,
+        kind: meta.kind,
+      })
+    }
+    return cards
+  }, [finalToolSections, fileArtifactsByToolCall, isUser])
   const shouldRenderMessageBubble =
     hasText ||
     hasAttachments ||
@@ -2509,7 +2563,7 @@ function MessageItemComponent({
       (hasText || !effectiveIsStreaming) ? (
         <div className="w-full max-w-[var(--chat-content-max-width)] flex">
           <div className="w-6 shrink-0" aria-hidden />
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 flex flex-col gap-2">
             <TuiActivityCard
               toolSections={finalToolSections}
               thinking={null}
@@ -2518,6 +2572,21 @@ function MessageItemComponent({
               formatLabel={formatToolDisplayLabel}
               formatArg={keyArgLabel}
             />
+            {fileArtifactCards.length > 0 && !isMobile ? (
+              <div className="flex flex-col gap-1.5">
+                {fileArtifactCards.map((card) => (
+                  <ArtifactCard
+                    key={card.key}
+                    artifactId={card.artifactId}
+                    sessionId={card.sessionId}
+                    path={card.path}
+                    version={card.version}
+                    toolName={card.toolName}
+                    kind={card.kind}
+                  />
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}

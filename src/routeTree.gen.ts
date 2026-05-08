@@ -75,6 +75,7 @@ import { Route as ApiSessionHistoryRouteImport } from './routes/api/session-hist
 import { Route as ApiSendStreamRouteImport } from './routes/api/send-stream'
 import { Route as ApiSendRouteImport } from './routes/api/send'
 import { Route as ApiProviderUsageRouteImport } from './routes/api/provider-usage'
+import { Route as ApiPreviewProjectsRouteImport } from './routes/api/preview-projects'
 import { Route as ApiPreviewFileRouteImport } from './routes/api/preview-file'
 import { Route as ApiPluginsRouteImport } from './routes/api/plugins'
 import { Route as ApiPlaygroundNpcRouteImport } from './routes/api/playground-npc'
@@ -91,6 +92,7 @@ import { Route as ApiHistoryRouteImport } from './routes/api/history'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-status'
 import { Route as ApiGatewayReprobeRouteImport } from './routes/api/gateway-reprobe'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
+import { Route as ApiFileArtifactsRouteImport } from './routes/api/file-artifacts'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as ApiCrewStatusRouteImport } from './routes/api/crew-status'
 import { Route as ApiCouncilRouteImport } from './routes/api/council'
@@ -108,6 +110,7 @@ import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
 import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
 import { Route as ApiAuthRouteImport } from './routes/api/auth'
 import { Route as ApiArtifactsRouteImport } from './routes/api/artifacts'
+import { Route as PreviewRunIdSplatRouteImport } from './routes/preview.$runId.$'
 import { Route as PredictSimulationIdRunRouteImport } from './routes/predict.$simulationId.run'
 import { Route as PredictReportIdReportRouteImport } from './routes/predict.$reportId.report'
 import { Route as PredictReportIdChatRouteImport } from './routes/predict.$reportId.chat'
@@ -128,6 +131,11 @@ import { Route as ApiProfilesListRouteImport } from './routes/api/profiles/list'
 import { Route as ApiProfilesDeleteRouteImport } from './routes/api/profiles/delete'
 import { Route as ApiProfilesCreateRouteImport } from './routes/api/profiles/create'
 import { Route as ApiProfilesActivateRouteImport } from './routes/api/profiles/activate'
+import { Route as ApiPreviewRunnerStopRouteImport } from './routes/api/preview-runner/stop'
+import { Route as ApiPreviewRunnerStatusRouteImport } from './routes/api/preview-runner/status'
+import { Route as ApiPreviewRunnerStartRouteImport } from './routes/api/preview-runner/start'
+import { Route as ApiPreviewRunnerLogsRouteImport } from './routes/api/preview-runner/logs'
+import { Route as ApiPreviewRunnerListRouteImport } from './routes/api/preview-runner/list'
 import { Route as ApiPredictProxySplatRouteImport } from './routes/api/predict-proxy/$'
 import { Route as ApiOauthPollTokenRouteImport } from './routes/api/oauth.poll-token'
 import { Route as ApiOauthDeviceCodeRouteImport } from './routes/api/oauth.device-code'
@@ -149,6 +157,7 @@ import { Route as ApiKnowledgeReadRouteImport } from './routes/api/knowledge/rea
 import { Route as ApiKnowledgeListRouteImport } from './routes/api/knowledge/list'
 import { Route as ApiKnowledgeGraphRouteImport } from './routes/api/knowledge/graph'
 import { Route as ApiKnowledgeConfigRouteImport } from './routes/api/knowledge/config'
+import { Route as ApiFileArtifactsArtifactIdRouteImport } from './routes/api/file-artifacts/$artifactId'
 import { Route as ApiDashboardOverviewRouteImport } from './routes/api/dashboard/overview'
 import { Route as ApiClaudeTasksTaskIdRouteImport } from './routes/api/claude-tasks.$taskId'
 import { Route as ApiClaudeProxySplatRouteImport } from './routes/api/claude-proxy/$'
@@ -490,6 +499,11 @@ const ApiProviderUsageRoute = ApiProviderUsageRouteImport.update({
   path: '/api/provider-usage',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPreviewProjectsRoute = ApiPreviewProjectsRouteImport.update({
+  id: '/api/preview-projects',
+  path: '/api/preview-projects',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPreviewFileRoute = ApiPreviewFileRouteImport.update({
   id: '/api/preview-file',
   path: '/api/preview-file',
@@ -568,6 +582,11 @@ const ApiGatewayReprobeRoute = ApiGatewayReprobeRouteImport.update({
 const ApiFilesRoute = ApiFilesRouteImport.update({
   id: '/api/files',
   path: '/api/files',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiFileArtifactsRoute = ApiFileArtifactsRouteImport.update({
+  id: '/api/file-artifacts',
+  path: '/api/file-artifacts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiEventsRoute = ApiEventsRouteImport.update({
@@ -653,6 +672,11 @@ const ApiAuthRoute = ApiAuthRouteImport.update({
 const ApiArtifactsRoute = ApiArtifactsRouteImport.update({
   id: '/api/artifacts',
   path: '/api/artifacts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewRunIdSplatRoute = PreviewRunIdSplatRouteImport.update({
+  id: '/preview/$runId/$',
+  path: '/preview/$runId/$',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PredictSimulationIdRunRoute = PredictSimulationIdRunRouteImport.update({
@@ -753,6 +777,31 @@ const ApiProfilesCreateRoute = ApiProfilesCreateRouteImport.update({
 const ApiProfilesActivateRoute = ApiProfilesActivateRouteImport.update({
   id: '/api/profiles/activate',
   path: '/api/profiles/activate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPreviewRunnerStopRoute = ApiPreviewRunnerStopRouteImport.update({
+  id: '/api/preview-runner/stop',
+  path: '/api/preview-runner/stop',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPreviewRunnerStatusRoute = ApiPreviewRunnerStatusRouteImport.update({
+  id: '/api/preview-runner/status',
+  path: '/api/preview-runner/status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPreviewRunnerStartRoute = ApiPreviewRunnerStartRouteImport.update({
+  id: '/api/preview-runner/start',
+  path: '/api/preview-runner/start',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPreviewRunnerLogsRoute = ApiPreviewRunnerLogsRouteImport.update({
+  id: '/api/preview-runner/logs',
+  path: '/api/preview-runner/logs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPreviewRunnerListRoute = ApiPreviewRunnerListRouteImport.update({
+  id: '/api/preview-runner/list',
+  path: '/api/preview-runner/list',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPredictProxySplatRoute = ApiPredictProxySplatRouteImport.update({
@@ -860,6 +909,12 @@ const ApiKnowledgeConfigRoute = ApiKnowledgeConfigRouteImport.update({
   path: '/api/knowledge/config',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiFileArtifactsArtifactIdRoute =
+  ApiFileArtifactsArtifactIdRouteImport.update({
+    id: '/$artifactId',
+    path: '/$artifactId',
+    getParentRoute: () => ApiFileArtifactsRoute,
+  } as any)
 const ApiDashboardOverviewRoute = ApiDashboardOverviewRouteImport.update({
   id: '/api/dashboard/overview',
   path: '/api/dashboard/overview',
@@ -949,6 +1004,7 @@ export interface FileRoutesByFullPath {
   '/api/council': typeof ApiCouncilRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/file-artifacts': typeof ApiFileArtifactsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
@@ -965,6 +1021,7 @@ export interface FileRoutesByFullPath {
   '/api/playground-npc': typeof ApiPlaygroundNpcRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/preview-projects': typeof ApiPreviewProjectsRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
@@ -1013,6 +1070,7 @@ export interface FileRoutesByFullPath {
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
+  '/api/file-artifacts/$artifactId': typeof ApiFileArtifactsArtifactIdRoute
   '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
   '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
   '/api/knowledge/list': typeof ApiKnowledgeListRoute
@@ -1034,6 +1092,11 @@ export interface FileRoutesByFullPath {
   '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
   '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
   '/api/predict-proxy/$': typeof ApiPredictProxySplatRoute
+  '/api/preview-runner/list': typeof ApiPreviewRunnerListRoute
+  '/api/preview-runner/logs': typeof ApiPreviewRunnerLogsRoute
+  '/api/preview-runner/start': typeof ApiPreviewRunnerStartRoute
+  '/api/preview-runner/status': typeof ApiPreviewRunnerStatusRoute
+  '/api/preview-runner/stop': typeof ApiPreviewRunnerStopRoute
   '/api/profiles/activate': typeof ApiProfilesActivateRoute
   '/api/profiles/create': typeof ApiProfilesCreateRoute
   '/api/profiles/delete': typeof ApiProfilesDeleteRoute
@@ -1054,6 +1117,7 @@ export interface FileRoutesByFullPath {
   '/predict/$reportId/chat': typeof PredictReportIdChatRoute
   '/predict/$reportId/report': typeof PredictReportIdReportRoute
   '/predict/$simulationId/run': typeof PredictSimulationIdRunRoute
+  '/preview/$runId/$': typeof PreviewRunIdSplatRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
@@ -1099,6 +1163,7 @@ export interface FileRoutesByTo {
   '/api/council': typeof ApiCouncilRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/file-artifacts': typeof ApiFileArtifactsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
@@ -1115,6 +1180,7 @@ export interface FileRoutesByTo {
   '/api/playground-npc': typeof ApiPlaygroundNpcRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/preview-projects': typeof ApiPreviewProjectsRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
@@ -1163,6 +1229,7 @@ export interface FileRoutesByTo {
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
+  '/api/file-artifacts/$artifactId': typeof ApiFileArtifactsArtifactIdRoute
   '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
   '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
   '/api/knowledge/list': typeof ApiKnowledgeListRoute
@@ -1184,6 +1251,11 @@ export interface FileRoutesByTo {
   '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
   '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
   '/api/predict-proxy/$': typeof ApiPredictProxySplatRoute
+  '/api/preview-runner/list': typeof ApiPreviewRunnerListRoute
+  '/api/preview-runner/logs': typeof ApiPreviewRunnerLogsRoute
+  '/api/preview-runner/start': typeof ApiPreviewRunnerStartRoute
+  '/api/preview-runner/status': typeof ApiPreviewRunnerStatusRoute
+  '/api/preview-runner/stop': typeof ApiPreviewRunnerStopRoute
   '/api/profiles/activate': typeof ApiProfilesActivateRoute
   '/api/profiles/create': typeof ApiProfilesCreateRoute
   '/api/profiles/delete': typeof ApiProfilesDeleteRoute
@@ -1204,6 +1276,7 @@ export interface FileRoutesByTo {
   '/predict/$reportId/chat': typeof PredictReportIdChatRoute
   '/predict/$reportId/report': typeof PredictReportIdReportRoute
   '/predict/$simulationId/run': typeof PredictSimulationIdRunRoute
+  '/preview/$runId/$': typeof PreviewRunIdSplatRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
@@ -1251,6 +1324,7 @@ export interface FileRoutesById {
   '/api/council': typeof ApiCouncilRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/file-artifacts': typeof ApiFileArtifactsRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
@@ -1267,6 +1341,7 @@ export interface FileRoutesById {
   '/api/playground-npc': typeof ApiPlaygroundNpcRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/preview-projects': typeof ApiPreviewProjectsRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
@@ -1315,6 +1390,7 @@ export interface FileRoutesById {
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
+  '/api/file-artifacts/$artifactId': typeof ApiFileArtifactsArtifactIdRoute
   '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
   '/api/knowledge/graph': typeof ApiKnowledgeGraphRoute
   '/api/knowledge/list': typeof ApiKnowledgeListRoute
@@ -1336,6 +1412,11 @@ export interface FileRoutesById {
   '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
   '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
   '/api/predict-proxy/$': typeof ApiPredictProxySplatRoute
+  '/api/preview-runner/list': typeof ApiPreviewRunnerListRoute
+  '/api/preview-runner/logs': typeof ApiPreviewRunnerLogsRoute
+  '/api/preview-runner/start': typeof ApiPreviewRunnerStartRoute
+  '/api/preview-runner/status': typeof ApiPreviewRunnerStatusRoute
+  '/api/preview-runner/stop': typeof ApiPreviewRunnerStopRoute
   '/api/profiles/activate': typeof ApiProfilesActivateRoute
   '/api/profiles/create': typeof ApiProfilesCreateRoute
   '/api/profiles/delete': typeof ApiProfilesDeleteRoute
@@ -1356,6 +1437,7 @@ export interface FileRoutesById {
   '/predict/$reportId/chat': typeof PredictReportIdChatRoute
   '/predict/$reportId/report': typeof PredictReportIdReportRoute
   '/predict/$simulationId/run': typeof PredictSimulationIdRunRoute
+  '/preview/$runId/$': typeof PreviewRunIdSplatRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
@@ -1404,6 +1486,7 @@ export interface FileRouteTypes {
     | '/api/council'
     | '/api/crew-status'
     | '/api/events'
+    | '/api/file-artifacts'
     | '/api/files'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
@@ -1420,6 +1503,7 @@ export interface FileRouteTypes {
     | '/api/playground-npc'
     | '/api/plugins'
     | '/api/preview-file'
+    | '/api/preview-projects'
     | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
@@ -1468,6 +1552,7 @@ export interface FileRouteTypes {
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
     | '/api/dashboard/overview'
+    | '/api/file-artifacts/$artifactId'
     | '/api/knowledge/config'
     | '/api/knowledge/graph'
     | '/api/knowledge/list'
@@ -1489,6 +1574,11 @@ export interface FileRouteTypes {
     | '/api/oauth/device-code'
     | '/api/oauth/poll-token'
     | '/api/predict-proxy/$'
+    | '/api/preview-runner/list'
+    | '/api/preview-runner/logs'
+    | '/api/preview-runner/start'
+    | '/api/preview-runner/status'
+    | '/api/preview-runner/stop'
     | '/api/profiles/activate'
     | '/api/profiles/create'
     | '/api/profiles/delete'
@@ -1509,6 +1599,7 @@ export interface FileRouteTypes {
     | '/predict/$reportId/chat'
     | '/predict/$reportId/report'
     | '/predict/$simulationId/run'
+    | '/preview/$runId/$'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
     | '/api/sessions/$sessionKey/active-run'
@@ -1554,6 +1645,7 @@ export interface FileRouteTypes {
     | '/api/council'
     | '/api/crew-status'
     | '/api/events'
+    | '/api/file-artifacts'
     | '/api/files'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
@@ -1570,6 +1662,7 @@ export interface FileRouteTypes {
     | '/api/playground-npc'
     | '/api/plugins'
     | '/api/preview-file'
+    | '/api/preview-projects'
     | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
@@ -1618,6 +1711,7 @@ export interface FileRouteTypes {
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
     | '/api/dashboard/overview'
+    | '/api/file-artifacts/$artifactId'
     | '/api/knowledge/config'
     | '/api/knowledge/graph'
     | '/api/knowledge/list'
@@ -1639,6 +1733,11 @@ export interface FileRouteTypes {
     | '/api/oauth/device-code'
     | '/api/oauth/poll-token'
     | '/api/predict-proxy/$'
+    | '/api/preview-runner/list'
+    | '/api/preview-runner/logs'
+    | '/api/preview-runner/start'
+    | '/api/preview-runner/status'
+    | '/api/preview-runner/stop'
     | '/api/profiles/activate'
     | '/api/profiles/create'
     | '/api/profiles/delete'
@@ -1659,6 +1758,7 @@ export interface FileRouteTypes {
     | '/predict/$reportId/chat'
     | '/predict/$reportId/report'
     | '/predict/$simulationId/run'
+    | '/preview/$runId/$'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
     | '/api/sessions/$sessionKey/active-run'
@@ -1705,6 +1805,7 @@ export interface FileRouteTypes {
     | '/api/council'
     | '/api/crew-status'
     | '/api/events'
+    | '/api/file-artifacts'
     | '/api/files'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
@@ -1721,6 +1822,7 @@ export interface FileRouteTypes {
     | '/api/playground-npc'
     | '/api/plugins'
     | '/api/preview-file'
+    | '/api/preview-projects'
     | '/api/provider-usage'
     | '/api/send'
     | '/api/send-stream'
@@ -1769,6 +1871,7 @@ export interface FileRouteTypes {
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
     | '/api/dashboard/overview'
+    | '/api/file-artifacts/$artifactId'
     | '/api/knowledge/config'
     | '/api/knowledge/graph'
     | '/api/knowledge/list'
@@ -1790,6 +1893,11 @@ export interface FileRouteTypes {
     | '/api/oauth/device-code'
     | '/api/oauth/poll-token'
     | '/api/predict-proxy/$'
+    | '/api/preview-runner/list'
+    | '/api/preview-runner/logs'
+    | '/api/preview-runner/start'
+    | '/api/preview-runner/status'
+    | '/api/preview-runner/stop'
     | '/api/profiles/activate'
     | '/api/profiles/create'
     | '/api/profiles/delete'
@@ -1810,6 +1918,7 @@ export interface FileRouteTypes {
     | '/predict/$reportId/chat'
     | '/predict/$reportId/report'
     | '/predict/$simulationId/run'
+    | '/preview/$runId/$'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
     | '/api/sessions/$sessionKey/active-run'
@@ -1857,6 +1966,7 @@ export interface RootRouteChildren {
   ApiCouncilRoute: typeof ApiCouncilRoute
   ApiCrewStatusRoute: typeof ApiCrewStatusRoute
   ApiEventsRoute: typeof ApiEventsRoute
+  ApiFileArtifactsRoute: typeof ApiFileArtifactsRouteWithChildren
   ApiFilesRoute: typeof ApiFilesRoute
   ApiGatewayReprobeRoute: typeof ApiGatewayReprobeRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
@@ -1873,6 +1983,7 @@ export interface RootRouteChildren {
   ApiPlaygroundNpcRoute: typeof ApiPlaygroundNpcRoute
   ApiPluginsRoute: typeof ApiPluginsRoute
   ApiPreviewFileRoute: typeof ApiPreviewFileRoute
+  ApiPreviewProjectsRoute: typeof ApiPreviewProjectsRoute
   ApiProviderUsageRoute: typeof ApiProviderUsageRoute
   ApiSendRoute: typeof ApiSendRoute
   ApiSendStreamRoute: typeof ApiSendStreamRoute
@@ -1926,6 +2037,11 @@ export interface RootRouteChildren {
   ApiOauthDeviceCodeRoute: typeof ApiOauthDeviceCodeRoute
   ApiOauthPollTokenRoute: typeof ApiOauthPollTokenRoute
   ApiPredictProxySplatRoute: typeof ApiPredictProxySplatRoute
+  ApiPreviewRunnerListRoute: typeof ApiPreviewRunnerListRoute
+  ApiPreviewRunnerLogsRoute: typeof ApiPreviewRunnerLogsRoute
+  ApiPreviewRunnerStartRoute: typeof ApiPreviewRunnerStartRoute
+  ApiPreviewRunnerStatusRoute: typeof ApiPreviewRunnerStatusRoute
+  ApiPreviewRunnerStopRoute: typeof ApiPreviewRunnerStopRoute
   ApiProfilesActivateRoute: typeof ApiProfilesActivateRoute
   ApiProfilesCreateRoute: typeof ApiProfilesCreateRoute
   ApiProfilesDeleteRoute: typeof ApiProfilesDeleteRoute
@@ -1936,6 +2052,7 @@ export interface RootRouteChildren {
   ApiUpdateAgentRoute: typeof ApiUpdateAgentRoute
   ApiUpdateStatusRoute: typeof ApiUpdateStatusRoute
   ApiUpdateWorkspaceRoute: typeof ApiUpdateWorkspaceRoute
+  PreviewRunIdSplatRoute: typeof PreviewRunIdSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -2402,6 +2519,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiProviderUsageRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/preview-projects': {
+      id: '/api/preview-projects'
+      path: '/api/preview-projects'
+      fullPath: '/api/preview-projects'
+      preLoaderRoute: typeof ApiPreviewProjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/preview-file': {
       id: '/api/preview-file'
       path: '/api/preview-file'
@@ -2512,6 +2636,13 @@ declare module '@tanstack/react-router' {
       path: '/api/files'
       fullPath: '/api/files'
       preLoaderRoute: typeof ApiFilesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/file-artifacts': {
+      id: '/api/file-artifacts'
+      path: '/api/file-artifacts'
+      fullPath: '/api/file-artifacts'
+      preLoaderRoute: typeof ApiFileArtifactsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/events': {
@@ -2631,6 +2762,13 @@ declare module '@tanstack/react-router' {
       path: '/api/artifacts'
       fullPath: '/api/artifacts'
       preLoaderRoute: typeof ApiArtifactsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview/$runId/$': {
+      id: '/preview/$runId/$'
+      path: '/preview/$runId/$'
+      fullPath: '/preview/$runId/$'
+      preLoaderRoute: typeof PreviewRunIdSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/predict/$simulationId/run': {
@@ -2771,6 +2909,41 @@ declare module '@tanstack/react-router' {
       path: '/api/profiles/activate'
       fullPath: '/api/profiles/activate'
       preLoaderRoute: typeof ApiProfilesActivateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/preview-runner/stop': {
+      id: '/api/preview-runner/stop'
+      path: '/api/preview-runner/stop'
+      fullPath: '/api/preview-runner/stop'
+      preLoaderRoute: typeof ApiPreviewRunnerStopRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/preview-runner/status': {
+      id: '/api/preview-runner/status'
+      path: '/api/preview-runner/status'
+      fullPath: '/api/preview-runner/status'
+      preLoaderRoute: typeof ApiPreviewRunnerStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/preview-runner/start': {
+      id: '/api/preview-runner/start'
+      path: '/api/preview-runner/start'
+      fullPath: '/api/preview-runner/start'
+      preLoaderRoute: typeof ApiPreviewRunnerStartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/preview-runner/logs': {
+      id: '/api/preview-runner/logs'
+      path: '/api/preview-runner/logs'
+      fullPath: '/api/preview-runner/logs'
+      preLoaderRoute: typeof ApiPreviewRunnerLogsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/preview-runner/list': {
+      id: '/api/preview-runner/list'
+      path: '/api/preview-runner/list'
+      fullPath: '/api/preview-runner/list'
+      preLoaderRoute: typeof ApiPreviewRunnerListRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/predict-proxy/$': {
@@ -2920,6 +3093,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiKnowledgeConfigRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/file-artifacts/$artifactId': {
+      id: '/api/file-artifacts/$artifactId'
+      path: '/$artifactId'
+      fullPath: '/api/file-artifacts/$artifactId'
+      preLoaderRoute: typeof ApiFileArtifactsArtifactIdRouteImport
+      parentRoute: typeof ApiFileArtifactsRoute
+    }
     '/api/dashboard/overview': {
       id: '/api/dashboard/overview'
       path: '/api/dashboard/overview'
@@ -3052,6 +3232,17 @@ const ApiClaudeTasksRouteChildren: ApiClaudeTasksRouteChildren = {
 const ApiClaudeTasksRouteWithChildren = ApiClaudeTasksRoute._addFileChildren(
   ApiClaudeTasksRouteChildren,
 )
+
+interface ApiFileArtifactsRouteChildren {
+  ApiFileArtifactsArtifactIdRoute: typeof ApiFileArtifactsArtifactIdRoute
+}
+
+const ApiFileArtifactsRouteChildren: ApiFileArtifactsRouteChildren = {
+  ApiFileArtifactsArtifactIdRoute: ApiFileArtifactsArtifactIdRoute,
+}
+
+const ApiFileArtifactsRouteWithChildren =
+  ApiFileArtifactsRoute._addFileChildren(ApiFileArtifactsRouteChildren)
 
 interface ApiMcpNameRouteChildren {
   ApiMcpNameLogsRoute: typeof ApiMcpNameLogsRoute
@@ -3204,6 +3395,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCouncilRoute: ApiCouncilRoute,
   ApiCrewStatusRoute: ApiCrewStatusRoute,
   ApiEventsRoute: ApiEventsRoute,
+  ApiFileArtifactsRoute: ApiFileArtifactsRouteWithChildren,
   ApiFilesRoute: ApiFilesRoute,
   ApiGatewayReprobeRoute: ApiGatewayReprobeRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
@@ -3220,6 +3412,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPlaygroundNpcRoute: ApiPlaygroundNpcRoute,
   ApiPluginsRoute: ApiPluginsRoute,
   ApiPreviewFileRoute: ApiPreviewFileRoute,
+  ApiPreviewProjectsRoute: ApiPreviewProjectsRoute,
   ApiProviderUsageRoute: ApiProviderUsageRoute,
   ApiSendRoute: ApiSendRoute,
   ApiSendStreamRoute: ApiSendStreamRoute,
@@ -3273,6 +3466,11 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOauthDeviceCodeRoute: ApiOauthDeviceCodeRoute,
   ApiOauthPollTokenRoute: ApiOauthPollTokenRoute,
   ApiPredictProxySplatRoute: ApiPredictProxySplatRoute,
+  ApiPreviewRunnerListRoute: ApiPreviewRunnerListRoute,
+  ApiPreviewRunnerLogsRoute: ApiPreviewRunnerLogsRoute,
+  ApiPreviewRunnerStartRoute: ApiPreviewRunnerStartRoute,
+  ApiPreviewRunnerStatusRoute: ApiPreviewRunnerStatusRoute,
+  ApiPreviewRunnerStopRoute: ApiPreviewRunnerStopRoute,
   ApiProfilesActivateRoute: ApiProfilesActivateRoute,
   ApiProfilesCreateRoute: ApiProfilesCreateRoute,
   ApiProfilesDeleteRoute: ApiProfilesDeleteRoute,
@@ -3283,6 +3481,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiUpdateAgentRoute: ApiUpdateAgentRoute,
   ApiUpdateStatusRoute: ApiUpdateStatusRoute,
   ApiUpdateWorkspaceRoute: ApiUpdateWorkspaceRoute,
+  PreviewRunIdSplatRoute: PreviewRunIdSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -89,6 +89,7 @@ import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { TerminalPanel } from '@/components/terminal-panel'
 import { AgentViewPanel } from '@/components/agent-view/agent-view-panel'
+import { PreviewPanel } from '@/components/preview-panel'
 import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
 import { useModelSuggestions } from '@/hooks/use-model-suggestions'
 import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
@@ -597,6 +598,19 @@ export function ChatScreen({
     sessionKey: resolvedSessionKey ?? '',
     enabled: !isNewChat && Boolean(resolvedSessionKey) && historyQuery.isSuccess,
   })
+
+  // After history loads for a session, fetch the persisted FileArtifacts and
+  // populate `chat-store.fileArtifactsByToolCall` so old assistant messages
+  // can render their inline ArtifactCard. Without this hydration, the panel
+  // tabs persist (zustand persist middleware) but the per-message cards
+  // disappear on refresh because the in-memory map starts empty.
+  const hydrateFileArtifacts = useChatStore((s) => s.hydrateFileArtifacts)
+  useEffect(() => {
+    if (!resolvedSessionKey) return
+    if (isNewChat) return
+    if (!historyQuery.isSuccess) return
+    void hydrateFileArtifacts(resolvedSessionKey)
+  }, [hydrateFileArtifacts, isNewChat, resolvedSessionKey, historyQuery.isSuccess])
 
   // Wire SSE realtime stream for instant message delivery
   const {
@@ -2594,7 +2608,7 @@ export function ChatScreen({
             ? 'flex min-h-0 w-full flex-col'
             : isMobile
               ? 'flex flex-col'
-              : 'grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[minmax(0,1fr)]',
+              : 'grid grid-cols-[auto_minmax(0,1fr)_auto_auto] grid-rows-[minmax(0,1fr)]',
         )}
       >
         {hideUi || compact || isFocusMode ? null : isMobile ? null : (
@@ -2779,6 +2793,7 @@ export function ChatScreen({
           ) : null}
         </main>
         {!compact && !isFocusMode && <AgentViewPanel />}
+        {!compact && !isFocusMode && !isMobile && <PreviewPanel />}
       </div>
       {!compact && !hideUi && !isMobile && !isFocusMode && <TerminalPanel />}
 
