@@ -10,6 +10,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [Stratex Predict — Hotfix] — 2026-05-08
+
+### Fixed
+- **"Simulation starten" failed silently** — re-running an existing simulation crashed in the runner because of a Postgres unique-key collision on `sim_rounds`. Backend hotfix: schema now scopes round numbering by `run_task_id` instead of `simulation_id`, and the prompt feed filters by run_task_id so a restart never reads the previous run's posts. No frontend change required; the existing run-screen now actually starts new runs.
+
+---
+
 ## [Stratex / `stratex/workspace-customizations` branch] — 2026-05-08
 
 These entries are specific to the Stratex fork; they are not present in
