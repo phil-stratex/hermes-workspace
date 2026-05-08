@@ -28,6 +28,7 @@ import {
 import { ErrorBoundary } from '@/components/error-boundary'
 import { LoginScreen } from '@/components/auth/login-screen'
 import { WorkspaceHeaderBanner } from '@/components/workspace/workspace-header-banner'
+import { RosterIssuesBanner } from '@/components/workspace/roster-issues-banner'
 import { fetchClaudeAuthStatus, type AuthStatus } from '@/lib/claude-auth'
 import { getRootSurfaceState } from './-root-layout-state'
 
@@ -362,7 +363,12 @@ function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <Toaster />
       {mounted && rootSurfaceState.showLogin ? <LoginScreen /> : null}
-      {mounted && rootSurfaceState.showWorkspaceShell ? <WorkspaceHeaderBanner /> : null}
+      {mounted && rootSurfaceState.showWorkspaceShell ? (
+        <>
+          <WorkspaceHeaderBanner />
+          <RosterIssuesBanner />
+        </>
+      ) : null}
       {mounted && rootSurfaceState.showOnboarding ? <ClaudeOnboarding /> : null}
       {rootSurfaceState.showWorkspaceShell ? (
         <>

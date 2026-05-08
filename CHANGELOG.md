@@ -5,6 +5,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — Workspace-Settings, Audit-Viewer, Account, Session-Share-UI (Phase A.7, 2026-05-08)
+
+**API-Routes (2)**
+- **`GET /api/workspaces/$id/audit`** — gated auf `audit-view`. `?listDays=1` returnt verfügbare Tag-Files, ohne Param `?date=` returnt heute. **Plan-Finding F10:** Server rekomputet die Hash-Chain bei jedem Read; bei Bruch wird der Befund (`brokenAt`, `breakReason`) zurückgegeben UND ein `chain_break_detected`-Event in dasselbe Audit-Log geschrieben — Tampering wird sichtbar UND als forensisches Ereignis aufgezeichnet.
+- **`GET /api/swarm-yaml-issues`** — Read-only Summary von `data/global/swarm-yaml-issues.json` (Plan-Finding L3). Filtert die Issues auf Workspaces wo der Caller `roster-edit` hat — kein Cross-WS-Leak.
+
+**Account / Workspace-Settings UI**
+- **`/account`** Route + `AccountScreen` — eigenes Profil (read-only Card mit ID/Email/Name/Status/lastLoginAt) + ChangePasswordForm (Old-PW-Verify, neues PW ≥8 Zeichen, Bestätigung, Auto-Reload nach Erfolg).
+- **`/workspace/$id/settings`** Layout + 4 Tabs (General/Members/Roster/Audit Log). Left-rail Navigation mit Branding-Color-Bar + WS-Name. Member-Rolle landet bei `member` auf einer Permission-Denied-Seite.
+- **General-Tab** — Name/Description/PrimaryColor/DefaultModel editierbar via PATCH; **Soft-Delete-Box** für Owner mit Slug-Confirmation-Tippen.
+- **Members-Tab** — Tabelle mit Status-Badges (active / locked-with-fails / disabled), Pending-Invites-Sub-Tabelle mit Revoke. Kontextmenü pro Member: Promote/Demote (gated auf `owner-handover`), PW-Reset, Entfernen.
+- **Roster-Tab** — Status "Default" vs. "Custom" + scannedAt-Zeitstempel, Issue-List wenn `swarm-yaml-issues.json` Einträge für den WS hat. Editor folgt später.
+- **Audit-Tab** — Day-Picker, Tabelle mit ID/Zeit/Typ/Akteur/Chain-Status. Zeile expandierbar zu Full-JSON. Bei `brokenAt !== null`: prominenter roter Banner mit Index + Reason (Plan-Finding F10).
+
+**Modals (alle in `members-tab.tsx`)**
+- `InviteCreateModal` — Email (optional), Rolle (Member/Admin), TTL (1/3/7/14/30d).
+- `InviteLinkModal` — zeigt Link mit Kopier-Button + Verfalls-Datum.
+- `PwResetResultModal` — Mono-Font-Plaintext + Kopier-Button + 3 Warnungen (einmalig, force-change, 24h).
+- `MemberRemoveModal` (Plan-Finding D1 Two-Path) — drei Optionen via Radio: nur Membership entfernen / Sessions an anderen User übertragen (Dropdown) / Sessions löschen. Sendet `?sessions=transfer&transferTo=<uid>` oder `?sessions=delete` als Query-Param.
+
+**Globale Komponenten**
+- **`RosterIssuesBanner`** — sticky alert oben für Owner/Admins wenn der aktive Workspace einen Issue hat. Dismiss-able, linkt auf Roster-Tab.
+- **`SessionShareButton`** — inline Toggle 🔒 Privat ↔ 👥 Geteilt. Ruft `/api/sessions/$id/{share,unshare}`.
+- **`SharedSessionReadOnlyBanner`** (Plan-Finding F11) — Read-Only-Hinweis für non-Owner-Viewer einer geteilten Session.
+
+**Routes (5 neu in TanStack)**
+- `/account`
+- `/workspace/$id/settings` (Layout) + `/workspace/$id/settings/` (redirect → /general) + `/workspace/$id/settings/$tab` (general | members | roster | audit)
+
+### Changed
+- `src/routes/__root.tsx` — `<RosterIssuesBanner />` nach `<WorkspaceHeaderBanner />` gemounted.
+- `src/routeTree.gen.ts` — auto-regenerated mit allen neuen Routes.
+
 ### Added — Multi-Tenant UI Core (Phase A.6, 2026-05-08)
 
 **Auth-Surface Refactor**

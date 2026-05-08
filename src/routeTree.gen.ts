@@ -30,6 +30,7 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CouncilRouteImport } from './routes/council'
 import { Route as ConductorRouteImport } from './routes/conductor'
 import { Route as AgoraRouteImport } from './routes/agora'
+import { Route as AccountRouteImport } from './routes/account'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
@@ -47,6 +48,7 @@ import { Route as ApiTerminalCloseRouteImport } from './routes/api/terminal-clos
 import { Route as ApiSystemMetricsRouteImport } from './routes/api/system-metrics'
 import { Route as ApiSystemInfoRouteImport } from './routes/api/system-info'
 import { Route as ApiSwitchModelRouteImport } from './routes/api/switch-model'
+import { Route as ApiSwarmYamlIssuesRouteImport } from './routes/api/swarm-yaml-issues'
 import { Route as ApiSwarmTmuxStopRouteImport } from './routes/api/swarm-tmux-stop'
 import { Route as ApiSwarmTmuxStartRouteImport } from './routes/api/swarm-tmux-start'
 import { Route as ApiSwarmTmuxScrollRouteImport } from './routes/api/swarm-tmux-scroll'
@@ -113,6 +115,7 @@ import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
 import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
 import { Route as ApiAuthRouteImport } from './routes/api/auth'
 import { Route as ApiArtifactsRouteImport } from './routes/api/artifacts'
+import { Route as WorkspaceIdSettingsRouteImport } from './routes/workspace.$id.settings'
 import { Route as PreviewRunIdSplatRouteImport } from './routes/preview.$runId.$'
 import { Route as PredictSimulationIdRunRouteImport } from './routes/predict.$simulationId.run'
 import { Route as PredictReportIdReportRouteImport } from './routes/predict.$reportId.report'
@@ -172,9 +175,12 @@ import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth.logout'
 import { Route as ApiAuthLoginRouteImport } from './routes/api/auth.login'
 import { Route as ApiAuthChangePasswordRouteImport } from './routes/api/auth.change-password'
 import { Route as ApiArtifactsArtifactIdRouteImport } from './routes/api/artifacts.$artifactId'
+import { Route as WorkspaceIdSettingsIndexRouteImport } from './routes/workspace.$id.settings.index'
+import { Route as WorkspaceIdSettingsTabRouteImport } from './routes/workspace.$id.settings.$tab'
 import { Route as ApiWorkspacesIdSwitchRouteImport } from './routes/api/workspaces.$id.switch'
 import { Route as ApiWorkspacesIdMembersRouteImport } from './routes/api/workspaces.$id.members'
 import { Route as ApiWorkspacesIdInvitesRouteImport } from './routes/api/workspaces.$id.invites'
+import { Route as ApiWorkspacesIdAuditRouteImport } from './routes/api/workspaces.$id.audit'
 import { Route as ApiUsersIdPasswordResetRouteImport } from './routes/api/users.$id.password-reset'
 import { Route as ApiUsersIdEnableRouteImport } from './routes/api/users.$id.enable'
 import { Route as ApiUsersIdDisableRouteImport } from './routes/api/users.$id.disable'
@@ -294,6 +300,11 @@ const AgoraRoute = AgoraRouteImport.update({
   path: '/agora',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AccountRoute = AccountRouteImport.update({
+  id: '/account',
+  path: '/account',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SplatRoute = SplatRouteImport.update({
   id: '/$',
   path: '/$',
@@ -377,6 +388,11 @@ const ApiSystemInfoRoute = ApiSystemInfoRouteImport.update({
 const ApiSwitchModelRoute = ApiSwitchModelRouteImport.update({
   id: '/api/switch-model',
   path: '/api/switch-model',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmYamlIssuesRoute = ApiSwarmYamlIssuesRouteImport.update({
+  id: '/api/swarm-yaml-issues',
+  path: '/api/swarm-yaml-issues',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSwarmTmuxStopRoute = ApiSwarmTmuxStopRouteImport.update({
@@ -710,6 +726,11 @@ const ApiArtifactsRoute = ApiArtifactsRouteImport.update({
   path: '/api/artifacts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WorkspaceIdSettingsRoute = WorkspaceIdSettingsRouteImport.update({
+  id: '/workspace/$id/settings',
+  path: '/workspace/$id/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PreviewRunIdSplatRoute = PreviewRunIdSplatRouteImport.update({
   id: '/preview/$runId/$',
   path: '/preview/$runId/$',
@@ -1006,6 +1027,17 @@ const ApiArtifactsArtifactIdRoute = ApiArtifactsArtifactIdRouteImport.update({
   path: '/$artifactId',
   getParentRoute: () => ApiArtifactsRoute,
 } as any)
+const WorkspaceIdSettingsIndexRoute =
+  WorkspaceIdSettingsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => WorkspaceIdSettingsRoute,
+  } as any)
+const WorkspaceIdSettingsTabRoute = WorkspaceIdSettingsTabRouteImport.update({
+  id: '/$tab',
+  path: '/$tab',
+  getParentRoute: () => WorkspaceIdSettingsRoute,
+} as any)
 const ApiWorkspacesIdSwitchRoute = ApiWorkspacesIdSwitchRouteImport.update({
   id: '/switch',
   path: '/switch',
@@ -1019,6 +1051,11 @@ const ApiWorkspacesIdMembersRoute = ApiWorkspacesIdMembersRouteImport.update({
 const ApiWorkspacesIdInvitesRoute = ApiWorkspacesIdInvitesRouteImport.update({
   id: '/invites',
   path: '/invites',
+  getParentRoute: () => ApiWorkspacesIdRoute,
+} as any)
+const ApiWorkspacesIdAuditRoute = ApiWorkspacesIdAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
   getParentRoute: () => ApiWorkspacesIdRoute,
 } as any)
 const ApiUsersIdPasswordResetRoute = ApiUsersIdPasswordResetRouteImport.update({
@@ -1094,6 +1131,7 @@ const ApiWorkspacesIdInvitesTokenRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
+  '/account': typeof AccountRoute
   '/agora': typeof AgoraRoute
   '/conductor': typeof ConductorRoute
   '/council': typeof CouncilRoute
@@ -1181,6 +1219,7 @@ export interface FileRoutesByFullPath {
   '/api/swarm-tmux-scroll': typeof ApiSwarmTmuxScrollRoute
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
   '/api/swarm-tmux-stop': typeof ApiSwarmTmuxStopRoute
+  '/api/swarm-yaml-issues': typeof ApiSwarmYamlIssuesRoute
   '/api/switch-model': typeof ApiSwitchModelRoute
   '/api/system-info': typeof ApiSystemInfoRoute
   '/api/system-metrics': typeof ApiSystemMetricsRoute
@@ -1255,6 +1294,7 @@ export interface FileRoutesByFullPath {
   '/predict/$reportId/report': typeof PredictReportIdReportRoute
   '/predict/$simulationId/run': typeof PredictSimulationIdRunRoute
   '/preview/$runId/$': typeof PreviewRunIdSplatRoute
+  '/workspace/$id/settings': typeof WorkspaceIdSettingsRouteWithChildren
   '/api/invites/$token/accept': typeof ApiInvitesTokenAcceptRoute
   '/api/invites/$token/info': typeof ApiInvitesTokenInfoRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
@@ -1266,15 +1306,19 @@ export interface FileRoutesByFullPath {
   '/api/users/$id/disable': typeof ApiUsersIdDisableRoute
   '/api/users/$id/enable': typeof ApiUsersIdEnableRoute
   '/api/users/$id/password-reset': typeof ApiUsersIdPasswordResetRoute
+  '/api/workspaces/$id/audit': typeof ApiWorkspacesIdAuditRoute
   '/api/workspaces/$id/invites': typeof ApiWorkspacesIdInvitesRouteWithChildren
   '/api/workspaces/$id/members': typeof ApiWorkspacesIdMembersRouteWithChildren
   '/api/workspaces/$id/switch': typeof ApiWorkspacesIdSwitchRoute
+  '/workspace/$id/settings/$tab': typeof WorkspaceIdSettingsTabRoute
+  '/workspace/$id/settings/': typeof WorkspaceIdSettingsIndexRoute
   '/api/workspaces/$id/invites/$token': typeof ApiWorkspacesIdInvitesTokenRoute
   '/api/workspaces/$id/members/$uid': typeof ApiWorkspacesIdMembersUidRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
+  '/account': typeof AccountRoute
   '/agora': typeof AgoraRoute
   '/conductor': typeof ConductorRoute
   '/council': typeof CouncilRoute
@@ -1361,6 +1405,7 @@ export interface FileRoutesByTo {
   '/api/swarm-tmux-scroll': typeof ApiSwarmTmuxScrollRoute
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
   '/api/swarm-tmux-stop': typeof ApiSwarmTmuxStopRoute
+  '/api/swarm-yaml-issues': typeof ApiSwarmYamlIssuesRoute
   '/api/switch-model': typeof ApiSwitchModelRoute
   '/api/system-info': typeof ApiSystemInfoRoute
   '/api/system-metrics': typeof ApiSystemMetricsRoute
@@ -1446,9 +1491,12 @@ export interface FileRoutesByTo {
   '/api/users/$id/disable': typeof ApiUsersIdDisableRoute
   '/api/users/$id/enable': typeof ApiUsersIdEnableRoute
   '/api/users/$id/password-reset': typeof ApiUsersIdPasswordResetRoute
+  '/api/workspaces/$id/audit': typeof ApiWorkspacesIdAuditRoute
   '/api/workspaces/$id/invites': typeof ApiWorkspacesIdInvitesRouteWithChildren
   '/api/workspaces/$id/members': typeof ApiWorkspacesIdMembersRouteWithChildren
   '/api/workspaces/$id/switch': typeof ApiWorkspacesIdSwitchRoute
+  '/workspace/$id/settings/$tab': typeof WorkspaceIdSettingsTabRoute
+  '/workspace/$id/settings': typeof WorkspaceIdSettingsIndexRoute
   '/api/workspaces/$id/invites/$token': typeof ApiWorkspacesIdInvitesTokenRoute
   '/api/workspaces/$id/members/$uid': typeof ApiWorkspacesIdMembersUidRoute
 }
@@ -1456,6 +1504,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
+  '/account': typeof AccountRoute
   '/agora': typeof AgoraRoute
   '/conductor': typeof ConductorRoute
   '/council': typeof CouncilRoute
@@ -1543,6 +1592,7 @@ export interface FileRoutesById {
   '/api/swarm-tmux-scroll': typeof ApiSwarmTmuxScrollRoute
   '/api/swarm-tmux-start': typeof ApiSwarmTmuxStartRoute
   '/api/swarm-tmux-stop': typeof ApiSwarmTmuxStopRoute
+  '/api/swarm-yaml-issues': typeof ApiSwarmYamlIssuesRoute
   '/api/switch-model': typeof ApiSwitchModelRoute
   '/api/system-info': typeof ApiSystemInfoRoute
   '/api/system-metrics': typeof ApiSystemMetricsRoute
@@ -1617,6 +1667,7 @@ export interface FileRoutesById {
   '/predict/$reportId/report': typeof PredictReportIdReportRoute
   '/predict/$simulationId/run': typeof PredictSimulationIdRunRoute
   '/preview/$runId/$': typeof PreviewRunIdSplatRoute
+  '/workspace/$id/settings': typeof WorkspaceIdSettingsRouteWithChildren
   '/api/invites/$token/accept': typeof ApiInvitesTokenAcceptRoute
   '/api/invites/$token/info': typeof ApiInvitesTokenInfoRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
@@ -1628,9 +1679,12 @@ export interface FileRoutesById {
   '/api/users/$id/disable': typeof ApiUsersIdDisableRoute
   '/api/users/$id/enable': typeof ApiUsersIdEnableRoute
   '/api/users/$id/password-reset': typeof ApiUsersIdPasswordResetRoute
+  '/api/workspaces/$id/audit': typeof ApiWorkspacesIdAuditRoute
   '/api/workspaces/$id/invites': typeof ApiWorkspacesIdInvitesRouteWithChildren
   '/api/workspaces/$id/members': typeof ApiWorkspacesIdMembersRouteWithChildren
   '/api/workspaces/$id/switch': typeof ApiWorkspacesIdSwitchRoute
+  '/workspace/$id/settings/$tab': typeof WorkspaceIdSettingsTabRoute
+  '/workspace/$id/settings/': typeof WorkspaceIdSettingsIndexRoute
   '/api/workspaces/$id/invites/$token': typeof ApiWorkspacesIdInvitesTokenRoute
   '/api/workspaces/$id/members/$uid': typeof ApiWorkspacesIdMembersUidRoute
 }
@@ -1639,6 +1693,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/$'
+    | '/account'
     | '/agora'
     | '/conductor'
     | '/council'
@@ -1726,6 +1781,7 @@ export interface FileRouteTypes {
     | '/api/swarm-tmux-scroll'
     | '/api/swarm-tmux-start'
     | '/api/swarm-tmux-stop'
+    | '/api/swarm-yaml-issues'
     | '/api/switch-model'
     | '/api/system-info'
     | '/api/system-metrics'
@@ -1800,6 +1856,7 @@ export interface FileRouteTypes {
     | '/predict/$reportId/report'
     | '/predict/$simulationId/run'
     | '/preview/$runId/$'
+    | '/workspace/$id/settings'
     | '/api/invites/$token/accept'
     | '/api/invites/$token/info'
     | '/api/mcp/$name/logs'
@@ -1811,15 +1868,19 @@ export interface FileRouteTypes {
     | '/api/users/$id/disable'
     | '/api/users/$id/enable'
     | '/api/users/$id/password-reset'
+    | '/api/workspaces/$id/audit'
     | '/api/workspaces/$id/invites'
     | '/api/workspaces/$id/members'
     | '/api/workspaces/$id/switch'
+    | '/workspace/$id/settings/$tab'
+    | '/workspace/$id/settings/'
     | '/api/workspaces/$id/invites/$token'
     | '/api/workspaces/$id/members/$uid'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/$'
+    | '/account'
     | '/agora'
     | '/conductor'
     | '/council'
@@ -1906,6 +1967,7 @@ export interface FileRouteTypes {
     | '/api/swarm-tmux-scroll'
     | '/api/swarm-tmux-start'
     | '/api/swarm-tmux-stop'
+    | '/api/swarm-yaml-issues'
     | '/api/switch-model'
     | '/api/system-info'
     | '/api/system-metrics'
@@ -1991,15 +2053,19 @@ export interface FileRouteTypes {
     | '/api/users/$id/disable'
     | '/api/users/$id/enable'
     | '/api/users/$id/password-reset'
+    | '/api/workspaces/$id/audit'
     | '/api/workspaces/$id/invites'
     | '/api/workspaces/$id/members'
     | '/api/workspaces/$id/switch'
+    | '/workspace/$id/settings/$tab'
+    | '/workspace/$id/settings'
     | '/api/workspaces/$id/invites/$token'
     | '/api/workspaces/$id/members/$uid'
   id:
     | '__root__'
     | '/'
     | '/$'
+    | '/account'
     | '/agora'
     | '/conductor'
     | '/council'
@@ -2087,6 +2153,7 @@ export interface FileRouteTypes {
     | '/api/swarm-tmux-scroll'
     | '/api/swarm-tmux-start'
     | '/api/swarm-tmux-stop'
+    | '/api/swarm-yaml-issues'
     | '/api/switch-model'
     | '/api/system-info'
     | '/api/system-metrics'
@@ -2161,6 +2228,7 @@ export interface FileRouteTypes {
     | '/predict/$reportId/report'
     | '/predict/$simulationId/run'
     | '/preview/$runId/$'
+    | '/workspace/$id/settings'
     | '/api/invites/$token/accept'
     | '/api/invites/$token/info'
     | '/api/mcp/$name/logs'
@@ -2172,9 +2240,12 @@ export interface FileRouteTypes {
     | '/api/users/$id/disable'
     | '/api/users/$id/enable'
     | '/api/users/$id/password-reset'
+    | '/api/workspaces/$id/audit'
     | '/api/workspaces/$id/invites'
     | '/api/workspaces/$id/members'
     | '/api/workspaces/$id/switch'
+    | '/workspace/$id/settings/$tab'
+    | '/workspace/$id/settings/'
     | '/api/workspaces/$id/invites/$token'
     | '/api/workspaces/$id/members/$uid'
   fileRoutesById: FileRoutesById
@@ -2182,6 +2253,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SplatRoute: typeof SplatRoute
+  AccountRoute: typeof AccountRoute
   AgoraRoute: typeof AgoraRoute
   ConductorRoute: typeof ConductorRoute
   CouncilRoute: typeof CouncilRoute
@@ -2269,6 +2341,7 @@ export interface RootRouteChildren {
   ApiSwarmTmuxScrollRoute: typeof ApiSwarmTmuxScrollRoute
   ApiSwarmTmuxStartRoute: typeof ApiSwarmTmuxStartRoute
   ApiSwarmTmuxStopRoute: typeof ApiSwarmTmuxStopRoute
+  ApiSwarmYamlIssuesRoute: typeof ApiSwarmYamlIssuesRoute
   ApiSwitchModelRoute: typeof ApiSwitchModelRoute
   ApiSystemInfoRoute: typeof ApiSystemInfoRoute
   ApiSystemMetricsRoute: typeof ApiSystemMetricsRoute
@@ -2310,6 +2383,7 @@ export interface RootRouteChildren {
   ApiUpdateStatusRoute: typeof ApiUpdateStatusRoute
   ApiUpdateWorkspaceRoute: typeof ApiUpdateWorkspaceRoute
   PreviewRunIdSplatRoute: typeof PreviewRunIdSplatRoute
+  WorkspaceIdSettingsRoute: typeof WorkspaceIdSettingsRouteWithChildren
   ApiInvitesTokenAcceptRoute: typeof ApiInvitesTokenAcceptRoute
   ApiInvitesTokenInfoRoute: typeof ApiInvitesTokenInfoRoute
   ApiUsersIdDisableRoute: typeof ApiUsersIdDisableRoute
@@ -2466,6 +2540,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgoraRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/account': {
+      id: '/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/$': {
       id: '/$'
       path: '/$'
@@ -2583,6 +2664,13 @@ declare module '@tanstack/react-router' {
       path: '/api/switch-model'
       fullPath: '/api/switch-model'
       preLoaderRoute: typeof ApiSwitchModelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-yaml-issues': {
+      id: '/api/swarm-yaml-issues'
+      path: '/api/swarm-yaml-issues'
+      fullPath: '/api/swarm-yaml-issues'
+      preLoaderRoute: typeof ApiSwarmYamlIssuesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/swarm-tmux-stop': {
@@ -3047,6 +3135,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiArtifactsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/workspace/$id/settings': {
+      id: '/workspace/$id/settings'
+      path: '/workspace/$id/settings'
+      fullPath: '/workspace/$id/settings'
+      preLoaderRoute: typeof WorkspaceIdSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/preview/$runId/$': {
       id: '/preview/$runId/$'
       path: '/preview/$runId/$'
@@ -3460,6 +3555,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiArtifactsArtifactIdRouteImport
       parentRoute: typeof ApiArtifactsRoute
     }
+    '/workspace/$id/settings/': {
+      id: '/workspace/$id/settings/'
+      path: '/'
+      fullPath: '/workspace/$id/settings/'
+      preLoaderRoute: typeof WorkspaceIdSettingsIndexRouteImport
+      parentRoute: typeof WorkspaceIdSettingsRoute
+    }
+    '/workspace/$id/settings/$tab': {
+      id: '/workspace/$id/settings/$tab'
+      path: '/$tab'
+      fullPath: '/workspace/$id/settings/$tab'
+      preLoaderRoute: typeof WorkspaceIdSettingsTabRouteImport
+      parentRoute: typeof WorkspaceIdSettingsRoute
+    }
     '/api/workspaces/$id/switch': {
       id: '/api/workspaces/$id/switch'
       path: '/switch'
@@ -3479,6 +3588,13 @@ declare module '@tanstack/react-router' {
       path: '/invites'
       fullPath: '/api/workspaces/$id/invites'
       preLoaderRoute: typeof ApiWorkspacesIdInvitesRouteImport
+      parentRoute: typeof ApiWorkspacesIdRoute
+    }
+    '/api/workspaces/$id/audit': {
+      id: '/api/workspaces/$id/audit'
+      path: '/audit'
+      fullPath: '/api/workspaces/$id/audit'
+      preLoaderRoute: typeof ApiWorkspacesIdAuditRouteImport
       parentRoute: typeof ApiWorkspacesIdRoute
     }
     '/api/users/$id/password-reset': {
@@ -3815,12 +3931,14 @@ const ApiWorkspacesIdMembersRouteWithChildren =
   )
 
 interface ApiWorkspacesIdRouteChildren {
+  ApiWorkspacesIdAuditRoute: typeof ApiWorkspacesIdAuditRoute
   ApiWorkspacesIdInvitesRoute: typeof ApiWorkspacesIdInvitesRouteWithChildren
   ApiWorkspacesIdMembersRoute: typeof ApiWorkspacesIdMembersRouteWithChildren
   ApiWorkspacesIdSwitchRoute: typeof ApiWorkspacesIdSwitchRoute
 }
 
 const ApiWorkspacesIdRouteChildren: ApiWorkspacesIdRouteChildren = {
+  ApiWorkspacesIdAuditRoute: ApiWorkspacesIdAuditRoute,
   ApiWorkspacesIdInvitesRoute: ApiWorkspacesIdInvitesRouteWithChildren,
   ApiWorkspacesIdMembersRoute: ApiWorkspacesIdMembersRouteWithChildren,
   ApiWorkspacesIdSwitchRoute: ApiWorkspacesIdSwitchRoute,
@@ -3842,9 +3960,23 @@ const ApiWorkspacesRouteWithChildren = ApiWorkspacesRoute._addFileChildren(
   ApiWorkspacesRouteChildren,
 )
 
+interface WorkspaceIdSettingsRouteChildren {
+  WorkspaceIdSettingsTabRoute: typeof WorkspaceIdSettingsTabRoute
+  WorkspaceIdSettingsIndexRoute: typeof WorkspaceIdSettingsIndexRoute
+}
+
+const WorkspaceIdSettingsRouteChildren: WorkspaceIdSettingsRouteChildren = {
+  WorkspaceIdSettingsTabRoute: WorkspaceIdSettingsTabRoute,
+  WorkspaceIdSettingsIndexRoute: WorkspaceIdSettingsIndexRoute,
+}
+
+const WorkspaceIdSettingsRouteWithChildren =
+  WorkspaceIdSettingsRoute._addFileChildren(WorkspaceIdSettingsRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
+  AccountRoute: AccountRoute,
   AgoraRoute: AgoraRoute,
   ConductorRoute: ConductorRoute,
   CouncilRoute: CouncilRoute,
@@ -3932,6 +4064,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSwarmTmuxScrollRoute: ApiSwarmTmuxScrollRoute,
   ApiSwarmTmuxStartRoute: ApiSwarmTmuxStartRoute,
   ApiSwarmTmuxStopRoute: ApiSwarmTmuxStopRoute,
+  ApiSwarmYamlIssuesRoute: ApiSwarmYamlIssuesRoute,
   ApiSwitchModelRoute: ApiSwitchModelRoute,
   ApiSystemInfoRoute: ApiSystemInfoRoute,
   ApiSystemMetricsRoute: ApiSystemMetricsRoute,
@@ -3973,6 +4106,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiUpdateStatusRoute: ApiUpdateStatusRoute,
   ApiUpdateWorkspaceRoute: ApiUpdateWorkspaceRoute,
   PreviewRunIdSplatRoute: PreviewRunIdSplatRoute,
+  WorkspaceIdSettingsRoute: WorkspaceIdSettingsRouteWithChildren,
   ApiInvitesTokenAcceptRoute: ApiInvitesTokenAcceptRoute,
   ApiInvitesTokenInfoRoute: ApiInvitesTokenInfoRoute,
   ApiUsersIdDisableRoute: ApiUsersIdDisableRoute,
