@@ -162,6 +162,83 @@ export type PrepareEvent =
   | { type: 'failed'; error: string }
   | { type: 'end'; reason: string }
 
+// --- Phase 5 — Interaction (chat + batch survey) -------------------------
+
+export type ChatTurnResponse = {
+  chat_id: string
+  user_message_id: string
+  assistant_message_id: string
+  answer: string
+}
+
+export type ChatHistoryMessage = {
+  id: string
+  role: 'user' | 'assistant' | string
+  content: string
+  created_at: string
+}
+
+export type ChatHistoryResponse = {
+  chat_id: string
+  report_id: string
+  mode: 'agent' | 'persona' | string
+  persona_id: string | null
+  title: string
+  messages: Array<ChatHistoryMessage>
+}
+
+export type CreatedBatch = {
+  batch_id: string
+  report_id: string
+  target_count: number
+  status: string
+}
+
+export type BatchResponseRow = {
+  id: string
+  persona_id: string
+  persona_name: string
+  persona_role: string
+  status: 'pending' | 'running' | 'completed' | 'failed' | string
+  content: string
+  error: string | null
+}
+
+export type BatchDetail = {
+  batch_id: string
+  report_id: string
+  question: string
+  status: 'queued' | 'running' | 'completed' | 'failed' | string
+  target_count: number
+  error: string | null
+  created_at: string
+  finished_at: string | null
+  responses: Array<BatchResponseRow>
+}
+
+export type InterviewEvent =
+  | { type: 'snapshot'; status: string }
+  | { type: 'started'; batch_id: string; target_count: number }
+  | { type: 'response_running'; persona_id: string; persona_name: string }
+  | {
+      type: 'response_done'
+      persona_id: string
+      persona_name: string
+      content: string
+    }
+  | {
+      type: 'response_failed'
+      persona_id: string
+      persona_name?: string
+      error: string
+    }
+  | {
+      type: 'done'
+      stats: { target: number; completed: number; failed: number }
+    }
+  | { type: 'failed'; error: string }
+  | { type: 'end'; reason: string }
+
 // --- Phase 4 — Reports ---------------------------------------------------
 
 export type ReportSectionRow = {
@@ -509,6 +586,60 @@ export const predictClient = {
   openReportEventStream: (reportId: string): EventSource =>
     new EventSource(
       `${PROXY_BASE}/api/reports/${encodeURIComponent(reportId)}/events`,
+    ),
+
+  // --- Phase 5 — Chat + batch survey ----------------------------------
+
+  postChatTurn: (
+    reportId: string,
+    body: {
+      mode: 'agent' | 'persona'
+      message: string
+      chatId?: string | null
+      personaId?: string | null
+    },
+  ) =>
+    call<ChatTurnResponse>(`/api/reports/${encodeURIComponent(reportId)}/chat`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        mode: body.mode,
+        message: body.message,
+        chat_id: body.chatId ?? null,
+        persona_id: body.personaId ?? null,
+      }),
+    }),
+
+  getChatHistory: (reportId: string, chatId: string) =>
+    call<ChatHistoryResponse>(
+      `/api/reports/${encodeURIComponent(reportId)}/chat/${encodeURIComponent(chatId)}`,
+    ),
+
+  createInterviewBatch: (
+    reportId: string,
+    body: { personaIds: Array<string>; question: string },
+  ) =>
+    call<CreatedBatch>(
+      `/api/reports/${encodeURIComponent(reportId)}/interview/batch`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          persona_ids: body.personaIds,
+          question: body.question,
+        }),
+      },
+    ),
+
+  getInterviewBatch: (reportId: string, batchId: string) =>
+    call<BatchDetail>(
+      `/api/reports/${encodeURIComponent(reportId)}/interview/batch/${encodeURIComponent(batchId)}`,
+    ),
+
+  /** SSE stream for live batch-survey progress. */
+  openBatchEventStream: (reportId: string, batchId: string): EventSource =>
+    new EventSource(
+      `${PROXY_BASE}/api/reports/${encodeURIComponent(reportId)}/interview/batch/${encodeURIComponent(batchId)}/events`,
     ),
 }
 
