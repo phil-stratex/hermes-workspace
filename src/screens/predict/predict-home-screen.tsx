@@ -1,15 +1,26 @@
 import { useEffect, useState } from 'react'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { ArrowRight01Icon } from '@hugeicons/core-free-icons'
-import { PhasePlaceholder, PredictShell } from './predict-shell'
+import { ArrowRight01Icon, RocketIcon, Delete02Icon } from '@hugeicons/core-free-icons'
+import { PredictShell } from './predict-shell'
+import { UploadDropzone } from './components/upload-dropzone'
 import { predictClient, type PredictHealth } from '@/server/predict-client'
+import { usePredictStore, type RecentProject } from '@/stores/predict-store'
 import { cn } from '@/lib/utils'
 
 export function PredictHomeScreen() {
   const [health, setHealth] = useState<PredictHealth | null>(null)
   const [healthError, setHealthError] = useState<string | null>(null)
   const [healthLoading, setHealthLoading] = useState(true)
+  const [files, setFiles] = useState<Array<File>>([])
+  const [prompt, setPrompt] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const navigate = useNavigate()
+  const setPendingUpload = usePredictStore((s) => s.setPendingUpload)
+  const upsertRecent = usePredictStore((s) => s.upsertRecent)
+  const removeRecent = usePredictStore((s) => s.removeRecent)
+  const recentProjects = usePredictStore((s) => s.recentProjects)
 
   useEffect(() => {
     let cancelled = false
@@ -34,6 +45,37 @@ export function PredictHomeScreen() {
     }
   }, [])
 
+  const canSubmit = files.length > 0 && prompt.trim().length > 0 && !submitting
+
+  async function handleSubmit() {
+    if (!canSubmit) return
+    setSubmitting(true)
+    setSubmitError(null)
+    try {
+      // Cache so the build screen can render before the POST resolves.
+      setPendingUpload({ files, prompt })
+      const created = await predictClient.createProjectMultipart(files, prompt.trim())
+      const recent: RecentProject = {
+        projectId: created.project_id,
+        prompt: prompt.trim(),
+        documentNames: created.documents,
+        createdAt: Date.now(),
+        status: (created.status as RecentProject['status']) || 'queued',
+      }
+      upsertRecent(recent)
+      setPendingUpload(null)
+      void navigate({
+        to: '/predict/$projectId/build',
+        params: { projectId: created.project_id },
+      })
+    } catch (err) {
+      setPendingUpload(null)
+      setSubmitError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   return (
     <PredictShell
       step={null}
@@ -41,35 +83,101 @@ export function PredictHomeScreen() {
       subtitle="Multi-Agent-Vorhersage-Engine — Upload, Graph, Simulation, Report, Interaktion."
       rightSlot={<HealthBadge health={health} error={healthError} loading={healthLoading} />}
     >
-      <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6">
+      <section className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-6">
         <h2 className="text-base font-semibold">Neue Vorhersage starten</h2>
         <p className="mt-1 text-sm text-[var(--theme-muted)]">
           Lade Seed-Material (PDF, Markdown, Text) und beschreibe, was du
-          vorhersagen möchtest. MiroFish-Spec, neu im Stratex-Stack.
+          vorhersagen möchtest. Im nächsten Schritt baut das System einen
+          Wissensgraph und generiert daraus die Persona-Population.
         </p>
-        <div className="mt-4 flex items-center gap-2">
-          <Link
-            to="/predict/$projectId/build"
-            params={{ projectId: 'new' }}
-            className="inline-flex items-center gap-2 rounded-xl bg-[var(--theme-accent)] px-4 py-2 text-sm font-semibold text-primary-950 hover:bg-[var(--theme-accent-strong)]"
-          >
-            Engine starten
-            <HugeiconsIcon icon={ArrowRight01Icon} size={14} />
-          </Link>
+        <div className="mt-5 space-y-4">
+          <UploadDropzone files={files} onChange={setFiles} disabled={submitting} />
+          <div>
+            <label htmlFor="predict-prompt" className="text-xs font-semibold text-[var(--theme-muted)]">
+              Vorhersage-Frage
+            </label>
+            <textarea
+              id="predict-prompt"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              disabled={submitting}
+              placeholder="Beispiel: Wie wird die Stadt auf das neue Klimaschutzgesetz reagieren — welche Stakeholder werden Widerstand leisten, welche nicht?"
+              rows={3}
+              className="mt-1 w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] p-3 text-sm placeholder:text-[var(--theme-muted)] focus:border-[var(--theme-accent)] focus:outline-none disabled:opacity-60"
+            />
+          </div>
+          {submitError ? (
+            <div className="rounded-xl border border-red-500 bg-red-500/10 p-3 text-xs text-red-200">
+              {submitError}
+            </div>
+          ) : null}
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-xs text-[var(--theme-muted)]">
+              {files.length} {files.length === 1 ? 'Datei' : 'Dateien'} ·{' '}
+              {prompt.trim().length} Zeichen Prompt
+            </div>
+            <button
+              type="button"
+              disabled={!canSubmit}
+              onClick={handleSubmit}
+              className="inline-flex items-center gap-2 rounded-xl bg-[var(--theme-accent)] px-4 py-2 text-sm font-semibold text-primary-950 hover:bg-[var(--theme-accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <HugeiconsIcon icon={RocketIcon} size={14} />
+              {submitting ? 'Starte Engine…' : 'Engine starten'}
+              <HugeiconsIcon icon={ArrowRight01Icon} size={14} />
+            </button>
+          </div>
         </div>
-      </div>
-
-      <PhasePlaceholder
-        phase="Phase 0 — Foundation"
-        description="Diese Seite ist das Skelett. In den nächsten Phasen kommen Upload-Dropzone, Knowledge-Graph-Live-Build, Persona-Generation, Dual-Platform-Simulation, Report-Streaming und Agent-Interaction dazu."
-      />
+      </section>
 
       <section>
         <h3 className="mb-3 text-sm font-semibold">Verlauf</h3>
-        <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4 text-xs text-[var(--theme-muted)]">
-          Noch keine Vorhersagen — die History-Datenbank wird in Phase 1 mit
-          dem Backend verbunden.
-        </div>
+        {recentProjects.length === 0 ? (
+          <div className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-4 text-xs text-[var(--theme-muted)]">
+            Noch keine Vorhersagen — abgeschlossene Projekte erscheinen hier.
+          </div>
+        ) : (
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {recentProjects.map((project) => (
+              <li key={project.projectId}>
+                <Link
+                  to="/predict/$projectId/build"
+                  params={{ projectId: project.projectId }}
+                  className="block rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card)] p-3 transition hover:border-[var(--theme-accent)]"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="text-[10px] uppercase text-[var(--theme-muted)]">
+                      {project.projectId.slice(0, 16)}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        removeRecent(project.projectId)
+                      }}
+                      className="text-[var(--theme-muted)] hover:text-red-300"
+                      aria-label="Aus Verlauf entfernen"
+                    >
+                      <HugeiconsIcon icon={Delete02Icon} size={12} />
+                    </button>
+                  </div>
+                  <p className="mt-2 line-clamp-2 text-sm">{project.prompt}</p>
+                  <div className="mt-2 text-[10px] text-[var(--theme-muted)]">
+                    {project.documentNames.slice(0, 3).join(', ')}
+                    {project.documentNames.length > 3 ? '…' : ''}
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-[10px] text-[var(--theme-muted)]">
+                    <span>{new Date(project.createdAt).toLocaleString()}</span>
+                    <span className="rounded-full border border-[var(--theme-border)] px-2 py-0.5">
+                      {project.status}
+                    </span>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </PredictShell>
   )
