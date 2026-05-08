@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — Multi-Workspace Foundation (Phase A.0, 2026-05-08)
+- **`src/server/data-paths.ts`** — zentrale Pfad-Boundary für den Multi-Workspace-Refactor. Helpers `getDataDir()`, `getWorkspaceDir(id)`, `getUserDir(id)`, `getGlobalDir()`, `getTrashDir()`. Resolution-Order `HERMES_DATA_DIR` → `HERMES_HOME` → `~/.hermes`. Slug-Validation (a-z, 0-9, `-`, max 64 chars) blockiert Path-Traversal-Versuche in `workspaceId` / `userId` zur Konstruktionszeit, nicht erst beim Filesystem-Call.
+- **`src/server/sessions-types.ts`** — `FilteredSessions<T>`-Brand-Type über `unique symbol`. Endpoints, die Sessions zurückgeben, deklarieren diesen Return-Type — `tsc` weigert sich dann, Code zu kompilieren, der eine Roh-Session-Liste returnt. `_markAsFiltered()` ist die einzige legale Mint-Funktion und ist nur für `sessions-privacy.ts` (Phase A) gedacht; das Brand kann nicht über Object-Literal geforged werden, weil das Symbol nicht im Aufrufer-Scope ist.
+- **`src/server/json-schema-version.ts`** — `assertSchemaVersion(value, expected, fileHint)` für persistierte JSON-Files (`members.json`, `meta.json`, `sessions-meta.json`, `peers.json`, Manifest, …). Wirft `SchemaVersionError` mit klarer Operator-Message bei Mismatch statt silently den falschen Default zu parsen. Akzeptiert auch ein Array erlaubter Versionen für Übergangsphasen.
+- **`src/server/migration-marker.ts`** — `migration-completed.json` mit SHA256-self-Checksum + Manifest-Cross-Check (Plan-Finding L4). `isMigrationCompleted()` returnt `true` auch wenn der Marker manuell gelöscht oder korrupt ist, solange `migration-manifest.json` als zweiter Beweis daneben liegt. Verhindert versehentliches Re-Triggern der Migration auf einem bereits umgeformten Stack.
+- **Vollständige Test-Suite** — 39 neue Vitest-Cases in `data-paths.test.ts`, `sessions-types.test.ts`, `json-schema-version.test.ts`, `migration-marker.test.ts`, plus zwei N7-Cases in `atomic-write.test.ts`. Coverage inkl. Race-Safety, Tampering, Forging-Attempts und Path-Traversal.
+
+### Changed — Multi-Workspace Foundation (Phase A.0, 2026-05-08)
+- **`src/server/atomic-write.ts#withMutex`** mit Self-Cleanup-Finally (Plan-Finding N7) — die interne `mutexChains`-Map droppt einen Slot, sobald die zugehörige Chain settled, aber nur wenn kein neuerer Aufruf den Slot bereits übernommen hat (Identity-Check für Race-Safety). Ohne diesen Patch wuchs die Map monoton, wenn Keys per-Resource unique sind (`snapshot:${wsId}:${sid}` über tausende Sessions). Test: 1000 unique Keys ⇒ `mutexChains.size` zurück auf 0.
+- **`_mutexChainsSizeForTests()`** als Test-only Inspector exportiert, damit Unit-Tests den Cleanup-Pfad assertieren können.
+
 ### Added — Public hosting via `hermes.stratex-ai.cloud`
 - **System nginx site** (`/etc/nginx/sites-enabled/hermes.stratex-ai.cloud`) reverse-proxies to `127.0.0.1:3000` with a Let's-Encrypt cert from Certbot. Replaces the previous SSH-tunnel-only access. Multi-device usable from anywhere.
 - **HTTP BasicAuth** in front of the SPA — `auth_basic` middleware reads `/etc/nginx/auth/hermes.htpasswd` (bcrypt, owned by `www-data:www-data`, mode 640). Credentials reuse the existing `ADMIN_USERNAME` + `ADMIN_PASSWORD` from `.env` so there are no new secrets to rotate.

@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { withMutex, writeJsonAtomic, writeTextAtomic } from './atomic-write'
+import {
+  _mutexChainsSizeForTests,
+  withMutex,
+  writeJsonAtomic,
+  writeTextAtomic,
+} from './atomic-write'
 
 describe('writeTextAtomic', () => {
   it('writes target file and leaves no temp artefacts', () => {
@@ -86,5 +91,45 @@ describe('withMutex', () => {
   it('returns the function result', async () => {
     const result = await withMutex('ret', async () => 42)
     expect(result).toBe(42)
+  })
+
+  // N7 — Self-cleanup-finally: unique keys must not leak slots in the
+  // internal map. Without the finally hook, a chain like
+  // `snapshot:${wsId}:${sid}` keyed on thousands of unique session IDs
+  // would grow the map monotonically.
+  it('drops the chain slot after settle (no unbounded growth)', async () => {
+    const sizeBefore = _mutexChainsSizeForTests()
+    const tasks = Array.from({ length: 1000 }, (_, i) =>
+      withMutex(`unique-${i}`, async () => i * 2),
+    )
+    const results = await Promise.all(tasks)
+    expect(results).toEqual(Array.from({ length: 1000 }, (_, i) => i * 2))
+    // Drain microtasks so the .finally() handlers have all fired.
+    await new Promise((resolve) => setImmediate(resolve))
+    const sizeAfter = _mutexChainsSizeForTests()
+    expect(sizeAfter).toBe(sizeBefore)
+  })
+
+  it('cleanup is race-safe — newer call on the same key keeps its slot', async () => {
+    const key = 'race-safe-key'
+    let firstResolve: (() => void) | null = null
+    const firstStarted = new Promise<void>((started) => {
+      void withMutex(key, async () => {
+        started()
+        await new Promise<void>((resolve) => {
+          firstResolve = resolve
+        })
+      })
+    })
+    await firstStarted
+    // Second call queues behind the first — slot belongs to the queued chain.
+    const secondPromise = withMutex(key, async () => 'second')
+    // Resolve first; cleanup-finally for the first chain MUST NOT delete
+    // the slot, because the second chain has already overwritten it.
+    firstResolve!()
+    await secondPromise
+    // After both settle, the slot is cleared by the second chain's finally.
+    await new Promise((resolve) => setImmediate(resolve))
+    expect(_mutexChainsSizeForTests()).toBe(0)
   })
 })
