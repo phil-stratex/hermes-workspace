@@ -7,6 +7,7 @@ import {
   Building01Icon,
   Castle02Icon,
   ChartBarLineIcon,
+  Telescope01Icon,
   Chat01Icon,
   CheckListIcon,
   Clock01Icon,
@@ -594,6 +595,7 @@ function ChatSidebarComponent({
   const isOperationsActive = pathname === '/operations'
   const isSwarmActive = pathname === '/swarm' || pathname === '/swarm2'
   const isCouncilActive = pathname === '/council'
+  const isPredictActive = pathname === '/predict' || pathname.startsWith('/predict/')
   const isUsageActive = pathname === '/usage'
   const mainRoutes = ['/chat', '/new', '/files', '/terminal']
   const knowledgeRoutes = ['/memory', '/skills']
@@ -866,6 +868,13 @@ function ChatSidebarComponent({
       icon: JusticeScale02Icon,
       label: 'Council',
       active: isCouncilActive,
+    },
+    {
+      kind: 'link',
+      to: '/predict',
+      icon: Telescope01Icon,
+      label: 'Predict',
+      active: isPredictActive,
     },
 
   ]

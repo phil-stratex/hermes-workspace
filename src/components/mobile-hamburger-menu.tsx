@@ -6,6 +6,7 @@ import {
   Cancel01Icon,
   Castle02Icon,
   ChartBarLineIcon,
+  Telescope01Icon,
   Chat01Icon,
   Clock01Icon,
   CommandLineIcon,
@@ -99,6 +100,13 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     icon: JusticeScale02Icon,
     to: '/council',
     match: (p: string) => p.startsWith('/council'),
+  },
+  {
+    id: 'predict',
+    label: 'Predict',
+    icon: Telescope01Icon,
+    to: '/predict',
+    match: (p: string) => p.startsWith('/predict'),
   },
   {
     id: 'memory',

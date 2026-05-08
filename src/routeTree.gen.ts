@@ -18,6 +18,7 @@ import { Route as SwarmRouteImport } from './routes/swarm'
 import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ProfilesRouteImport } from './routes/profiles'
+import { Route as PredictRouteImport } from './routes/predict'
 import { Route as PlaygroundRouteImport } from './routes/playground'
 import { Route as OperationsRouteImport } from './routes/operations'
 import { Route as MemoryRouteImport } from './routes/memory'
@@ -107,6 +108,10 @@ import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
 import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
 import { Route as ApiAuthRouteImport } from './routes/api/auth'
 import { Route as ApiArtifactsRouteImport } from './routes/api/artifacts'
+import { Route as PredictSimulationIdRunRouteImport } from './routes/predict.$simulationId.run'
+import { Route as PredictReportIdReportRouteImport } from './routes/predict.$reportId.report'
+import { Route as PredictReportIdChatRouteImport } from './routes/predict.$reportId.chat'
+import { Route as PredictProjectIdBuildRouteImport } from './routes/predict.$projectId.build'
 import { Route as ApiUpdateWorkspaceRouteImport } from './routes/api/update/workspace'
 import { Route as ApiUpdateStatusRouteImport } from './routes/api/update/status'
 import { Route as ApiUpdateAgentRouteImport } from './routes/api/update/agent'
@@ -123,6 +128,7 @@ import { Route as ApiProfilesListRouteImport } from './routes/api/profiles/list'
 import { Route as ApiProfilesDeleteRouteImport } from './routes/api/profiles/delete'
 import { Route as ApiProfilesCreateRouteImport } from './routes/api/profiles/create'
 import { Route as ApiProfilesActivateRouteImport } from './routes/api/profiles/activate'
+import { Route as ApiPredictProxySplatRouteImport } from './routes/api/predict-proxy/$'
 import { Route as ApiOauthPollTokenRouteImport } from './routes/api/oauth.poll-token'
 import { Route as ApiOauthDeviceCodeRouteImport } from './routes/api/oauth.device-code'
 import { Route as ApiModelInfoRouteImport } from './routes/api/model/info'
@@ -196,6 +202,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const ProfilesRoute = ProfilesRouteImport.update({
   id: '/profiles',
   path: '/profiles',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PredictRoute = PredictRouteImport.update({
+  id: '/predict',
+  path: '/predict',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlaygroundRoute = PlaygroundRouteImport.update({
@@ -644,6 +655,26 @@ const ApiArtifactsRoute = ApiArtifactsRouteImport.update({
   path: '/api/artifacts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PredictSimulationIdRunRoute = PredictSimulationIdRunRouteImport.update({
+  id: '/$simulationId/run',
+  path: '/$simulationId/run',
+  getParentRoute: () => PredictRoute,
+} as any)
+const PredictReportIdReportRoute = PredictReportIdReportRouteImport.update({
+  id: '/$reportId/report',
+  path: '/$reportId/report',
+  getParentRoute: () => PredictRoute,
+} as any)
+const PredictReportIdChatRoute = PredictReportIdChatRouteImport.update({
+  id: '/$reportId/chat',
+  path: '/$reportId/chat',
+  getParentRoute: () => PredictRoute,
+} as any)
+const PredictProjectIdBuildRoute = PredictProjectIdBuildRouteImport.update({
+  id: '/$projectId/build',
+  path: '/$projectId/build',
+  getParentRoute: () => PredictRoute,
+} as any)
 const ApiUpdateWorkspaceRoute = ApiUpdateWorkspaceRouteImport.update({
   id: '/api/update/workspace',
   path: '/api/update/workspace',
@@ -722,6 +753,11 @@ const ApiProfilesCreateRoute = ApiProfilesCreateRouteImport.update({
 const ApiProfilesActivateRoute = ApiProfilesActivateRouteImport.update({
   id: '/api/profiles/activate',
   path: '/api/profiles/activate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPredictProxySplatRoute = ApiPredictProxySplatRouteImport.update({
+  id: '/api/predict-proxy/$',
+  path: '/api/predict-proxy/$',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiOauthPollTokenRoute = ApiOauthPollTokenRouteImport.update({
@@ -886,6 +922,7 @@ export interface FileRoutesByFullPath {
   '/memory': typeof MemoryRoute
   '/operations': typeof OperationsRoute
   '/playground': typeof PlaygroundRoute
+  '/predict': typeof PredictRouteWithChildren
   '/profiles': typeof ProfilesRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
@@ -996,6 +1033,7 @@ export interface FileRoutesByFullPath {
   '/api/model/info': typeof ApiModelInfoRoute
   '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
   '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
+  '/api/predict-proxy/$': typeof ApiPredictProxySplatRoute
   '/api/profiles/activate': typeof ApiProfilesActivateRoute
   '/api/profiles/create': typeof ApiProfilesCreateRoute
   '/api/profiles/delete': typeof ApiProfilesDeleteRoute
@@ -1012,6 +1050,10 @@ export interface FileRoutesByFullPath {
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
+  '/predict/$projectId/build': typeof PredictProjectIdBuildRoute
+  '/predict/$reportId/chat': typeof PredictReportIdChatRoute
+  '/predict/$reportId/report': typeof PredictReportIdReportRoute
+  '/predict/$simulationId/run': typeof PredictSimulationIdRunRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
@@ -1031,6 +1073,7 @@ export interface FileRoutesByTo {
   '/memory': typeof MemoryRoute
   '/operations': typeof OperationsRoute
   '/playground': typeof PlaygroundRoute
+  '/predict': typeof PredictRouteWithChildren
   '/profiles': typeof ProfilesRoute
   '/skills': typeof SkillsRoute
   '/swarm': typeof SwarmRoute
@@ -1140,6 +1183,7 @@ export interface FileRoutesByTo {
   '/api/model/info': typeof ApiModelInfoRoute
   '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
   '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
+  '/api/predict-proxy/$': typeof ApiPredictProxySplatRoute
   '/api/profiles/activate': typeof ApiProfilesActivateRoute
   '/api/profiles/create': typeof ApiProfilesCreateRoute
   '/api/profiles/delete': typeof ApiProfilesDeleteRoute
@@ -1156,6 +1200,10 @@ export interface FileRoutesByTo {
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
+  '/predict/$projectId/build': typeof PredictProjectIdBuildRoute
+  '/predict/$reportId/chat': typeof PredictReportIdChatRoute
+  '/predict/$reportId/report': typeof PredictReportIdReportRoute
+  '/predict/$simulationId/run': typeof PredictSimulationIdRunRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
@@ -1176,6 +1224,7 @@ export interface FileRoutesById {
   '/memory': typeof MemoryRoute
   '/operations': typeof OperationsRoute
   '/playground': typeof PlaygroundRoute
+  '/predict': typeof PredictRouteWithChildren
   '/profiles': typeof ProfilesRoute
   '/settings': typeof SettingsRouteWithChildren
   '/skills': typeof SkillsRoute
@@ -1286,6 +1335,7 @@ export interface FileRoutesById {
   '/api/model/info': typeof ApiModelInfoRoute
   '/api/oauth/device-code': typeof ApiOauthDeviceCodeRoute
   '/api/oauth/poll-token': typeof ApiOauthPollTokenRoute
+  '/api/predict-proxy/$': typeof ApiPredictProxySplatRoute
   '/api/profiles/activate': typeof ApiProfilesActivateRoute
   '/api/profiles/create': typeof ApiProfilesCreateRoute
   '/api/profiles/delete': typeof ApiProfilesDeleteRoute
@@ -1302,6 +1352,10 @@ export interface FileRoutesById {
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
+  '/predict/$projectId/build': typeof PredictProjectIdBuildRoute
+  '/predict/$reportId/chat': typeof PredictReportIdChatRoute
+  '/predict/$reportId/report': typeof PredictReportIdReportRoute
+  '/predict/$simulationId/run': typeof PredictSimulationIdRunRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
@@ -1323,6 +1377,7 @@ export interface FileRouteTypes {
     | '/memory'
     | '/operations'
     | '/playground'
+    | '/predict'
     | '/profiles'
     | '/settings'
     | '/skills'
@@ -1433,6 +1488,7 @@ export interface FileRouteTypes {
     | '/api/model/info'
     | '/api/oauth/device-code'
     | '/api/oauth/poll-token'
+    | '/api/predict-proxy/$'
     | '/api/profiles/activate'
     | '/api/profiles/create'
     | '/api/profiles/delete'
@@ -1449,6 +1505,10 @@ export interface FileRouteTypes {
     | '/api/update/agent'
     | '/api/update/status'
     | '/api/update/workspace'
+    | '/predict/$projectId/build'
+    | '/predict/$reportId/chat'
+    | '/predict/$reportId/report'
+    | '/predict/$simulationId/run'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
     | '/api/sessions/$sessionKey/active-run'
@@ -1468,6 +1528,7 @@ export interface FileRouteTypes {
     | '/memory'
     | '/operations'
     | '/playground'
+    | '/predict'
     | '/profiles'
     | '/skills'
     | '/swarm'
@@ -1577,6 +1638,7 @@ export interface FileRouteTypes {
     | '/api/model/info'
     | '/api/oauth/device-code'
     | '/api/oauth/poll-token'
+    | '/api/predict-proxy/$'
     | '/api/profiles/activate'
     | '/api/profiles/create'
     | '/api/profiles/delete'
@@ -1593,6 +1655,10 @@ export interface FileRouteTypes {
     | '/api/update/agent'
     | '/api/update/status'
     | '/api/update/workspace'
+    | '/predict/$projectId/build'
+    | '/predict/$reportId/chat'
+    | '/predict/$reportId/report'
+    | '/predict/$simulationId/run'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
     | '/api/sessions/$sessionKey/active-run'
@@ -1612,6 +1678,7 @@ export interface FileRouteTypes {
     | '/memory'
     | '/operations'
     | '/playground'
+    | '/predict'
     | '/profiles'
     | '/settings'
     | '/skills'
@@ -1722,6 +1789,7 @@ export interface FileRouteTypes {
     | '/api/model/info'
     | '/api/oauth/device-code'
     | '/api/oauth/poll-token'
+    | '/api/predict-proxy/$'
     | '/api/profiles/activate'
     | '/api/profiles/create'
     | '/api/profiles/delete'
@@ -1738,6 +1806,10 @@ export interface FileRouteTypes {
     | '/api/update/agent'
     | '/api/update/status'
     | '/api/update/workspace'
+    | '/predict/$projectId/build'
+    | '/predict/$reportId/chat'
+    | '/predict/$reportId/report'
+    | '/predict/$simulationId/run'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
     | '/api/sessions/$sessionKey/active-run'
@@ -1758,6 +1830,7 @@ export interface RootRouteChildren {
   MemoryRoute: typeof MemoryRoute
   OperationsRoute: typeof OperationsRoute
   PlaygroundRoute: typeof PlaygroundRoute
+  PredictRoute: typeof PredictRouteWithChildren
   ProfilesRoute: typeof ProfilesRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   SkillsRoute: typeof SkillsRoute
@@ -1852,6 +1925,7 @@ export interface RootRouteChildren {
   ApiModelInfoRoute: typeof ApiModelInfoRoute
   ApiOauthDeviceCodeRoute: typeof ApiOauthDeviceCodeRoute
   ApiOauthPollTokenRoute: typeof ApiOauthPollTokenRoute
+  ApiPredictProxySplatRoute: typeof ApiPredictProxySplatRoute
   ApiProfilesActivateRoute: typeof ApiProfilesActivateRoute
   ApiProfilesCreateRoute: typeof ApiProfilesCreateRoute
   ApiProfilesDeleteRoute: typeof ApiProfilesDeleteRoute
@@ -1927,6 +2001,13 @@ declare module '@tanstack/react-router' {
       path: '/profiles'
       fullPath: '/profiles'
       preLoaderRoute: typeof ProfilesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/predict': {
+      id: '/predict'
+      path: '/predict'
+      fullPath: '/predict'
+      preLoaderRoute: typeof PredictRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/playground': {
@@ -2552,6 +2633,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiArtifactsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/predict/$simulationId/run': {
+      id: '/predict/$simulationId/run'
+      path: '/$simulationId/run'
+      fullPath: '/predict/$simulationId/run'
+      preLoaderRoute: typeof PredictSimulationIdRunRouteImport
+      parentRoute: typeof PredictRoute
+    }
+    '/predict/$reportId/report': {
+      id: '/predict/$reportId/report'
+      path: '/$reportId/report'
+      fullPath: '/predict/$reportId/report'
+      preLoaderRoute: typeof PredictReportIdReportRouteImport
+      parentRoute: typeof PredictRoute
+    }
+    '/predict/$reportId/chat': {
+      id: '/predict/$reportId/chat'
+      path: '/$reportId/chat'
+      fullPath: '/predict/$reportId/chat'
+      preLoaderRoute: typeof PredictReportIdChatRouteImport
+      parentRoute: typeof PredictRoute
+    }
+    '/predict/$projectId/build': {
+      id: '/predict/$projectId/build'
+      path: '/$projectId/build'
+      fullPath: '/predict/$projectId/build'
+      preLoaderRoute: typeof PredictProjectIdBuildRouteImport
+      parentRoute: typeof PredictRoute
+    }
     '/api/update/workspace': {
       id: '/api/update/workspace'
       path: '/api/update/workspace'
@@ -2662,6 +2771,13 @@ declare module '@tanstack/react-router' {
       path: '/api/profiles/activate'
       fullPath: '/api/profiles/activate'
       preLoaderRoute: typeof ApiProfilesActivateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/predict-proxy/$': {
+      id: '/api/predict-proxy/$'
+      path: '/api/predict-proxy/$'
+      fullPath: '/api/predict-proxy/$'
+      preLoaderRoute: typeof ApiPredictProxySplatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/oauth/poll-token': {
@@ -2870,6 +2986,23 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface PredictRouteChildren {
+  PredictProjectIdBuildRoute: typeof PredictProjectIdBuildRoute
+  PredictReportIdChatRoute: typeof PredictReportIdChatRoute
+  PredictReportIdReportRoute: typeof PredictReportIdReportRoute
+  PredictSimulationIdRunRoute: typeof PredictSimulationIdRunRoute
+}
+
+const PredictRouteChildren: PredictRouteChildren = {
+  PredictProjectIdBuildRoute: PredictProjectIdBuildRoute,
+  PredictReportIdChatRoute: PredictReportIdChatRoute,
+  PredictReportIdReportRoute: PredictReportIdReportRoute,
+  PredictSimulationIdRunRoute: PredictSimulationIdRunRoute,
+}
+
+const PredictRouteWithChildren =
+  PredictRoute._addFileChildren(PredictRouteChildren)
+
 interface SettingsRouteChildren {
   SettingsProvidersRoute: typeof SettingsProvidersRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
@@ -3044,6 +3177,7 @@ const rootRouteChildren: RootRouteChildren = {
   MemoryRoute: MemoryRoute,
   OperationsRoute: OperationsRoute,
   PlaygroundRoute: PlaygroundRoute,
+  PredictRoute: PredictRouteWithChildren,
   ProfilesRoute: ProfilesRoute,
   SettingsRoute: SettingsRouteWithChildren,
   SkillsRoute: SkillsRoute,
@@ -3138,6 +3272,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiModelInfoRoute: ApiModelInfoRoute,
   ApiOauthDeviceCodeRoute: ApiOauthDeviceCodeRoute,
   ApiOauthPollTokenRoute: ApiOauthPollTokenRoute,
+  ApiPredictProxySplatRoute: ApiPredictProxySplatRoute,
   ApiProfilesActivateRoute: ApiProfilesActivateRoute,
   ApiProfilesCreateRoute: ApiProfilesCreateRoute,
   ApiProfilesDeleteRoute: ApiProfilesDeleteRoute,
