@@ -1,8 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { requireWorkspaceAction } from '../../server/route-auth-helpers'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { isAuthenticated } from '../../server/auth-middleware'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 import { getProfilesDir } from '../../server/claude-paths'
 import { newestCheckpointFromMessages, readRuntimeJson, type ParsedSwarmCheckpoint } from '../../server/swarm-checkpoints'
 import { readWorkerMessages } from '../../server/swarm-chat-reader'
@@ -360,9 +361,8 @@ export const Route = createFileRoute('/api/swarm-orchestrator-loop')({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const guard = requireWorkspaceAction(request, 'chat')
+        if (!guard.ok) return guard.response
         let body: LoopRequest
         try {
           body = (await request.json()) as LoopRequest

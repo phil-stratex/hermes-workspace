@@ -10,7 +10,13 @@ import {
   createSyntheticLiveToolTracker,
 } from './-send-stream-live-tools'
 import { resolveSessionKey } from '../../server/session-utils'
-import { isAuthenticated } from '../../server/auth-middleware'
+import { isMultiTenantAuthEnabled } from '../../server/auth-middleware'
+import { requireWorkspaceAction } from '../../server/route-auth-helpers'
+import {
+  readSessionsMeta,
+  recordActivity,
+  tagSession,
+} from '../../server/sessions-privacy'
 import { requireJsonContentType } from '../../server/rate-limit'
 import { publishChatEvent } from '../../server/chat-event-bus'
 import { loadWorkspaceCatalog } from './workspace'
@@ -424,13 +430,9 @@ export const Route = createFileRoute('/api/send-stream')({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        // Auth check
-        if (!isAuthenticated(request)) {
-          return new Response(
-            JSON.stringify({ ok: false, error: 'Unauthorized' }),
-            { status: 401, headers: { 'Content-Type': 'application/json' } },
-          )
-        }
+        // Auth + workspace action check.
+        const guard = requireWorkspaceAction(request, 'chat')
+        if (!guard.ok) return guard.response
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
         await ensureGatewayProbed()
@@ -490,6 +492,41 @@ export const Route = createFileRoute('/api/send-stream')({
             status: 500,
             headers: { 'Content-Type': 'application/json' },
           })
+        }
+        void resolvedFriendlyId
+        // F11 + D1 — multi-tenant only:
+        //   - tag the session into sessions-meta.json if it's not yet
+        //     mapped (caller becomes owner)
+        //   - refuse to write into a *shared* session unless the
+        //     caller is the original owner
+        //   - bump lastActivityAt
+        if (
+          isMultiTenantAuthEnabled()
+          && guard.value.user
+          && guard.value.wsId
+          && sessionKey
+        ) {
+          const wsId = guard.value.wsId
+          const userId = guard.value.user.id
+          try {
+            const meta = readSessionsMeta(wsId)
+            const entry = meta.sessions[sessionKey]
+            if (!entry) {
+              await tagSession(wsId, sessionKey, userId)
+            } else if (entry.shared && entry.ownerId !== userId) {
+              return new Response(
+                JSON.stringify({
+                  ok: false,
+                  error: 'shared session is read-only for non-owners',
+                  reason: 'shared-not-owner',
+                }),
+                { status: 403, headers: { 'Content-Type': 'application/json' } },
+              )
+            }
+            await recordActivity(wsId, sessionKey)
+          } catch {
+            // best-effort — never block the chat for an audit-side bookkeeping issue
+          }
         }
 
         // Check if the selected model is a local provider model — force portable + direct routing

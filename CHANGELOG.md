@@ -5,6 +5,61 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed — Existing-Routes-Refactor (Phase A.8, 2026-05-09)
+
+**Auth-Schicht-Migration der Bestandsrouten** (Plan A.3.1). 15 Routes auf den neuen `requirePermission` / `requireWorkspaceAction`-Pattern umgestellt; verbleibende ~95 nutzen weiterhin den `@deprecated isAuthenticated`-Wrapper bis sie einzeln migriert werden.
+
+**Neuer Helper**
+- **`src/server/route-auth-helpers.ts`** — Drop-in-Bridge zwischen Legacy `isAuthenticated()` und den neuen `requireUser` / `requirePermission`-Helpers. Drei Funktionen:
+  - `requireAuthenticated(request)` — minimaler Auth-Check; in Multi-Tenant returnt User+wsId, in Legacy nur Boolean-Pass.
+  - `requireWorkspaceAction(request, action)` — Auth + aktiver Workspace + `canDo(action)`. Returnt **409** mit Hinweis-Hint wenn der eingeloggte User keinen aktiven Workspace hat (UI routet auf Workspace-Picker).
+  - `requireActiveWorkspaceMember(request)` — Member-only ohne Action-Gate, für Routes die für jeden Member offen sind.
+  - In Legacy-Modus degradieren alle drei auf simple `isAuthenticated`-Boolean — weshalb der Refactor non-breaking ist.
+
+**Refaktorierte Routes (15 Files)**
+| Datei | Action |
+|---|---|
+| `swarm-roster.ts` | GET: `requireAuthenticated`; POST/PATCH: `requireWorkspaceAction('roster-edit')` |
+| `usage.ts` | `requireWorkspaceAction('view-usage')` |
+| `council.ts` | `requireWorkspaceAction('chat')` |
+| `switch-model.ts` | `requireWorkspaceAction('roster-edit')` |
+| `swarm-tmux-{start,stop}.ts` | `requireWorkspaceAction('worker-control')` |
+| `swarm-decompose.ts`, `swarm-dispatch.ts` | `requireWorkspaceAction('chat')` |
+| `swarm-orchestrator-loop.ts`, `swarm-direct-chat.ts` | `requireWorkspaceAction('chat')` |
+| `swarm-idle-tick.ts` | `requireActiveWorkspaceMember` |
+| `workspace.ts` | `requireActiveWorkspaceMember` |
+| `system-info.ts` | `requireAuthenticated` (global) |
+| `sessions.ts` | siehe unten |
+| `send-stream.ts` | siehe unten |
+
+**`sessions.ts` mit D1-Hybrid-Privacy**
+- 4× `isAuthenticated` → `requireWorkspaceAction('chat')` ersetzt.
+- GET filtert via `filterVisibleSessions(sessions, userId, meta)` — der `FilteredSessions`-Brand-Type aus Phase A.0 sorgt dafür dass `tsc` jeden Endpoint zurückweist der ungetaggte oder nicht-eigene/nicht-shared Sessions returnt.
+- POST tagged neu erstellte Sessions automatisch via `tagSession(wsId, sessionId, userId)` ins `sessions-meta.json`-Mapping → ab Erstellung sind sie für andere Members fail-closed unsichtbar (D1).
+
+**`send-stream.ts` mit F11-Block + lastActivityAt**
+- 1× `isAuthenticated` → `requireWorkspaceAction('chat')` ersetzt.
+- Nach `resolveSessionKey`: lookup in `sessions-meta.json`. Wenn die Session **shared** ist UND der Caller ist **nicht der ursprüngliche Owner** → **403** mit `reason: 'shared-not-owner'`. Plan-Finding **F11**: Shared Sessions sind read-only für non-Owner.
+- Untagged Sessions werden auto-getagged (Caller wird Owner) — verhindert Sichtbarkeitsverlust für eigene neue Chats.
+- `recordActivity(wsId, sessionId)` setzt `lastActivityAt` beim Stream-Start → triggert die Lazy-Re-Snapshot-Logik in `sessions-snapshot.ts` korrekt.
+
+**Pre-existing Bug fix (drive-by)**
+- `swarm-idle-tick.ts:70` — `runtime?.state` → `runtime?.runtime?.state` (TypeScript wusste schon dass das ein Schreibfehler war).
+
+**Mass-Refactor-Skripte** (`scripts/dev/`)
+- `a8-route-refactor.mjs` — applies the 3-line `if (!isAuthenticated(request)) { return ... }` → 2-line helper-call substitution per route. Two pattern variants (`{ ok: false, error: 'Unauthorized' }` und `{ error: 'Unauthorized' }`). Idempotent.
+- `a8-fix-imports.mjs` — Follow-up: scannt alle `src/routes/api/`-Files, erkennt fehlende `route-auth-helpers`-Imports und fügt sie nach dem `@tanstack/react-start`-Import ein. CRLF-aware.
+
+**Verifikation (harte Zahlen)**
+- **isAuthenticated-Aufrufe vorher/nachher:** 146 → 124 (−22, also 15 % der Stack-weiten Aufrufe migriert in einem Pass).
+- **Files mit Legacy-Helper vorher/nachher:** 111 → 101 (−10, plus die ~5 Files wo nur einzelne Calls übrig sind aber andere migriert wurden).
+- **Diff:** 15 files changed, +151 / −89.
+- **Tests Phase A (alle 21 Test-Files):** **296 passed (296)**, Duration 6.13 s. Inkl. AK26 (1000 Tokens, p99 < 5 ms), F6 50-parallele-Failed-Login-Race, R6 Thundering-Herd (50 → 1 Gateway-Call), L4 Marker-Tampering, L6 Type-Brand `tsc`-Enforcement, F10 Audit-Chain-Tampering-Detection.
+- **route-auth-helpers.test.ts:** 10 Cases — Legacy-Mode (3), Multi-Tenant-Mode (7) inkl. 401/403/404/409-Pfade.
+- **Typecheck:** keine neuen Fehler in Phase-A.8-Files; pre-existing `swarm2-screen.tsx`-Baseline (65 Errors aus Mai-Inventory) unverändert.
+- **Build:** `pnpm build` durchgelaufen in 9.55 s, alle Routes im `routeTree.gen.ts` registered.
+- **Pre-existing nicht-Phase-A Test-Failures (vorhanden vor Refactor):** 11 Tests in 5 Files (kanban-backend, mcp-presets-store, swarm-memory, gateway-capabilities, local-provider-discovery) — komplett orthogonal zu diesem Refactor.
+
 ### Added — Workspace-Settings, Audit-Viewer, Account, Session-Share-UI (Phase A.7, 2026-05-08)
 
 **API-Routes (2)**

@@ -1,10 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { requireWorkspaceAction } from '../../server/route-auth-helpers'
 import { execFile } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { isAuthenticated } from '../../server/auth-middleware'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 import { requireJsonContentType } from '../../server/rate-limit'
 import { rosterByWorkerId } from '../../server/swarm-roster'
 import { resolveSwarmModelLabel } from '../../server/swarm-model-resolver'
@@ -159,9 +160,8 @@ export const Route = createFileRoute('/api/swarm-tmux-start')({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const guard = requireWorkspaceAction(request, 'worker-control')
+        if (!guard.ok) return guard.response
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
 

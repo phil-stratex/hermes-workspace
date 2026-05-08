@@ -1,11 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { requireWorkspaceAction } from '../../server/route-auth-helpers'
 import { execFile } from 'node:child_process'
 import { swarmExec, useDockerExec } from '../../server/swarm-docker-exec'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { isAuthenticated } from '../../server/auth-middleware'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 import { requireJsonContentType } from '../../server/rate-limit'
 import { newestCheckpointFromMessages, type ParsedSwarmCheckpoint } from '../../server/swarm-checkpoints'
 import { readWorkerMessages } from '../../server/swarm-chat-reader'
@@ -1031,9 +1032,8 @@ export const Route = createFileRoute('/api/swarm-dispatch')({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const guard = requireWorkspaceAction(request, 'chat')
+        if (!guard.ok) return guard.response
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
 

@@ -4,9 +4,20 @@ import path from 'node:path'
 import os from 'node:os'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { isAuthenticated } from '../../server/auth-middleware'
+import {
+  isMultiTenantAuthEnabled,
+} from '../../server/auth-middleware'
+import {
+  requireAuthenticated,
+  requireWorkspaceAction,
+} from '../../server/route-auth-helpers'
 import { writeJsonAtomic, withMutex } from '../../server/atomic-write'
 import { requireJsonContentType } from '../../server/rate-limit'
+import {
+  filterVisibleSessions,
+  readSessionsMeta,
+  tagSession,
+} from '../../server/sessions-privacy'
 import {
   SESSIONS_API_UNAVAILABLE_MESSAGE,
   createSession,
@@ -125,9 +136,8 @@ export const Route = createFileRoute('/api/sessions')({
     handlers: {
       GET: async ({ request }) => {
         // Auth check
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const guard = requireWorkspaceAction(request, 'chat')
+        if (!guard.ok) return guard.response
         const capabilities = await ensureGatewayProbed()
         if (!capabilities.sessions) {
           return json({
@@ -160,9 +170,18 @@ export const Route = createFileRoute('/api/sessions')({
             }
           }
 
-          return json({
-            sessions: withDerivedLocalTitles(applyStoredTitles(gatewaySessions)),
-          })
+          // D1 Privacy-Filter (multi-tenant only): hide sessions the
+          // caller doesn't own and that aren't workspace-shared.
+          // Untagged sessions fail-closed — until the migration step
+          // (or a future per-create tag, see POST below) labels them,
+          // they're invisible.
+          const titled = withDerivedLocalTitles(applyStoredTitles(gatewaySessions))
+          if (!isMultiTenantAuthEnabled() || !guard.value.user || !guard.value.wsId) {
+            return json({ sessions: titled })
+          }
+          const meta = readSessionsMeta(guard.value.wsId)
+          const visible = filterVisibleSessions(titled, guard.value.user.id, meta)
+          return json({ sessions: visible })
         } catch (err) {
           return json(
             {
@@ -173,9 +192,8 @@ export const Route = createFileRoute('/api/sessions')({
         }
       },
       POST: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const guard = requireWorkspaceAction(request, 'chat')
+        if (!guard.ok) return guard.response
         const csrfCheckPost = requireJsonContentType(request)
         if (csrfCheckPost) return csrfCheckPost
         const capabilities = await ensureGatewayProbed()
@@ -235,6 +253,18 @@ export const Route = createFileRoute('/api/sessions')({
             model,
           })
 
+          // D1: tag the freshly-created session into the workspace
+          // mapping so the privacy filter recognises it. Failure is
+          // non-fatal — a missing tag just makes the session invisible
+          // until the next mapping update.
+          if (isMultiTenantAuthEnabled() && guard.value.user && guard.value.wsId) {
+            try {
+              await tagSession(guard.value.wsId, session.id, guard.value.user.id)
+            } catch {
+              // best-effort — server emits a warning via console
+            }
+          }
+
           return json({
             ok: true,
             sessionKey: session.id,
@@ -253,9 +283,8 @@ export const Route = createFileRoute('/api/sessions')({
         }
       },
       PATCH: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const guard = requireWorkspaceAction(request, 'chat')
+        if (!guard.ok) return guard.response
         const csrfCheckPatch = requireJsonContentType(request)
         if (csrfCheckPatch) return csrfCheckPatch
         const capabilities = await ensureGatewayProbed()
@@ -342,9 +371,8 @@ export const Route = createFileRoute('/api/sessions')({
         }
       },
       DELETE: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const guard = requireWorkspaceAction(request, 'chat')
+        if (!guard.ok) return guard.response
         const url = new URL(request.url)
         const rawSessionKey = url.searchParams.get('sessionKey') ?? ''
         const rawFriendlyId = url.searchParams.get('friendlyId') ?? ''

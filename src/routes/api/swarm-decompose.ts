@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { isAuthenticated } from '../../server/auth-middleware'
+import { requireWorkspaceAction } from '../../server/route-auth-helpers'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 import { requireJsonContentType } from '../../server/rate-limit'
 import { BEARER_TOKEN, ensureGatewayProbed, getResolvedUrls } from '../../server/gateway-capabilities'
 
@@ -194,9 +195,8 @@ export const Route = createFileRoute('/api/swarm-decompose')({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const guard = requireWorkspaceAction(request, 'chat')
+        if (!guard.ok) return guard.response
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
         await ensureGatewayProbed()

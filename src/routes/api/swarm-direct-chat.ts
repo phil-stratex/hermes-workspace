@@ -1,10 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
+import { requireWorkspaceAction } from '../../server/route-auth-helpers'
 import { execFile } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { isAuthenticated } from '../../server/auth-middleware'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 import { readWorkerMessages, type SwarmChatMessage } from '../../server/swarm-chat-reader'
 import { swarmExec, useDockerExec } from '../../server/swarm-docker-exec'
 
@@ -264,9 +265,8 @@ export const Route = createFileRoute('/api/swarm-direct-chat')({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ error: 'Unauthorized' }, { status: 401 })
-        }
+        const guard = requireWorkspaceAction(request, 'chat')
+        if (!guard.ok) return guard.response
 
         let body: DirectChatRequest
         try {

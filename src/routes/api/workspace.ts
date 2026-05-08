@@ -12,7 +12,8 @@ import fs from 'node:fs/promises'
 import YAML from 'yaml'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { isAuthenticated } from '../../server/auth-middleware'
+import { requireActiveWorkspaceMember } from '../../server/route-auth-helpers'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 import { requireJsonContentType } from '../../server/rate-limit'
 import {
   getActiveProfileName,
@@ -397,9 +398,8 @@ export const Route = createFileRoute('/api/workspace')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireActiveWorkspaceMember(request)
+        if (!auth.ok) return auth.response
         try {
           return json(await loadWorkspaceCatalog())
         } catch (err) {
@@ -418,9 +418,8 @@ export const Route = createFileRoute('/api/workspace')({
         }
       },
       POST: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireActiveWorkspaceMember(request)
+        if (!auth.ok) return auth.response
         const contentTypeError = requireJsonContentType(request)
         if (contentTypeError) return contentTypeError
         try {

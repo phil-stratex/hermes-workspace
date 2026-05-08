@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { isAuthenticated } from '../../server/auth-middleware'
+import { requireAuthenticated, requireWorkspaceAction } from '../../server/route-auth-helpers'
 import { requireJsonContentType } from '../../server/rate-limit'
 import {
   SWARM_ROSTER_PATH,
@@ -13,10 +13,10 @@ import { listSwarmWorkerIds } from '../../server/swarm-foundation'
 export const Route = createFileRoute('/api/swarm-roster')({
   server: {
     handlers: {
+      // GET — every active-workspace member can read the roster.
       GET: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const auth = requireAuthenticated(request)
+        if (!auth.ok) return auth.response
         const ids = listSwarmWorkerIds()
         return json({
           ok: true,
@@ -25,10 +25,10 @@ export const Route = createFileRoute('/api/swarm-roster')({
           fetchedAt: Date.now(),
         })
       },
+      // POST — full upsert is `roster-edit` (admin/owner only in MT).
       POST: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const guard = requireWorkspaceAction(request, 'roster-edit')
+        if (!guard.ok) return guard.response
         const csrfCheckPost = requireJsonContentType(request)
         if (csrfCheckPost) return csrfCheckPost
         let body: unknown
@@ -48,10 +48,10 @@ export const Route = createFileRoute('/api/swarm-roster')({
           }, { status: 400 })
         }
       },
+      // PATCH — partial update is also `roster-edit`.
       PATCH: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const guard = requireWorkspaceAction(request, 'roster-edit')
+        if (!guard.ok) return guard.response
         const csrfCheckPatch = requireJsonContentType(request)
         if (csrfCheckPatch) return csrfCheckPatch
         let body: unknown

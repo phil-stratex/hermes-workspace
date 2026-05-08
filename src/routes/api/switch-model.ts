@@ -1,7 +1,8 @@
 import { spawn } from 'node:child_process'
 import { json } from '@tanstack/react-start'
+import { requireWorkspaceAction } from '../../server/route-auth-helpers'
 import { createFileRoute } from '@tanstack/react-router'
-import { isAuthenticated } from '../../server/auth-middleware'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 import { OLLAMA_CLOUD_IDS } from '../../server/ollama-cloud-models'
 import { requireJsonContentType } from '../../server/rate-limit'
 
@@ -48,9 +49,8 @@ export const Route = createFileRoute('/api/switch-model')({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const guard = requireWorkspaceAction(request, 'roster-edit')
+        if (!guard.ok) return guard.response
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
         let body: unknown

@@ -36,7 +36,8 @@ import os from 'node:os'
 import { randomUUID } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { isAuthenticated } from '../../server/auth-middleware'
+import { requireWorkspaceAction } from '../../server/route-auth-helpers'
+// (auth-middleware import dropped — uses route-auth-helpers below)
 import { requireJsonContentType } from '../../server/rate-limit'
 import {
   extractAttachmentText,
@@ -206,9 +207,8 @@ export const Route = createFileRoute('/api/council')({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const guard = requireWorkspaceAction(request, 'chat')
+        if (!guard.ok) return guard.response
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
         let body: CouncilRequest
@@ -533,9 +533,8 @@ export const Route = createFileRoute('/api/council')({
         })
       },
       GET: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const guard = requireWorkspaceAction(request, 'chat')
+        if (!guard.ok) return guard.response
         const url = new URL(request.url)
         const id = url.searchParams.get('id')
         try {

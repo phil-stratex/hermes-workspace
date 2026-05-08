@@ -17,7 +17,7 @@ import path from 'node:path'
 import os from 'node:os'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { isAuthenticated } from '../../server/auth-middleware'
+import { requireWorkspaceAction } from '../../server/route-auth-helpers'
 
 const HERMES_HOME =
   process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes')
@@ -139,9 +139,8 @@ export const Route = createFileRoute('/api/usage')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        if (!isAuthenticated(request)) {
-          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-        }
+        const guard = requireWorkspaceAction(request, 'view-usage')
+        if (!guard.ok) return guard.response
         const url = new URL(request.url)
         const win =
           (url.searchParams.get('window') as keyof typeof WINDOWS_MS) ?? '7d'
