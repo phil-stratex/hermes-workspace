@@ -162,6 +162,64 @@ export type PrepareEvent =
   | { type: 'failed'; error: string }
   | { type: 'end'; reason: string }
 
+// --- Phase 4 — Reports ---------------------------------------------------
+
+export type ReportSectionRow = {
+  slug: string
+  title: string
+  ordering: number
+  status: 'pending' | 'running' | 'completed' | 'failed' | string
+  content: string
+  error: string | null
+}
+
+export type ReportDetail = {
+  report_id: string
+  simulation_id: string
+  status: 'queued' | 'running' | 'completed' | 'failed' | string
+  progress: number
+  error: string | null
+  created_at: string
+  started_at: string | null
+  finished_at: string | null
+  sections: Array<ReportSectionRow>
+}
+
+export type CreatedReport = {
+  report_id: string
+  simulation_id: string
+  status: string
+}
+
+export type ReportEvent =
+  | { type: 'snapshot'; status: string; progress: number; error: string | null; ts: string }
+  | {
+      type: 'started'
+      report_id: string
+      simulation_id: string
+      section_slugs: Array<string>
+    }
+  | {
+      type: 'section_start'
+      slug: string
+      title: string
+      ordering: number
+    }
+  | {
+      type: 'section_done'
+      slug: string
+      title: string
+      content: string
+      ordering: number
+    }
+  | { type: 'section_failed'; slug: string; error: string }
+  | {
+      type: 'done'
+      stats: { total: number; completed: number; failed: number; failed_slugs: Array<string> }
+    }
+  | { type: 'failed'; error: string }
+  | { type: 'end'; reason: string }
+
 // --- Phase 3 — Run lifecycle ---------------------------------------------
 
 export type RunTaskState = {
@@ -430,6 +488,27 @@ export const predictClient = {
   openRunEventStream: (simulationId: string): EventSource =>
     new EventSource(
       `${PROXY_BASE}/api/simulations/${encodeURIComponent(simulationId)}/run/events`,
+    ),
+
+  // --- Phase 4 — Reports ----------------------------------------------
+
+  createReport: (simulationId: string) =>
+    call<CreatedReport>('/api/reports', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ simulation_id: simulationId }),
+    }),
+
+  getReport: (reportId: string) =>
+    call<ReportDetail>(`/api/reports/${encodeURIComponent(reportId)}`),
+
+  deleteReport: (reportId: string) =>
+    call<void>(`/api/reports/${encodeURIComponent(reportId)}`, { method: 'DELETE' }),
+
+  /** SSE stream for the report-generation run. */
+  openReportEventStream: (reportId: string): EventSource =>
+    new EventSource(
+      `${PROXY_BASE}/api/reports/${encodeURIComponent(reportId)}/events`,
     ),
 }
 

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ArrowRight01Icon,
@@ -37,6 +37,7 @@ export function PredictRunScreen({ simulationId }: { simulationId: string }) {
 
 function PredictRunContent({ simulationId }: { simulationId: string }) {
   const [actionError, setActionError] = useState<string | null>(null)
+  const [creatingReport, setCreatingReport] = useState(false)
   const navigate = useNavigate()
   const runHook = useRunProgress(simulationId)
 
@@ -101,6 +102,23 @@ function PredictRunContent({ simulationId }: { simulationId: string }) {
   const isCompleted = runHook.state.status === 'completed'
   const isFailed = runHook.state.status === 'failed'
   const isStopped = runHook.state.status === 'stopped'
+  const reportEligible = isCompleted || isStopped
+
+  const handleGenerateReport = async () => {
+    setCreatingReport(true)
+    setActionError(null)
+    try {
+      const created = await predictClient.createReport(simulationId)
+      void navigate({
+        to: '/predict/$reportId/report',
+        params: { reportId: created.report_id },
+      })
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setCreatingReport(false)
+    }
+  }
   const percent = runHook.state.targetRounds
     ? Math.round((runHook.state.currentRound / runHook.state.targetRounds) * 100)
     : 0
@@ -113,15 +131,16 @@ function PredictRunContent({ simulationId }: { simulationId: string }) {
       rightSlot={
         <div className="flex items-center gap-2">
           <ConnectionPill connection={runHook.connection} onReconnect={runHook.reconnect} />
-          {isCompleted ? (
-            <Link
-              to="/predict/$reportId/report"
-              params={{ reportId: 'tbd' }}
-              className="inline-flex items-center gap-2 rounded-xl bg-[var(--theme-accent)] px-3 py-1.5 text-xs font-semibold text-primary-950 hover:bg-[var(--theme-accent-strong)]"
+          {reportEligible ? (
+            <button
+              type="button"
+              onClick={handleGenerateReport}
+              disabled={creatingReport}
+              className="inline-flex items-center gap-2 rounded-xl bg-[var(--theme-accent)] px-3 py-1.5 text-xs font-semibold text-primary-950 hover:bg-[var(--theme-accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Weiter zu Phase 4
+              {creatingReport ? 'Erstelle Report…' : 'Report generieren'}
               <HugeiconsIcon icon={ArrowRight01Icon} size={12} />
-            </Link>
+            </button>
           ) : null}
         </div>
       }
