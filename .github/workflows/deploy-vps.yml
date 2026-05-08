@@ -1,0 +1,44 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - stratex/workspace-customizations
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Trigger VPS deploy (restricted key only runs deploy.sh)
+        id: deploy
+        run: |
+          set -o pipefail
+          ssh -i ~/.ssh/id_ed25519 \
+              -o StrictHostKeyChecking=accept-new \
+              -o ConnectTimeout=15 \
+              ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+              2>&1 | tee deploy.log
+
+      - name: Verify deploy succeeded
+        run: |
+          if ! grep -qE "(deployed at|nothing to do)" deploy.log; then
+            echo "::error::Deploy script did not produce expected output"
+            tail -30 deploy.log
+            exit 1
+          fi
+          echo "✓ Deploy verified"
+          tail -5 deploy.log

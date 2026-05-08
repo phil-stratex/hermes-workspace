@@ -32,12 +32,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
+      # NOTE: continue-on-error stays until the typecheck baseline is green
+      # (currently 65 errors across 25 files in the stratex/workspace-customizations
+      # branch). Once cleanup PR lands, drop the flag so broken types block merge.
       - name: Run linter
-        run: pnpm run lint || echo "⚠️ Lint not configured, skipping"
+        run: pnpm run lint
         continue-on-error: true
 
       - name: Type check
-        run: pnpm run typecheck || pnpm exec tsc --noEmit || echo "⚠️ Typecheck not configured"
+        run: pnpm run typecheck
         continue-on-error: true
 
       - name: Build
@@ -77,5 +80,5 @@ jobs:
         run: pnpm install --no-frozen-lockfile
 
       - name: Run tests
-        run: pnpm test || echo "⚠️ No tests configured"
+        run: pnpm test
         continue-on-error: true

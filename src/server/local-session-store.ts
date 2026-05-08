@@ -1,5 +1,7 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+
+import { writeJsonAtomic } from './atomic-write'
 
 const DATA_DIR = join(process.cwd(), '.runtime')
 const SESSIONS_FILE = join(DATA_DIR, 'local-sessions.json')
@@ -48,7 +50,7 @@ function loadFromDisk(): void {
 function saveToDisk(): void {
   try {
     if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true })
-    writeFileSync(SESSIONS_FILE, JSON.stringify(store, null, 2))
+    writeJsonAtomic(SESSIONS_FILE, store)
   } catch {
     // ignore cache write failures
   }

@@ -11,6 +11,12 @@ type ChatSSESubscriber = (event: ChatSSEEvent) => void
 
 const BUS_KEY = '__claude_chat_event_bus__' as const
 
+// Hard cap so a leaked SSE handler (forgotten cleanup, runaway client reconnect
+// loop) cannot grow the subscriber set without bound. Each subscriber is a
+// closure over a Response stream — at ~1 KB/closure plus the per-event fan-out
+// cost, an unbounded set would silently turn into a memory + CPU regression.
+const MAX_SUBSCRIBERS = 200
+
 interface BusState {
   subscribers: Set<ChatSSESubscriber>
   started: boolean
@@ -58,6 +64,13 @@ export function subscribeToChatEvents(
   sessionKeyFilter?: string,
 ): () => void {
   const bus = getBus()
+
+  if (bus.subscribers.size >= MAX_SUBSCRIBERS) {
+    console.warn(
+      `[chat-event-bus] subscriber cap reached (${MAX_SUBSCRIBERS}); rejecting new subscription`,
+    )
+    return () => {}
+  }
 
   // Wrap subscriber with session key filter if provided
   const wrappedSubscriber: ChatSSESubscriber = sessionKeyFilter

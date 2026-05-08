@@ -5,6 +5,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — Public hosting via `hermes.stratex-ai.cloud`
+- **System nginx site** (`/etc/nginx/sites-enabled/hermes.stratex-ai.cloud`) reverse-proxies to `127.0.0.1:3000` with a Let's-Encrypt cert from Certbot. Replaces the previous SSH-tunnel-only access. Multi-device usable from anywhere.
+- **HTTP BasicAuth** in front of the SPA — `auth_basic` middleware reads `/etc/nginx/auth/hermes.htpasswd` (bcrypt, owned by `www-data:www-data`, mode 640). Credentials reuse the existing `ADMIN_USERNAME` + `ADMIN_PASSWORD` from `.env` so there are no new secrets to rotate.
+- **HSTS header** — `Strict-Transport-Security: max-age=31536000; includeSubDomains` set on every response.
+- **WebSocket upgrade** + 300 s read/send timeouts already present in the nginx site, so Vite HMR + SSE keep working over the public URL.
+- **SSH tunnel still works** in parallel — the container's `127.0.0.1:3000:3000` bind is unchanged, so existing tunnels survive.
+
+### Added — GitHub Actions auto-deploy
+- **`.github/workflows/deploy-vps.yml`** — on `push` to `stratex/workspace-customizations`, the workflow SSHes into the VPS using a dedicated deploy key (stored as the `VPS_SSH_KEY` repo secret) and triggers a single `deploy.sh` invocation. `concurrency.cancel-in-progress: true` so a faster push overrides an in-flight deploy.
+- **Restricted SSH key on VPS** — the deploy public key in `/root/.ssh/authorized_keys` is constrained via `command="/docker/hermes-agent-zjya/deploy.sh",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty`. A leaked key can only trigger a `git pull`; no shell access. Verified — `ssh ... 'rm -rf /'` still just runs `deploy.sh`.
+- **`/docker/hermes-agent-zjya/deploy.sh`** — fetches origin, hard-resets to the new tip, and only restarts the workspace container when `routeTree.gen.ts` / `vite.config.ts` / `package.json` / `pnpm-lock.yaml` changed (everything else hot-reloads via Vite). Idempotent — exits early when there's nothing new to pull.
+
+### Fixed — QA-Audit Findings (2026-05-08)
+- **Atomic write for the local session cache** (`src/server/local-session-store.ts`) — `saveToDisk()` now goes through `writeJsonAtomic()` (`.tmp` + `rename`) instead of a direct `writeFileSync`. A reader during the write either sees the pre-write or post-write contents — no torn JSON.
+- **Subscriber cap on the chat-event bus** (`src/server/chat-event-bus.ts`) — `subscribeToChatEvents` now refuses to register past `MAX_SUBSCRIBERS = 200`, logs a warning, and returns a no-op cleanup. Guards against a leaked SSE handler or a runaway client-reconnect loop silently growing the subscriber set.
+
+### Changed — CI gates
+- **CI lint + typecheck no longer swallow failure output** (`.github/workflows/ci.yml`) — the `|| echo "⚠️ ..."` shell fallbacks were removed so real errors surface in the workflow log. `continue-on-error: true` stays on lint/typecheck/test for now (baseline currently has 65 TS errors across 25 files); flag will be dropped once the cleanup pass lands.
+- **`pnpm typecheck` script added** (`package.json`) — so CI and contributors can run the same `tsc --noEmit` command without falling back to `pnpm exec`.
+
 ### Changed
 - **`docker compose up` now pulls pre-built images by default** (#82) — `nousresearch/hermes-agent:latest` for the gateway and `ghcr.io/outsourc-e/hermes-workspace:latest` for the UI. Agent state persists in the `claude-data` named volume. Adds `docker-compose.dev.yml` overlay for building from source.
 
