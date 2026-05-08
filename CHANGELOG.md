@@ -5,6 +5,44 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — Single→Multi-Tenant Migration (Phase A.5, 2026-05-08)
+
+**Migration-Engine (3 neue Backend-Module)**
+- **`src/server/migration-detector.ts`** — `detectLegacySource()` resolved den Legacy-Layout-Root via `HERMES_LEGACY_DATA_DIR` → `HERMES_HOME` → `~/.hermes`. Erkennt: `memories/` (oder `memory/` als Fallback), `skills/`, `council/`, `profiles/`, `session-titles.json`, `workspace-sessions.json`, plus den externen `~/.openclaw/workspace/memory/swarm/` (für Manifest-Forensics — der echte Symlink-Reconcile passiert beim Boot, Phase A.4).
+- **`src/server/migration-multi-person.ts`** — Plan-Finding **L2** Heuristik. `analyzeMultiPerson(sessions)` flaggt wenn `>20 Sessions in <30d` ODER `>3 distinkte UA-Strings` aus den Gateway-Session-Records auftauchen (pure Function, no I/O). Confirmation-Marker `data/global/.multi-person-tag-confirmed` (JSON) ist **one-shot** — wird vom Migrations-Step nach erfolgreichem Run gelöscht (`consumeMultiPersonConfirmation`), damit ein zweiter Run frische Bestätigung braucht.
+- **`src/server/migration.ts`** — Hauptmodul mit `planMigration(params)` (pure) + `executeMigration(plan, opts)` (I/O). Pre-flight-gates:
+  - **L1+N6** Backup-Check: `data/global/.backup-confirmed` muss valide JSON sein, `snapshotId` non-empty, `confirmedAt < 24h`. Ohne Marker → Throw mit Operator-Hinweis.
+  - **L2** Multi-Person-Check: bei flaggter Heuristik ohne Confirmation → Throw.
+
+  Steps: copy memories+skills+council+profiles → workspace-dirs; bcrypt(HERMES_PASSWORD) → `users/<id>/auth/password-hash.txt`; Workspace-Meta + Members; Tag jeder Gateway-Session in `sessions-meta.json` mit `ownerId=migrant, shared=false` und Title aus `session-titles.json`-Merge; **`MigrationManifest`-Schema (N5)** in `data/global/migration-manifest.json` mit `rollbackInstructions` (sidecar | in-place); SHA256-self-Marker via `migration-marker.ts`; `workspace-sessions.json` cleared (Token-Invalidation, Plan-Finding **D3**).
+
+**CLI-Tools (2 neue + 1 erweitert)**
+- **`scripts/admin/migrate.ts`** — Migration-CLI. Args: `--owner <id>`, `--email`, `--name`, `--workspace <slug>`, `--workspace-name`, optional `--workspace-description`, `--primary-color`, `--dry-run`, `--in-place`. Print Plan immer (auch bei dry-run), pre-flight-gates erst bei Apply. Audit-Event `cli_migrate`. Operator-Hinweis am Ende: external-mv-Steps für Sidecar-Rename. **R3 Default ist Sidecar** — `--in-place` ist Edge-Case-Opt-In.
+- **`scripts/admin/migration-rollback.ts`** — Plan-Finding **N3** Two-Mode. `--sidecar`: druckt 1 `mv`-Step für den Operator + clearet Marker/Manifest; `--in-place`: iteriert `manifest.rollbackInstructions.inPlaceRollback.reverseMoves` und kopiert `to → from` zurück. **Dry-Run by Default** — destruktive Aktionen brauchen `--apply`. Audit-Event `cli_migration_rollback` mit Mode + cleared paths.
+
+**Sidecar-Pattern (Plan-Finding R3)**
+
+```bash
+# Sidecar — zero-risk: legacy /opt/data unchanged unless rename succeeds
+docker run --rm \
+  -v /opt/data:/in:ro \
+  -v /opt/data-staging:/out \
+  -e HERMES_LEGACY_DATA_DIR=/in \
+  -e HERMES_DATA_DIR=/out \
+  -e HERMES_PASSWORD="<single-pw>" \
+  hermes-workspace:migrate \
+  tsx scripts/admin/migrate.ts --owner phil --email phil@stratex-ai.com \
+                                --name "Phil" --workspace stratex --workspace-name "Stratex"
+
+# After exit 0:
+mv /opt/data /opt/data.pre-migration
+mv /opt/data-staging /opt/data
+docker compose restart hermes-workspace
+```
+
+**Test-Suite (1 File, 20 Cases — alle grün)**
+- `migration.test.ts` — Detector (4 Cases inkl. memory/-Fallback, hasLegacyPassword), Multi-Person-Heuristik (4 Cases inkl. activity-window), Pre-Flight-Gates (5 Cases: backup-missing, backup-stale-25h, backup-malformed-JSON, backup-fresh-ok, multi-person-flagged-without-confirmation), Multi-Person-Confirmed-Proceeds (1 Case mit one-shot Marker-Konsumierung), Happy-Path (3 Cases: planMigration moves, executeMigration full E2E mit memories+skills+profiles+bcrypt-roundtrip+manifest+marker+workspace-sessions-cleared, slug-rejection), Idempotency (1 Case), Rollback (2 Cases inkl. throw on missing manifest).
+
 ### Added — Sessions-Privacy, Snapshot, Roster-Validator, Symlink-Reconcile (Phase A.4, 2026-05-08)
 
 **Sessions-Privacy + Snapshot (D1 Hybrid)**
