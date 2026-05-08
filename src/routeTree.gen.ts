@@ -36,6 +36,7 @@ import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as ChatIndexRouteImport } from './routes/chat/index'
 import { Route as SettingsProvidersRouteImport } from './routes/settings/providers'
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
+import { Route as ApiWorkspacesRouteImport } from './routes/api/workspaces'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
 import { Route as ApiUsageRouteImport } from './routes/api/usage'
 import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
@@ -115,6 +116,7 @@ import { Route as PredictSimulationIdRunRouteImport } from './routes/predict.$si
 import { Route as PredictReportIdReportRouteImport } from './routes/predict.$reportId.report'
 import { Route as PredictReportIdChatRouteImport } from './routes/predict.$reportId.chat'
 import { Route as PredictProjectIdBuildRouteImport } from './routes/predict.$projectId.build'
+import { Route as ApiWorkspacesIdRouteImport } from './routes/api/workspaces.$id'
 import { Route as ApiUpdateWorkspaceRouteImport } from './routes/api/update/workspace'
 import { Route as ApiUpdateStatusRouteImport } from './routes/api/update/status'
 import { Route as ApiUpdateAgentRouteImport } from './routes/api/update/agent'
@@ -162,11 +164,26 @@ import { Route as ApiDashboardOverviewRouteImport } from './routes/api/dashboard
 import { Route as ApiClaudeTasksTaskIdRouteImport } from './routes/api/claude-tasks.$taskId'
 import { Route as ApiClaudeProxySplatRouteImport } from './routes/api/claude-proxy/$'
 import { Route as ApiClaudeJobsJobIdRouteImport } from './routes/api/claude-jobs.$jobId'
+import { Route as ApiAuthSetupRouteImport } from './routes/api/auth.setup'
+import { Route as ApiAuthMeRouteImport } from './routes/api/auth.me'
+import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth.logout'
+import { Route as ApiAuthLoginRouteImport } from './routes/api/auth.login'
+import { Route as ApiAuthChangePasswordRouteImport } from './routes/api/auth.change-password'
 import { Route as ApiArtifactsArtifactIdRouteImport } from './routes/api/artifacts.$artifactId'
+import { Route as ApiWorkspacesIdSwitchRouteImport } from './routes/api/workspaces.$id.switch'
+import { Route as ApiWorkspacesIdMembersRouteImport } from './routes/api/workspaces.$id.members'
+import { Route as ApiWorkspacesIdInvitesRouteImport } from './routes/api/workspaces.$id.invites'
+import { Route as ApiUsersIdPasswordResetRouteImport } from './routes/api/users.$id.password-reset'
+import { Route as ApiUsersIdEnableRouteImport } from './routes/api/users.$id.enable'
+import { Route as ApiUsersIdDisableRouteImport } from './routes/api/users.$id.disable'
 import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
 import { Route as ApiMcpHubSourcesIdRouteImport } from './routes/api/mcp/hub-sources.$id'
 import { Route as ApiMcpNameLogsRouteImport } from './routes/api/mcp/$name.logs'
+import { Route as ApiInvitesTokenInfoRouteImport } from './routes/api/invites.$token.info'
+import { Route as ApiInvitesTokenAcceptRouteImport } from './routes/api/invites.$token.accept'
+import { Route as ApiWorkspacesIdMembersUidRouteImport } from './routes/api/workspaces.$id.members.$uid'
+import { Route as ApiWorkspacesIdInvitesTokenRouteImport } from './routes/api/workspaces.$id.invites.$token'
 
 const WorldRoute = WorldRouteImport.update({
   id: '/world',
@@ -301,6 +318,11 @@ const SettingsProvidersRoute = SettingsProvidersRouteImport.update({
 const ChatSessionKeyRoute = ChatSessionKeyRouteImport.update({
   id: '/chat/$sessionKey',
   path: '/chat/$sessionKey',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWorkspacesRoute = ApiWorkspacesRouteImport.update({
+  id: '/api/workspaces',
+  path: '/api/workspaces',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiWorkspaceRoute = ApiWorkspaceRouteImport.update({
@@ -699,6 +721,11 @@ const PredictProjectIdBuildRoute = PredictProjectIdBuildRouteImport.update({
   path: '/$projectId/build',
   getParentRoute: () => PredictRoute,
 } as any)
+const ApiWorkspacesIdRoute = ApiWorkspacesIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ApiWorkspacesRoute,
+} as any)
 const ApiUpdateWorkspaceRoute = ApiUpdateWorkspaceRouteImport.update({
   id: '/api/update/workspace',
   path: '/api/update/workspace',
@@ -935,10 +962,65 @@ const ApiClaudeJobsJobIdRoute = ApiClaudeJobsJobIdRouteImport.update({
   path: '/$jobId',
   getParentRoute: () => ApiClaudeJobsRoute,
 } as any)
+const ApiAuthSetupRoute = ApiAuthSetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
+const ApiAuthMeRoute = ApiAuthMeRouteImport.update({
+  id: '/me',
+  path: '/me',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
+const ApiAuthLogoutRoute = ApiAuthLogoutRouteImport.update({
+  id: '/logout',
+  path: '/logout',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
+const ApiAuthLoginRoute = ApiAuthLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
+const ApiAuthChangePasswordRoute = ApiAuthChangePasswordRouteImport.update({
+  id: '/change-password',
+  path: '/change-password',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
 const ApiArtifactsArtifactIdRoute = ApiArtifactsArtifactIdRouteImport.update({
   id: '/$artifactId',
   path: '/$artifactId',
   getParentRoute: () => ApiArtifactsRoute,
+} as any)
+const ApiWorkspacesIdSwitchRoute = ApiWorkspacesIdSwitchRouteImport.update({
+  id: '/switch',
+  path: '/switch',
+  getParentRoute: () => ApiWorkspacesIdRoute,
+} as any)
+const ApiWorkspacesIdMembersRoute = ApiWorkspacesIdMembersRouteImport.update({
+  id: '/members',
+  path: '/members',
+  getParentRoute: () => ApiWorkspacesIdRoute,
+} as any)
+const ApiWorkspacesIdInvitesRoute = ApiWorkspacesIdInvitesRouteImport.update({
+  id: '/invites',
+  path: '/invites',
+  getParentRoute: () => ApiWorkspacesIdRoute,
+} as any)
+const ApiUsersIdPasswordResetRoute = ApiUsersIdPasswordResetRouteImport.update({
+  id: '/api/users/$id/password-reset',
+  path: '/api/users/$id/password-reset',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiUsersIdEnableRoute = ApiUsersIdEnableRouteImport.update({
+  id: '/api/users/$id/enable',
+  path: '/api/users/$id/enable',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiUsersIdDisableRoute = ApiUsersIdDisableRouteImport.update({
+  id: '/api/users/$id/disable',
+  path: '/api/users/$id/disable',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSessionsSessionKeyStatusRoute =
   ApiSessionsSessionKeyStatusRouteImport.update({
@@ -962,6 +1044,28 @@ const ApiMcpNameLogsRoute = ApiMcpNameLogsRouteImport.update({
   path: '/logs',
   getParentRoute: () => ApiMcpNameRoute,
 } as any)
+const ApiInvitesTokenInfoRoute = ApiInvitesTokenInfoRouteImport.update({
+  id: '/api/invites/$token/info',
+  path: '/api/invites/$token/info',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiInvitesTokenAcceptRoute = ApiInvitesTokenAcceptRouteImport.update({
+  id: '/api/invites/$token/accept',
+  path: '/api/invites/$token/accept',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWorkspacesIdMembersUidRoute =
+  ApiWorkspacesIdMembersUidRouteImport.update({
+    id: '/$uid',
+    path: '/$uid',
+    getParentRoute: () => ApiWorkspacesIdMembersRoute,
+  } as any)
+const ApiWorkspacesIdInvitesTokenRoute =
+  ApiWorkspacesIdInvitesTokenRouteImport.update({
+    id: '/$token',
+    path: '/$token',
+    getParentRoute: () => ApiWorkspacesIdInvitesRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -988,7 +1092,7 @@ export interface FileRoutesByFullPath {
   '/usage': typeof UsageRoute
   '/world': typeof WorldRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
-  '/api/auth': typeof ApiAuthRoute
+  '/api/auth': typeof ApiAuthRouteWithChildren
   '/api/auth-check': typeof ApiAuthCheckRoute
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/claude-config': typeof ApiClaudeConfigRoute
@@ -1061,11 +1165,17 @@ export interface FileRoutesByFullPath {
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/usage': typeof ApiUsageRoute
   '/api/workspace': typeof ApiWorkspaceRoute
+  '/api/workspaces': typeof ApiWorkspacesRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/artifacts/$artifactId': typeof ApiArtifactsArtifactIdRoute
+  '/api/auth/change-password': typeof ApiAuthChangePasswordRoute
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/auth/me': typeof ApiAuthMeRoute
+  '/api/auth/setup': typeof ApiAuthSetupRoute
   '/api/claude-jobs/$jobId': typeof ApiClaudeJobsJobIdRoute
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
@@ -1113,15 +1223,26 @@ export interface FileRoutesByFullPath {
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
+  '/api/workspaces/$id': typeof ApiWorkspacesIdRouteWithChildren
   '/predict/$projectId/build': typeof PredictProjectIdBuildRoute
   '/predict/$reportId/chat': typeof PredictReportIdChatRoute
   '/predict/$reportId/report': typeof PredictReportIdReportRoute
   '/predict/$simulationId/run': typeof PredictSimulationIdRunRoute
   '/preview/$runId/$': typeof PreviewRunIdSplatRoute
+  '/api/invites/$token/accept': typeof ApiInvitesTokenAcceptRoute
+  '/api/invites/$token/info': typeof ApiInvitesTokenInfoRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/users/$id/disable': typeof ApiUsersIdDisableRoute
+  '/api/users/$id/enable': typeof ApiUsersIdEnableRoute
+  '/api/users/$id/password-reset': typeof ApiUsersIdPasswordResetRoute
+  '/api/workspaces/$id/invites': typeof ApiWorkspacesIdInvitesRouteWithChildren
+  '/api/workspaces/$id/members': typeof ApiWorkspacesIdMembersRouteWithChildren
+  '/api/workspaces/$id/switch': typeof ApiWorkspacesIdSwitchRoute
+  '/api/workspaces/$id/invites/$token': typeof ApiWorkspacesIdInvitesTokenRoute
+  '/api/workspaces/$id/members/$uid': typeof ApiWorkspacesIdMembersUidRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -1147,7 +1268,7 @@ export interface FileRoutesByTo {
   '/usage': typeof UsageRoute
   '/world': typeof WorldRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
-  '/api/auth': typeof ApiAuthRoute
+  '/api/auth': typeof ApiAuthRouteWithChildren
   '/api/auth-check': typeof ApiAuthCheckRoute
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/claude-config': typeof ApiClaudeConfigRoute
@@ -1220,11 +1341,17 @@ export interface FileRoutesByTo {
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/usage': typeof ApiUsageRoute
   '/api/workspace': typeof ApiWorkspaceRoute
+  '/api/workspaces': typeof ApiWorkspacesRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat': typeof ChatIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/api/artifacts/$artifactId': typeof ApiArtifactsArtifactIdRoute
+  '/api/auth/change-password': typeof ApiAuthChangePasswordRoute
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/auth/me': typeof ApiAuthMeRoute
+  '/api/auth/setup': typeof ApiAuthSetupRoute
   '/api/claude-jobs/$jobId': typeof ApiClaudeJobsJobIdRoute
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
@@ -1272,15 +1399,26 @@ export interface FileRoutesByTo {
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
+  '/api/workspaces/$id': typeof ApiWorkspacesIdRouteWithChildren
   '/predict/$projectId/build': typeof PredictProjectIdBuildRoute
   '/predict/$reportId/chat': typeof PredictReportIdChatRoute
   '/predict/$reportId/report': typeof PredictReportIdReportRoute
   '/predict/$simulationId/run': typeof PredictSimulationIdRunRoute
   '/preview/$runId/$': typeof PreviewRunIdSplatRoute
+  '/api/invites/$token/accept': typeof ApiInvitesTokenAcceptRoute
+  '/api/invites/$token/info': typeof ApiInvitesTokenInfoRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/users/$id/disable': typeof ApiUsersIdDisableRoute
+  '/api/users/$id/enable': typeof ApiUsersIdEnableRoute
+  '/api/users/$id/password-reset': typeof ApiUsersIdPasswordResetRoute
+  '/api/workspaces/$id/invites': typeof ApiWorkspacesIdInvitesRouteWithChildren
+  '/api/workspaces/$id/members': typeof ApiWorkspacesIdMembersRouteWithChildren
+  '/api/workspaces/$id/switch': typeof ApiWorkspacesIdSwitchRoute
+  '/api/workspaces/$id/invites/$token': typeof ApiWorkspacesIdInvitesTokenRoute
+  '/api/workspaces/$id/members/$uid': typeof ApiWorkspacesIdMembersUidRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -1308,7 +1446,7 @@ export interface FileRoutesById {
   '/usage': typeof UsageRoute
   '/world': typeof WorldRoute
   '/api/artifacts': typeof ApiArtifactsRouteWithChildren
-  '/api/auth': typeof ApiAuthRoute
+  '/api/auth': typeof ApiAuthRouteWithChildren
   '/api/auth-check': typeof ApiAuthCheckRoute
   '/api/chat-events': typeof ApiChatEventsRoute
   '/api/claude-config': typeof ApiClaudeConfigRoute
@@ -1381,11 +1519,17 @@ export interface FileRoutesById {
   '/api/terminal-stream': typeof ApiTerminalStreamRoute
   '/api/usage': typeof ApiUsageRoute
   '/api/workspace': typeof ApiWorkspaceRoute
+  '/api/workspaces': typeof ApiWorkspacesRouteWithChildren
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/chat/': typeof ChatIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/artifacts/$artifactId': typeof ApiArtifactsArtifactIdRoute
+  '/api/auth/change-password': typeof ApiAuthChangePasswordRoute
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/auth/me': typeof ApiAuthMeRoute
+  '/api/auth/setup': typeof ApiAuthSetupRoute
   '/api/claude-jobs/$jobId': typeof ApiClaudeJobsJobIdRoute
   '/api/claude-proxy/$': typeof ApiClaudeProxySplatRoute
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
@@ -1433,15 +1577,26 @@ export interface FileRoutesById {
   '/api/update/agent': typeof ApiUpdateAgentRoute
   '/api/update/status': typeof ApiUpdateStatusRoute
   '/api/update/workspace': typeof ApiUpdateWorkspaceRoute
+  '/api/workspaces/$id': typeof ApiWorkspacesIdRouteWithChildren
   '/predict/$projectId/build': typeof PredictProjectIdBuildRoute
   '/predict/$reportId/chat': typeof PredictReportIdChatRoute
   '/predict/$reportId/report': typeof PredictReportIdReportRoute
   '/predict/$simulationId/run': typeof PredictSimulationIdRunRoute
   '/preview/$runId/$': typeof PreviewRunIdSplatRoute
+  '/api/invites/$token/accept': typeof ApiInvitesTokenAcceptRoute
+  '/api/invites/$token/info': typeof ApiInvitesTokenInfoRoute
   '/api/mcp/$name/logs': typeof ApiMcpNameLogsRoute
   '/api/mcp/hub-sources/$id': typeof ApiMcpHubSourcesIdRoute
   '/api/sessions/$sessionKey/active-run': typeof ApiSessionsSessionKeyActiveRunRoute
   '/api/sessions/$sessionKey/status': typeof ApiSessionsSessionKeyStatusRoute
+  '/api/users/$id/disable': typeof ApiUsersIdDisableRoute
+  '/api/users/$id/enable': typeof ApiUsersIdEnableRoute
+  '/api/users/$id/password-reset': typeof ApiUsersIdPasswordResetRoute
+  '/api/workspaces/$id/invites': typeof ApiWorkspacesIdInvitesRouteWithChildren
+  '/api/workspaces/$id/members': typeof ApiWorkspacesIdMembersRouteWithChildren
+  '/api/workspaces/$id/switch': typeof ApiWorkspacesIdSwitchRoute
+  '/api/workspaces/$id/invites/$token': typeof ApiWorkspacesIdInvitesTokenRoute
+  '/api/workspaces/$id/members/$uid': typeof ApiWorkspacesIdMembersUidRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1543,11 +1698,17 @@ export interface FileRouteTypes {
     | '/api/terminal-stream'
     | '/api/usage'
     | '/api/workspace'
+    | '/api/workspaces'
     | '/chat/$sessionKey'
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
     | '/api/artifacts/$artifactId'
+    | '/api/auth/change-password'
+    | '/api/auth/login'
+    | '/api/auth/logout'
+    | '/api/auth/me'
+    | '/api/auth/setup'
     | '/api/claude-jobs/$jobId'
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
@@ -1595,15 +1756,26 @@ export interface FileRouteTypes {
     | '/api/update/agent'
     | '/api/update/status'
     | '/api/update/workspace'
+    | '/api/workspaces/$id'
     | '/predict/$projectId/build'
     | '/predict/$reportId/chat'
     | '/predict/$reportId/report'
     | '/predict/$simulationId/run'
     | '/preview/$runId/$'
+    | '/api/invites/$token/accept'
+    | '/api/invites/$token/info'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
+    | '/api/users/$id/disable'
+    | '/api/users/$id/enable'
+    | '/api/users/$id/password-reset'
+    | '/api/workspaces/$id/invites'
+    | '/api/workspaces/$id/members'
+    | '/api/workspaces/$id/switch'
+    | '/api/workspaces/$id/invites/$token'
+    | '/api/workspaces/$id/members/$uid'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1702,11 +1874,17 @@ export interface FileRouteTypes {
     | '/api/terminal-stream'
     | '/api/usage'
     | '/api/workspace'
+    | '/api/workspaces'
     | '/chat/$sessionKey'
     | '/settings/providers'
     | '/chat'
     | '/settings'
     | '/api/artifacts/$artifactId'
+    | '/api/auth/change-password'
+    | '/api/auth/login'
+    | '/api/auth/logout'
+    | '/api/auth/me'
+    | '/api/auth/setup'
     | '/api/claude-jobs/$jobId'
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
@@ -1754,15 +1932,26 @@ export interface FileRouteTypes {
     | '/api/update/agent'
     | '/api/update/status'
     | '/api/update/workspace'
+    | '/api/workspaces/$id'
     | '/predict/$projectId/build'
     | '/predict/$reportId/chat'
     | '/predict/$reportId/report'
     | '/predict/$simulationId/run'
     | '/preview/$runId/$'
+    | '/api/invites/$token/accept'
+    | '/api/invites/$token/info'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
+    | '/api/users/$id/disable'
+    | '/api/users/$id/enable'
+    | '/api/users/$id/password-reset'
+    | '/api/workspaces/$id/invites'
+    | '/api/workspaces/$id/members'
+    | '/api/workspaces/$id/switch'
+    | '/api/workspaces/$id/invites/$token'
+    | '/api/workspaces/$id/members/$uid'
   id:
     | '__root__'
     | '/'
@@ -1862,11 +2051,17 @@ export interface FileRouteTypes {
     | '/api/terminal-stream'
     | '/api/usage'
     | '/api/workspace'
+    | '/api/workspaces'
     | '/chat/$sessionKey'
     | '/settings/providers'
     | '/chat/'
     | '/settings/'
     | '/api/artifacts/$artifactId'
+    | '/api/auth/change-password'
+    | '/api/auth/login'
+    | '/api/auth/logout'
+    | '/api/auth/me'
+    | '/api/auth/setup'
     | '/api/claude-jobs/$jobId'
     | '/api/claude-proxy/$'
     | '/api/claude-tasks/$taskId'
@@ -1914,15 +2109,26 @@ export interface FileRouteTypes {
     | '/api/update/agent'
     | '/api/update/status'
     | '/api/update/workspace'
+    | '/api/workspaces/$id'
     | '/predict/$projectId/build'
     | '/predict/$reportId/chat'
     | '/predict/$reportId/report'
     | '/predict/$simulationId/run'
     | '/preview/$runId/$'
+    | '/api/invites/$token/accept'
+    | '/api/invites/$token/info'
     | '/api/mcp/$name/logs'
     | '/api/mcp/hub-sources/$id'
     | '/api/sessions/$sessionKey/active-run'
     | '/api/sessions/$sessionKey/status'
+    | '/api/users/$id/disable'
+    | '/api/users/$id/enable'
+    | '/api/users/$id/password-reset'
+    | '/api/workspaces/$id/invites'
+    | '/api/workspaces/$id/members'
+    | '/api/workspaces/$id/switch'
+    | '/api/workspaces/$id/invites/$token'
+    | '/api/workspaces/$id/members/$uid'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1950,7 +2156,7 @@ export interface RootRouteChildren {
   UsageRoute: typeof UsageRoute
   WorldRoute: typeof WorldRoute
   ApiArtifactsRoute: typeof ApiArtifactsRouteWithChildren
-  ApiAuthRoute: typeof ApiAuthRoute
+  ApiAuthRoute: typeof ApiAuthRouteWithChildren
   ApiAuthCheckRoute: typeof ApiAuthCheckRoute
   ApiChatEventsRoute: typeof ApiChatEventsRoute
   ApiClaudeConfigRoute: typeof ApiClaudeConfigRoute
@@ -2023,6 +2229,7 @@ export interface RootRouteChildren {
   ApiTerminalStreamRoute: typeof ApiTerminalStreamRoute
   ApiUsageRoute: typeof ApiUsageRoute
   ApiWorkspaceRoute: typeof ApiWorkspaceRoute
+  ApiWorkspacesRoute: typeof ApiWorkspacesRouteWithChildren
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
   ChatIndexRoute: typeof ChatIndexRoute
   ApiClaudeProxySplatRoute: typeof ApiClaudeProxySplatRoute
@@ -2053,6 +2260,11 @@ export interface RootRouteChildren {
   ApiUpdateStatusRoute: typeof ApiUpdateStatusRoute
   ApiUpdateWorkspaceRoute: typeof ApiUpdateWorkspaceRoute
   PreviewRunIdSplatRoute: typeof PreviewRunIdSplatRoute
+  ApiInvitesTokenAcceptRoute: typeof ApiInvitesTokenAcceptRoute
+  ApiInvitesTokenInfoRoute: typeof ApiInvitesTokenInfoRoute
+  ApiUsersIdDisableRoute: typeof ApiUsersIdDisableRoute
+  ApiUsersIdEnableRoute: typeof ApiUsersIdEnableRoute
+  ApiUsersIdPasswordResetRoute: typeof ApiUsersIdPasswordResetRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -2244,6 +2456,13 @@ declare module '@tanstack/react-router' {
       path: '/chat/$sessionKey'
       fullPath: '/chat/$sessionKey'
       preLoaderRoute: typeof ChatSessionKeyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/workspaces': {
+      id: '/api/workspaces'
+      path: '/api/workspaces'
+      fullPath: '/api/workspaces'
+      preLoaderRoute: typeof ApiWorkspacesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/workspace': {
@@ -2799,6 +3018,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PredictProjectIdBuildRouteImport
       parentRoute: typeof PredictRoute
     }
+    '/api/workspaces/$id': {
+      id: '/api/workspaces/$id'
+      path: '/$id'
+      fullPath: '/api/workspaces/$id'
+      preLoaderRoute: typeof ApiWorkspacesIdRouteImport
+      parentRoute: typeof ApiWorkspacesRoute
+    }
     '/api/update/workspace': {
       id: '/api/update/workspace'
       path: '/api/update/workspace'
@@ -3128,12 +3354,89 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiClaudeJobsJobIdRouteImport
       parentRoute: typeof ApiClaudeJobsRoute
     }
+    '/api/auth/setup': {
+      id: '/api/auth/setup'
+      path: '/setup'
+      fullPath: '/api/auth/setup'
+      preLoaderRoute: typeof ApiAuthSetupRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/auth/me': {
+      id: '/api/auth/me'
+      path: '/me'
+      fullPath: '/api/auth/me'
+      preLoaderRoute: typeof ApiAuthMeRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/auth/logout': {
+      id: '/api/auth/logout'
+      path: '/logout'
+      fullPath: '/api/auth/logout'
+      preLoaderRoute: typeof ApiAuthLogoutRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/auth/login': {
+      id: '/api/auth/login'
+      path: '/login'
+      fullPath: '/api/auth/login'
+      preLoaderRoute: typeof ApiAuthLoginRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/auth/change-password': {
+      id: '/api/auth/change-password'
+      path: '/change-password'
+      fullPath: '/api/auth/change-password'
+      preLoaderRoute: typeof ApiAuthChangePasswordRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
     '/api/artifacts/$artifactId': {
       id: '/api/artifacts/$artifactId'
       path: '/$artifactId'
       fullPath: '/api/artifacts/$artifactId'
       preLoaderRoute: typeof ApiArtifactsArtifactIdRouteImport
       parentRoute: typeof ApiArtifactsRoute
+    }
+    '/api/workspaces/$id/switch': {
+      id: '/api/workspaces/$id/switch'
+      path: '/switch'
+      fullPath: '/api/workspaces/$id/switch'
+      preLoaderRoute: typeof ApiWorkspacesIdSwitchRouteImport
+      parentRoute: typeof ApiWorkspacesIdRoute
+    }
+    '/api/workspaces/$id/members': {
+      id: '/api/workspaces/$id/members'
+      path: '/members'
+      fullPath: '/api/workspaces/$id/members'
+      preLoaderRoute: typeof ApiWorkspacesIdMembersRouteImport
+      parentRoute: typeof ApiWorkspacesIdRoute
+    }
+    '/api/workspaces/$id/invites': {
+      id: '/api/workspaces/$id/invites'
+      path: '/invites'
+      fullPath: '/api/workspaces/$id/invites'
+      preLoaderRoute: typeof ApiWorkspacesIdInvitesRouteImport
+      parentRoute: typeof ApiWorkspacesIdRoute
+    }
+    '/api/users/$id/password-reset': {
+      id: '/api/users/$id/password-reset'
+      path: '/api/users/$id/password-reset'
+      fullPath: '/api/users/$id/password-reset'
+      preLoaderRoute: typeof ApiUsersIdPasswordResetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/users/$id/enable': {
+      id: '/api/users/$id/enable'
+      path: '/api/users/$id/enable'
+      fullPath: '/api/users/$id/enable'
+      preLoaderRoute: typeof ApiUsersIdEnableRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/users/$id/disable': {
+      id: '/api/users/$id/disable'
+      path: '/api/users/$id/disable'
+      fullPath: '/api/users/$id/disable'
+      preLoaderRoute: typeof ApiUsersIdDisableRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/sessions/$sessionKey/status': {
       id: '/api/sessions/$sessionKey/status'
@@ -3162,6 +3465,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/mcp/$name/logs'
       preLoaderRoute: typeof ApiMcpNameLogsRouteImport
       parentRoute: typeof ApiMcpNameRoute
+    }
+    '/api/invites/$token/info': {
+      id: '/api/invites/$token/info'
+      path: '/api/invites/$token/info'
+      fullPath: '/api/invites/$token/info'
+      preLoaderRoute: typeof ApiInvitesTokenInfoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/invites/$token/accept': {
+      id: '/api/invites/$token/accept'
+      path: '/api/invites/$token/accept'
+      fullPath: '/api/invites/$token/accept'
+      preLoaderRoute: typeof ApiInvitesTokenAcceptRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/workspaces/$id/members/$uid': {
+      id: '/api/workspaces/$id/members/$uid'
+      path: '/$uid'
+      fullPath: '/api/workspaces/$id/members/$uid'
+      preLoaderRoute: typeof ApiWorkspacesIdMembersUidRouteImport
+      parentRoute: typeof ApiWorkspacesIdMembersRoute
+    }
+    '/api/workspaces/$id/invites/$token': {
+      id: '/api/workspaces/$id/invites/$token'
+      path: '/$token'
+      fullPath: '/api/workspaces/$id/invites/$token'
+      preLoaderRoute: typeof ApiWorkspacesIdInvitesTokenRouteImport
+      parentRoute: typeof ApiWorkspacesIdInvitesRoute
     }
   }
 }
@@ -3208,6 +3539,25 @@ const ApiArtifactsRouteChildren: ApiArtifactsRouteChildren = {
 const ApiArtifactsRouteWithChildren = ApiArtifactsRoute._addFileChildren(
   ApiArtifactsRouteChildren,
 )
+
+interface ApiAuthRouteChildren {
+  ApiAuthChangePasswordRoute: typeof ApiAuthChangePasswordRoute
+  ApiAuthLoginRoute: typeof ApiAuthLoginRoute
+  ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
+  ApiAuthMeRoute: typeof ApiAuthMeRoute
+  ApiAuthSetupRoute: typeof ApiAuthSetupRoute
+}
+
+const ApiAuthRouteChildren: ApiAuthRouteChildren = {
+  ApiAuthChangePasswordRoute: ApiAuthChangePasswordRoute,
+  ApiAuthLoginRoute: ApiAuthLoginRoute,
+  ApiAuthLogoutRoute: ApiAuthLogoutRoute,
+  ApiAuthMeRoute: ApiAuthMeRoute,
+  ApiAuthSetupRoute: ApiAuthSetupRoute,
+}
+
+const ApiAuthRouteWithChildren =
+  ApiAuthRoute._addFileChildren(ApiAuthRouteChildren)
 
 interface ApiClaudeJobsRouteChildren {
   ApiClaudeJobsJobIdRoute: typeof ApiClaudeJobsJobIdRoute
@@ -3354,6 +3704,62 @@ const ApiSwarmMemoryRouteWithChildren = ApiSwarmMemoryRoute._addFileChildren(
   ApiSwarmMemoryRouteChildren,
 )
 
+interface ApiWorkspacesIdInvitesRouteChildren {
+  ApiWorkspacesIdInvitesTokenRoute: typeof ApiWorkspacesIdInvitesTokenRoute
+}
+
+const ApiWorkspacesIdInvitesRouteChildren: ApiWorkspacesIdInvitesRouteChildren =
+  {
+    ApiWorkspacesIdInvitesTokenRoute: ApiWorkspacesIdInvitesTokenRoute,
+  }
+
+const ApiWorkspacesIdInvitesRouteWithChildren =
+  ApiWorkspacesIdInvitesRoute._addFileChildren(
+    ApiWorkspacesIdInvitesRouteChildren,
+  )
+
+interface ApiWorkspacesIdMembersRouteChildren {
+  ApiWorkspacesIdMembersUidRoute: typeof ApiWorkspacesIdMembersUidRoute
+}
+
+const ApiWorkspacesIdMembersRouteChildren: ApiWorkspacesIdMembersRouteChildren =
+  {
+    ApiWorkspacesIdMembersUidRoute: ApiWorkspacesIdMembersUidRoute,
+  }
+
+const ApiWorkspacesIdMembersRouteWithChildren =
+  ApiWorkspacesIdMembersRoute._addFileChildren(
+    ApiWorkspacesIdMembersRouteChildren,
+  )
+
+interface ApiWorkspacesIdRouteChildren {
+  ApiWorkspacesIdInvitesRoute: typeof ApiWorkspacesIdInvitesRouteWithChildren
+  ApiWorkspacesIdMembersRoute: typeof ApiWorkspacesIdMembersRouteWithChildren
+  ApiWorkspacesIdSwitchRoute: typeof ApiWorkspacesIdSwitchRoute
+}
+
+const ApiWorkspacesIdRouteChildren: ApiWorkspacesIdRouteChildren = {
+  ApiWorkspacesIdInvitesRoute: ApiWorkspacesIdInvitesRouteWithChildren,
+  ApiWorkspacesIdMembersRoute: ApiWorkspacesIdMembersRouteWithChildren,
+  ApiWorkspacesIdSwitchRoute: ApiWorkspacesIdSwitchRoute,
+}
+
+const ApiWorkspacesIdRouteWithChildren = ApiWorkspacesIdRoute._addFileChildren(
+  ApiWorkspacesIdRouteChildren,
+)
+
+interface ApiWorkspacesRouteChildren {
+  ApiWorkspacesIdRoute: typeof ApiWorkspacesIdRouteWithChildren
+}
+
+const ApiWorkspacesRouteChildren: ApiWorkspacesRouteChildren = {
+  ApiWorkspacesIdRoute: ApiWorkspacesIdRouteWithChildren,
+}
+
+const ApiWorkspacesRouteWithChildren = ApiWorkspacesRoute._addFileChildren(
+  ApiWorkspacesRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
@@ -3379,7 +3785,7 @@ const rootRouteChildren: RootRouteChildren = {
   UsageRoute: UsageRoute,
   WorldRoute: WorldRoute,
   ApiArtifactsRoute: ApiArtifactsRouteWithChildren,
-  ApiAuthRoute: ApiAuthRoute,
+  ApiAuthRoute: ApiAuthRouteWithChildren,
   ApiAuthCheckRoute: ApiAuthCheckRoute,
   ApiChatEventsRoute: ApiChatEventsRoute,
   ApiClaudeConfigRoute: ApiClaudeConfigRoute,
@@ -3452,6 +3858,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTerminalStreamRoute: ApiTerminalStreamRoute,
   ApiUsageRoute: ApiUsageRoute,
   ApiWorkspaceRoute: ApiWorkspaceRoute,
+  ApiWorkspacesRoute: ApiWorkspacesRouteWithChildren,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
   ChatIndexRoute: ChatIndexRoute,
   ApiClaudeProxySplatRoute: ApiClaudeProxySplatRoute,
@@ -3482,6 +3889,11 @@ const rootRouteChildren: RootRouteChildren = {
   ApiUpdateStatusRoute: ApiUpdateStatusRoute,
   ApiUpdateWorkspaceRoute: ApiUpdateWorkspaceRoute,
   PreviewRunIdSplatRoute: PreviewRunIdSplatRoute,
+  ApiInvitesTokenAcceptRoute: ApiInvitesTokenAcceptRoute,
+  ApiInvitesTokenInfoRoute: ApiInvitesTokenInfoRoute,
+  ApiUsersIdDisableRoute: ApiUsersIdDisableRoute,
+  ApiUsersIdEnableRoute: ApiUsersIdEnableRoute,
+  ApiUsersIdPasswordResetRoute: ApiUsersIdPasswordResetRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

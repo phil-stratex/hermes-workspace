@@ -4,37 +4,76 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   writeFileSync,
 } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
-/**
- * Persistent session token store.
- *
- * Tokens are held in memory for fast lookup and persisted to a JSON file
- * so they survive server restarts.  This is safe for single-instance
- * deployments.  For multi-worker setups the file becomes a race-condition
- * window — in that case replace with Redis or a database.
- *
- * File location: ~/.hermes/workspace-sessions.json
- */
-interface SessionStore {
-  tokens: Record<string, number> // token -> expiry unix-ms
+import { writeJsonAtomic, withMutex } from './atomic-write'
+import { getDataDir, getUserDir, isValidSlug } from './data-paths'
+import { assertSchemaVersion } from './json-schema-version'
+import { isMigrationCompleted } from './migration-marker'
+import {
+  getPasswordHash,
+  getUserProfile,
+  isUserLocked,
+  listUsers,
+  recordFailedLogin,
+  recordSuccessfulLogin,
+} from './users-store'
+import type { UserProfile } from './users-store'
+import { verifyPassword as bcryptVerify } from './auth-passwords'
+import { canDo } from './permissions'
+import { getMember, getWorkspaceMeta, isWorkspaceActive } from './workspace-store'
+import { appendAuditEvent } from './audit-log'
+import type { Action } from './permissions'
+
+// ──────────────────────────────────────────────────────────────────────
+// Modes
+//
+// Two parallel auth modes coexist during the rollout:
+//
+//   Legacy   — single HERMES_PASSWORD, no user identity. Used until
+//              the multi-tenant migration has run (`isMigrationCompleted()
+//              === false`). The original isAuthenticated() and the
+//              flat ~/.hermes/workspace-sessions.json store still work,
+//              so existing routes that haven't migrated keep working.
+//
+//   MultiTenant — email + bcrypt password. Tokens map to a userId.
+//              Active workspace is part of the user profile. This is
+//              the path taken once `isMigrationCompleted() === true`.
+//
+// L5 — `isAuthenticated`, `verifyPassword(password)`, `storeSessionToken`,
+//      `revokeSessionToken` are kept as @deprecated wrappers so the 178
+//      existing routes don't all have to flip on day one. New routes
+//      use `requireUser`/`requirePermission`/`requireWorkspaceMember`.
+//
+// D3 — Once `isMigrationCompleted() === true`, the legacy single-PW
+//      path stops accepting logins. HERMES_PASSWORD is migrated into
+//      the owner's bcrypt hash and then ignored.
+// ──────────────────────────────────────────────────────────────────────
+
+export function isMultiTenantAuthEnabled(): boolean {
+  return isMigrationCompleted()
 }
 
-const STORE_FILE = join(
+// ─── Legacy session store (pre-migration only) ────────────────────────
+
+interface LegacySessionStore {
+  tokens: Record<string, number>
+}
+
+const LEGACY_STORE_FILE = join(
   process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? join(homedir(), '.hermes'),
   'workspace-sessions.json',
 )
-const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
+const LEGACY_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000
 
-function loadStore(): SessionStore {
+function loadLegacyStore(): LegacySessionStore {
   try {
-    if (existsSync(STORE_FILE)) {
-      const raw = readFileSync(STORE_FILE, 'utf8')
-      const parsed = JSON.parse(raw) as SessionStore
-      // Expire any stale tokens on load
+    if (existsSync(LEGACY_STORE_FILE)) {
+      const parsed = JSON.parse(readFileSync(LEGACY_STORE_FILE, 'utf8')) as LegacySessionStore
       const now = Date.now()
       const valid: Record<string, number> = {}
       for (const [token, expiry] of Object.entries(parsed.tokens)) {
@@ -43,154 +82,209 @@ function loadStore(): SessionStore {
       return { tokens: valid }
     }
   } catch {
-    // Corrupt store — start fresh
+    // corrupt — start fresh
   }
   return { tokens: {} }
 }
 
-function saveStore(store: SessionStore): void {
+function saveLegacyStore(store: LegacySessionStore): void {
   try {
-    const dir = dirname(STORE_FILE)
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true, mode: 0o700 })
-    }
-    // Write with restrictive permissions — tokens are sensitive.
-    writeFileSync(STORE_FILE, JSON.stringify(store), { encoding: 'utf8', mode: 0o600 })
-    // Enforce 0600 even if the file already existed with looser perms.
+    const dir = dirname(LEGACY_STORE_FILE)
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 })
+    writeFileSync(LEGACY_STORE_FILE, JSON.stringify(store), { encoding: 'utf8', mode: 0o600 })
     try {
-      chmodSync(STORE_FILE, 0o600)
+      chmodSync(LEGACY_STORE_FILE, 0o600)
     } catch {
-      // chmod is best-effort (e.g. Windows) — ignore failures.
+      // best-effort
     }
   } catch {
-    // Non-fatal — tokens are still in memory.
-    console.warn(`[auth] Failed to persist session store to ${STORE_FILE}`)
+    console.warn(`[auth] Failed to persist legacy session store to ${LEGACY_STORE_FILE}`)
   }
 }
 
-// In-memory working copy
-const _tokens: Map<string, number> = new Map()
-
-// Hydrate from disk on module load
-const initial = loadStore()
-for (const [token, expiry] of Object.entries(initial.tokens)) {
-  _tokens.set(token, expiry)
+const _legacyTokens = new Map<string, number>()
+{
+  const initial = loadLegacyStore()
+  for (const [t, e] of Object.entries(initial.tokens)) _legacyTokens.set(t, e)
 }
 
-/**
- * Prune expired tokens from the store (called on every write + a periodic sweep).
- */
-function _prune(): void {
+function legacyPersist(): void {
+  saveLegacyStore({ tokens: Object.fromEntries(_legacyTokens) })
+}
+
+setInterval(() => {
   const now = Date.now()
   let changed = false
-  for (const [token, expiry] of _tokens) {
-    if (expiry <= now) {
-      _tokens.delete(token)
+  for (const [t, e] of _legacyTokens) {
+    if (e <= now) {
+      _legacyTokens.delete(t)
       changed = true
     }
   }
-  if (changed) _persist()
+  if (changed) legacyPersist()
+}, 10 * 60 * 1000)
+
+// ─── Multi-tenant session store (post-migration) ──────────────────────
+
+export const USER_SESSIONS_SCHEMA_VERSION = 1
+const USER_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000
+
+export type UserSessionRecord = {
+  token: string
+  issuedAt: string
+  expiresAt: string
+  userAgent?: string
+  ip?: string
 }
 
-function _persist(): void {
-  const store: SessionStore = { tokens: Object.fromEntries(_tokens) }
-  saveStore(store)
+export type UserSessions = {
+  schemaVersion: 1
+  sessions: Array<UserSessionRecord>
 }
 
-// Sweep expired tokens every 10 minutes
-setInterval(_prune, 10 * 60 * 1000)
+function userSessionsPath(userId: string): string {
+  return join(getUserDir(userId), 'auth', 'sessions.json')
+}
+
+function userSessionsMutex(userId: string): string {
+  return `user-sessions:${userId}`
+}
+
+function readUserSessions(userId: string): UserSessions {
+  const path = userSessionsPath(userId)
+  if (!existsSync(path)) return { schemaVersion: 1, sessions: [] }
+  try {
+    const raw = JSON.parse(readFileSync(path, 'utf8'))
+    return assertSchemaVersion<UserSessions>(raw, 1, path)
+  } catch {
+    return { schemaVersion: 1, sessions: [] }
+  }
+}
 
 /**
- * Generate a cryptographically secure session token.
+ * Token → userId in-memory index for O(1) auth checks (Plan AK26: p99
+ * < 5 ms at 1000 tokens). Hydrated from disk on first access.
  */
+const _tokenIndex = new Map<string, { userId: string; expiresAt: number }>()
+let _tokenIndexHydrated = false
+
+function hydrateTokenIndex(): void {
+  if (_tokenIndexHydrated) return
+  const usersRoot = join(getDataDir(), 'users')
+  if (existsSync(usersRoot)) {
+    for (const userId of listUsers()) {
+      const sessions = readUserSessions(userId)
+      const now = Date.now()
+      for (const s of sessions.sessions) {
+        const expiresAt = new Date(s.expiresAt).getTime()
+        if (expiresAt > now) {
+          _tokenIndex.set(s.token, { userId, expiresAt })
+        }
+      }
+    }
+  }
+  _tokenIndexHydrated = true
+}
+
+/**
+ * Test-only: drop all in-memory index state. Lets a fixture-using test
+ * start with a known clean index per case.
+ */
+export function _resetAuthIndexForTests(): void {
+  _tokenIndex.clear()
+  _tokenIndexHydrated = false
+  _legacyTokens.clear()
+  // Suppress unused warning for readdirSync (kept for symmetry / future use)
+  void readdirSync
+}
+
+// ─── Public token API (multi-tenant) ──────────────────────────────────
+
 export function generateSessionToken(): string {
   return randomBytes(32).toString('hex')
 }
 
-/**
- * Store a session token as valid (30-day TTL).
- */
-export function storeSessionToken(token: string): void {
-  _tokens.set(token, Date.now() + TOKEN_TTL_MS)
-  _persist()
+export type IssueTokenInput = {
+  userId: string
+  ip?: string
+  userAgent?: string
 }
 
-/**
- * Check if a session token is valid and not expired.
- */
-export function isValidSessionToken(token: string): boolean {
-  const expiry = _tokens.get(token)
-  if (expiry === undefined) return false
-  if (expiry <= Date.now()) {
-    _tokens.delete(token)
-    _persist()
-    return false
+export async function issueUserSessionToken(input: IssueTokenInput): Promise<string> {
+  if (!isValidSlug(input.userId)) {
+    throw new Error(`[auth] invalid userId: ${JSON.stringify(input.userId)}`)
   }
-  return true
-}
-
-/**
- * Remove a session token (logout).
- */
-export function revokeSessionToken(token: string): void {
-  _tokens.delete(token)
-  _persist()
-}
-
-/**
- * Resolve the configured workspace password.
- *
- * Honors HERMES_PASSWORD first (current name, post-rename) and falls back to
- * CLAUDE_PASSWORD for back-compat with deployments configured pre-rename.
- */
-function getConfiguredPassword(): string {
-  const fromHermes = process.env.HERMES_PASSWORD
-  if (fromHermes && fromHermes.length > 0) return fromHermes
-  const fromClaude = process.env.CLAUDE_PASSWORD
-  if (fromClaude && fromClaude.length > 0) return fromClaude
-  return ''
-}
-
-/**
- * Check if password protection is enabled.
- */
-export function isPasswordProtectionEnabled(): boolean {
-  return getConfiguredPassword().length > 0
-}
-
-/**
- * Verify password using timing-safe comparison.
- */
-export function verifyPassword(password: string): boolean {
-  const configured = getConfiguredPassword()
-  if (!configured || configured.length === 0) {
-    return false
+  const token = generateSessionToken()
+  const now = Date.now()
+  const expiresAt = now + USER_TOKEN_TTL_MS
+  const record: UserSessionRecord = {
+    token,
+    issuedAt: new Date(now).toISOString(),
+    expiresAt: new Date(expiresAt).toISOString(),
+    userAgent: input.userAgent,
+    ip: input.ip,
   }
-
-  // Timing-safe comparison
-  const passwordBuf = Buffer.from(password, 'utf8')
-  const configuredBuf = Buffer.from(configured, 'utf8')
-
-  // If lengths differ, still do a comparison to avoid timing leak
-  if (passwordBuf.length !== configuredBuf.length) {
-    return false
-  }
-
-  try {
-    return timingSafeEqual(passwordBuf, configuredBuf)
-  } catch {
-    return false
-  }
+  await withMutex(userSessionsMutex(input.userId), async () => {
+    const current = readUserSessions(input.userId)
+    const next: UserSessions = {
+      schemaVersion: 1,
+      sessions: [
+        ...current.sessions.filter((s) => new Date(s.expiresAt).getTime() > now),
+        record,
+      ],
+    }
+    mkdirSync(dirname(userSessionsPath(input.userId)), { recursive: true })
+    writeJsonAtomic(userSessionsPath(input.userId), next)
+  })
+  hydrateTokenIndex()
+  _tokenIndex.set(token, { userId: input.userId, expiresAt })
+  return token
 }
 
-/**
- * Extract session token from cookie header.
- */
-export function getSessionTokenFromCookie(
-  cookieHeader: string | null,
-): string | null {
+export async function revokeUserSessionToken(token: string): Promise<void> {
+  hydrateTokenIndex()
+  const entry = _tokenIndex.get(token)
+  if (!entry) return
+  _tokenIndex.delete(token)
+  await withMutex(userSessionsMutex(entry.userId), async () => {
+    const current = readUserSessions(entry.userId)
+    const next: UserSessions = {
+      schemaVersion: 1,
+      sessions: current.sessions.filter((s) => s.token !== token),
+    }
+    writeJsonAtomic(userSessionsPath(entry.userId), next)
+  })
+}
+
+export async function revokeAllUserSessionTokens(userId: string): Promise<void> {
+  if (!isValidSlug(userId)) return
+  hydrateTokenIndex()
+  for (const [t, entry] of _tokenIndex) {
+    if (entry.userId === userId) _tokenIndex.delete(t)
+  }
+  await withMutex(userSessionsMutex(userId), async () => {
+    const next: UserSessions = { schemaVersion: 1, sessions: [] }
+    if (existsSync(userSessionsPath(userId))) {
+      writeJsonAtomic(userSessionsPath(userId), next)
+    }
+  })
+}
+
+export function lookupUserIdByToken(token: string): string | null {
+  hydrateTokenIndex()
+  const entry = _tokenIndex.get(token)
+  if (!entry) return null
+  if (Date.now() > entry.expiresAt) {
+    _tokenIndex.delete(token)
+    return null
+  }
+  return entry.userId
+}
+
+// ─── Cookie + IP helpers (carried over from legacy) ───────────────────
+
+export function getSessionTokenFromCookie(cookieHeader: string | null): string | null {
   if (!cookieHeader) return null
-
   const cookies = cookieHeader.split(';').map((c) => c.trim())
   for (const cookie of cookies) {
     if (cookie.startsWith('claude-auth=')) {
@@ -200,23 +294,11 @@ export function getSessionTokenFromCookie(
   return null
 }
 
-/**
- * Whether the workspace is configured to trust proxy-forwarded headers
- * (`x-forwarded-for`, `x-real-ip`). Off by default — enabled explicitly when
- * deployed behind a trusted reverse proxy (Traefik, Nginx, Cloudflare).
- * See #125.
- */
 function isTrustedProxyEnabled(): boolean {
   const v = (process.env.TRUST_PROXY || '').trim().toLowerCase()
   return v === '1' || v === 'true' || v === 'yes'
 }
 
-/**
- * Best-effort extraction of the peer IP, preferring the actual socket
- * address when available. Forwarded headers are only honored when
- * TRUST_PROXY is set — otherwise a client-controlled `x-forwarded-for`
- * could spoof local classification (#125).
- */
 export function getRequestIp(request: Request): string {
   if (isTrustedProxyEnabled()) {
     const forwarded = request.headers.get('x-forwarded-for')
@@ -225,12 +307,7 @@ export function getRequestIp(request: Request): string {
     const real = request.headers.get('x-real-ip')?.trim()
     if (real) return real
   }
-  // Node's Request does not expose the socket; the adapter that constructs it
-  // (TanStack Start / undici) may attach `remoteAddress` under a well-known
-  // symbol. Fall back to loopback when nothing is available so we fail *safe*
-  // (no LAN/Tailscale bypass for unknown peers).
-  const maybeAddress = (request as unknown as { remoteAddress?: string })
-    .remoteAddress
+  const maybeAddress = (request as unknown as { remoteAddress?: string }).remoteAddress
   return (maybeAddress && maybeAddress.trim()) || '127.0.0.1'
 }
 
@@ -238,51 +315,12 @@ function isLocalRequest(request: Request): boolean {
   const ip = getRequestIp(request)
   const localIPs = ['127.0.0.1', '::1', 'localhost', '::ffff:127.0.0.1']
   if (localIPs.includes(ip)) return true
-  // Allow Tailscale (100.x.x.x) and private LAN ranges
   if (/^100\.\d+\.\d+\.\d+$/.test(ip)) return true
   if (/^192\.168\./.test(ip)) return true
   if (/^10\./.test(ip)) return true
   return false
 }
 
-/**
- * Check if the request is authenticated.
- * Returns true if:
- * - Password protection is disabled, OR
- * - Request has a valid session token
- */
-export function isAuthenticated(request: Request): boolean {
-  // No password configured? No auth needed
-  if (!isPasswordProtectionEnabled()) {
-    return true
-  }
-
-  // Check for valid session token
-  const cookieHeader = request.headers.get('cookie')
-  const token = getSessionTokenFromCookie(cookieHeader)
-
-  if (!token) {
-    return false
-  }
-
-  return isValidSessionToken(token)
-}
-
-export function requireLocalOrAuth(request: Request): boolean {
-  if (!isPasswordProtectionEnabled()) {
-    return isLocalRequest(request)
-  }
-
-  return isAuthenticated(request)
-}
-
-/**
- * Whether session cookies should set the `Secure` attribute.
- *
- * Defaults ON in production, OFF in development (so localhost-over-HTTP
- * login flows still work). Operators can override with
- * `COOKIE_SECURE=0` (force off) or `COOKIE_SECURE=1` (force on). See #123.
- */
 function shouldSetSecureCookie(): boolean {
   const override = (process.env.COOKIE_SECURE || '').trim().toLowerCase()
   if (override === '1' || override === 'true' || override === 'yes') return true
@@ -290,19 +328,280 @@ function shouldSetSecureCookie(): boolean {
   return process.env.NODE_ENV === 'production'
 }
 
-/**
- * Create a Set-Cookie header for the session token.
- *
- * Attributes:
- *   - HttpOnly    — blocks JS access, mitigates XSS session theft
- *   - Secure      — HTTPS only (production default, overridable)
- *   - SameSite=Strict — CSRF protection
- *   - Path=/      — available across the whole app
- *   - Max-Age     — 30 days
- */
 export function createSessionCookie(token: string): string {
   const attrs = ['HttpOnly']
   if (shouldSetSecureCookie()) attrs.push('Secure')
   attrs.push('SameSite=Strict', 'Path=/', `Max-Age=${30 * 24 * 60 * 60}`)
   return `claude-auth=${token}; ${attrs.join('; ')}`
+}
+
+export function clearSessionCookie(): string {
+  const attrs = ['HttpOnly']
+  if (shouldSetSecureCookie()) attrs.push('Secure')
+  attrs.push('SameSite=Strict', 'Path=/', 'Max-Age=0')
+  return `claude-auth=; ${attrs.join('; ')}`
+}
+
+// ─── Multi-tenant: login + permission helpers ─────────────────────────
+
+export type LoginResult =
+  | { ok: true; userId: string; token: string }
+  | { ok: false; reason: 'invalid-credentials' | 'locked' | 'disabled' | 'no-such-user' }
+
+/**
+ * Verify an email + password against the user store. Records the
+ * attempt (failure increments the lockout counter, success resets it
+ * and emits an audit event). Caller is responsible for setting the
+ * cookie via `createSessionCookie(result.token)`.
+ */
+export async function loginWithEmailPassword(
+  email: string,
+  plain: string,
+  ctx: { ip?: string; userAgent?: string } = {},
+): Promise<LoginResult> {
+  const normEmail = email.trim().toLowerCase()
+  // Lookup user by email — O(N) over users, fine at the scale we
+  // target (≤ a few hundred per stack).
+  const userId = listUsers().find((id) => {
+    const profile = getUserProfile(id)
+    return profile?.email.toLowerCase() === normEmail
+  })
+  if (!userId) {
+    await appendAuditEvent('global', {
+      type: 'login_failed',
+      reason: 'no-such-user',
+      email: normEmail,
+      ip: ctx.ip ?? 'unknown',
+      userAgent: ctx.userAgent,
+    })
+    return { ok: false, reason: 'no-such-user' }
+  }
+  const profile = getUserProfile(userId)!
+  if (profile.status === 'disabled') {
+    await appendAuditEvent('global', {
+      type: 'login_failed',
+      reason: 'disabled',
+      userId,
+      ip: ctx.ip ?? 'unknown',
+    })
+    return { ok: false, reason: 'disabled' }
+  }
+  if (isUserLocked(profile)) {
+    await appendAuditEvent('global', {
+      type: 'login_failed',
+      reason: 'locked',
+      userId,
+      ip: ctx.ip ?? 'unknown',
+    })
+    return { ok: false, reason: 'locked' }
+  }
+  const hash = getPasswordHash(userId)
+  const valid = hash ? await bcryptVerify(plain, hash) : false
+  if (!valid) {
+    await recordFailedLogin(userId)
+    await appendAuditEvent('global', {
+      type: 'login_failed',
+      reason: 'invalid-credentials',
+      userId,
+      ip: ctx.ip ?? 'unknown',
+      userAgent: ctx.userAgent,
+    })
+    return { ok: false, reason: 'invalid-credentials' }
+  }
+  await recordSuccessfulLogin(userId)
+  const token = await issueUserSessionToken({ userId, ip: ctx.ip, userAgent: ctx.userAgent })
+  await appendAuditEvent('global', {
+    type: 'login',
+    userId,
+    ip: ctx.ip ?? 'unknown',
+    userAgent: ctx.userAgent,
+  })
+  return { ok: true, userId, token }
+}
+
+export function getCurrentUser(request: Request): UserProfile | null {
+  if (!isMultiTenantAuthEnabled()) return null
+  const token = getSessionTokenFromCookie(request.headers.get('cookie'))
+  if (!token) return null
+  const userId = lookupUserIdByToken(token)
+  if (!userId) return null
+  return getUserProfile(userId)
+}
+
+export function getActiveWorkspace(request: Request): string | null {
+  const user = getCurrentUser(request)
+  if (!user) return null
+  return user.defaultWorkspaceId ?? null
+}
+
+// ─── Standard error responses ─────────────────────────────────────────
+
+const JSON_HEADERS = { 'Content-Type': 'application/json' } as const
+
+function jsonResponse(body: unknown, status: number): Response {
+  return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS })
+}
+
+const RES_UNAUTHORIZED = () =>
+  jsonResponse({ ok: false, error: 'Unauthorized' }, 401)
+const RES_FORBIDDEN = (reason?: string) =>
+  jsonResponse({ ok: false, error: 'Forbidden', reason }, 403)
+const RES_NOT_FOUND = () =>
+  jsonResponse({ ok: false, error: 'Not Found' }, 404)
+
+export type RequireResult<T> = { ok: true; value: T } | { ok: false; response: Response }
+
+/**
+ * Resolve the request to a logged-in user. Returns either the user or
+ * a ready-to-return 401 Response. Callers do:
+ *   const auth = requireUser(req); if (!auth.ok) return auth.response
+ */
+export function requireUser(request: Request): RequireResult<UserProfile> {
+  const user = getCurrentUser(request)
+  if (!user) return { ok: false, response: RES_UNAUTHORIZED() }
+  if (user.status !== 'active') return { ok: false, response: RES_FORBIDDEN('user-status:' + user.status) }
+  return { ok: true, value: user }
+}
+
+/**
+ * `requireUser` plus an existing-and-active workspace + member check.
+ * Returns 404 when the workspace is missing or soft-deleted (don't
+ * leak existence to non-members). Returns 403 when the user is not a
+ * member.
+ */
+export function requireWorkspaceMember(
+  request: Request,
+  wsId: string,
+): RequireResult<{ user: UserProfile; wsId: string }> {
+  const auth = requireUser(request)
+  if (!auth.ok) return auth
+  if (!isValidSlug(wsId)) return { ok: false, response: RES_NOT_FOUND() }
+  const meta = getWorkspaceMeta(wsId)
+  if (!isWorkspaceActive(meta)) return { ok: false, response: RES_NOT_FOUND() }
+  const member = getMember(wsId, auth.value.id)
+  if (!member) return { ok: false, response: RES_NOT_FOUND() }
+  return { ok: true, value: { user: auth.value, wsId } }
+}
+
+/**
+ * `requireWorkspaceMember` plus a `canDo()` check for `action`. The
+ * gold-standard guard for any mutating workspace endpoint.
+ */
+export function requirePermission(
+  request: Request,
+  wsId: string,
+  action: Action,
+): RequireResult<{ user: UserProfile; wsId: string }> {
+  const member = requireWorkspaceMember(request, wsId)
+  if (!member.ok) return member
+  if (!canDo(member.value.user.id, wsId, action)) {
+    return { ok: false, response: RES_FORBIDDEN(`action:${action}`) }
+  }
+  return member
+}
+
+// ─── Legacy helpers (DEPRECATED — kept for incremental route migration, L5) ──
+
+/**
+ * @deprecated Multi-tenant routes should use `lookupUserIdByToken` plus
+ * `requireUser`. Kept to keep pre-migration single-PW deployments
+ * working until every route has flipped to the new helpers. Once the
+ * migration marker is set, this function only checks the multi-tenant
+ * index.
+ */
+export function isValidSessionToken(token: string): boolean {
+  if (isMultiTenantAuthEnabled()) return lookupUserIdByToken(token) !== null
+  // Legacy path
+  const expiry = _legacyTokens.get(token)
+  if (expiry === undefined) return false
+  if (expiry <= Date.now()) {
+    _legacyTokens.delete(token)
+    legacyPersist()
+    return false
+  }
+  return true
+}
+
+/**
+ * @deprecated Use `issueUserSessionToken` (with a real userId) for new
+ * code. Kept so the legacy auth.ts route can keep accepting
+ * HERMES_PASSWORD logins until the migration runs.
+ */
+export function storeSessionToken(token: string): void {
+  if (isMultiTenantAuthEnabled()) {
+    throw new Error(
+      '[auth] storeSessionToken is legacy-only — call issueUserSessionToken with a userId',
+    )
+  }
+  _legacyTokens.set(token, Date.now() + LEGACY_TOKEN_TTL_MS)
+  legacyPersist()
+}
+
+/**
+ * @deprecated Use `revokeUserSessionToken` in multi-tenant code.
+ */
+export function revokeSessionToken(token: string): void {
+  if (isMultiTenantAuthEnabled()) {
+    void revokeUserSessionToken(token)
+    return
+  }
+  _legacyTokens.delete(token)
+  legacyPersist()
+}
+
+function getConfiguredPassword(): string {
+  // After the migration marker is set (D3), the env-password is dead —
+  // ignored even if still present in the environment. Recovery goes
+  // through the CLI tools (scripts/admin/reset-password.ts).
+  if (isMultiTenantAuthEnabled()) return ''
+  const fromHermes = process.env.HERMES_PASSWORD
+  if (fromHermes && fromHermes.length > 0) return fromHermes
+  const fromClaude = process.env.CLAUDE_PASSWORD
+  if (fromClaude && fromClaude.length > 0) return fromClaude
+  return ''
+}
+
+export function isPasswordProtectionEnabled(): boolean {
+  if (isMultiTenantAuthEnabled()) return true
+  return getConfiguredPassword().length > 0
+}
+
+/**
+ * @deprecated Single-arg, single-PW. Use `loginWithEmailPassword`. Once
+ * `isMultiTenantAuthEnabled()`, this always returns false.
+ */
+export function verifyPassword(password: string): boolean {
+  const configured = getConfiguredPassword()
+  if (!configured || configured.length === 0) return false
+  const passwordBuf = Buffer.from(password, 'utf8')
+  const configuredBuf = Buffer.from(configured, 'utf8')
+  if (passwordBuf.length !== configuredBuf.length) return false
+  try {
+    return timingSafeEqual(passwordBuf, configuredBuf)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * @deprecated Use `requireUser`. Returns true under the legacy PW flow
+ * (no user identity) or when a multi-tenant token is present and
+ * resolvable. Do NOT use as a permission check — it doesn't tell you
+ * who the user is.
+ */
+export function isAuthenticated(request: Request): boolean {
+  if (isMultiTenantAuthEnabled()) {
+    const token = getSessionTokenFromCookie(request.headers.get('cookie'))
+    if (!token) return false
+    return lookupUserIdByToken(token) !== null
+  }
+  if (!isPasswordProtectionEnabled()) return true
+  const token = getSessionTokenFromCookie(request.headers.get('cookie'))
+  if (!token) return false
+  return isValidSessionToken(token)
+}
+
+export function requireLocalOrAuth(request: Request): boolean {
+  if (!isPasswordProtectionEnabled()) return isLocalRequest(request)
+  return isAuthenticated(request)
 }

@@ -5,6 +5,63 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — Multi-Tenant Auth, Routes & CLI (Phase A.2/A.3, 2026-05-08)
+
+**Backend-Foundation (4 neue Module + erweiterte auth-middleware)**
+- **`src/server/invites-store.ts`** — Workspace-Invite-Tokens (one-shot, TTL 7d default, clamped 1–30d). Atomic File-per-Token unter `data/global/invites/<token>.json`. `consumeInvite()` flippt `used` + setzt `usedBy/usedAt`; `revokeInvite()` deletet pending Tokens (consumed bleiben für Audit). `sweepExpiredInvites()` als periodic cleanup.
+- **`src/server/pw-resets-store.ts`** — Password-Reset-Tokens in zwei Flavours: `temp-password` (admin-getriggert, 24h TTL) + `reset-link` (self-service, 1h TTL, ready für SMTP-Phase). Plaintext Temp-PW wird **nie** persistiert — nur Hash via `users-store.setPasswordHash`. Reset-Record bleibt für Forensics.
+- **`src/server/boot-state-check.ts`** — Plan-Finding **F1**: Drei-Zustände-Coherence-Check beim Boot. `assertCoherentBootState()` wirft mit Operator-Hinweis (`scripts/admin/repair-marker.ts`), wenn Users existieren aber weder Marker noch Manifest da sind. Verhindert dass der SetupWizard auf einem korrupten Stack einen zweiten Owner-Account anlegt.
+- **`src/server/auth-middleware.ts`** Drop-in-Replace (Plan-Finding **L5**): Token-Index in-memory `Map<token, {userId, expiresAt}>` für **AK26** (1000 Tokens, Lookup p99 <5 ms). Per-User Sessions-File `data/users/<id>/auth/sessions.json` mit `schemaVersion: 1`. Neue Helper: `requireUser`, `requireWorkspaceMember`, `requirePermission`, `getCurrentUser`, `getActiveWorkspace`, `loginWithEmailPassword`, `issueUserSessionToken`, `revokeUserSessionToken`, `revokeAllUserSessionTokens`. Legacy-Helper (`isAuthenticated`, `verifyPassword(pw)`, `storeSessionToken`, `revokeSessionToken`) bleiben als `@deprecated` Wrapper für inkrementelle Route-Migration. **Plan-Finding D3**: nach Migration-Marker wird `HERMES_PASSWORD` nicht mehr akzeptiert (`getConfiguredPassword` returnt `''`).
+- Login-Flow integriert Failed-Login-Counter (`recordFailedLogin`/`recordSuccessfulLogin`) + emittiert globale Audit-Events `login`, `login_failed` (mit Reason + IP + UserAgent — Plan-Finding **L7**).
+
+**Auth-API-Routes (5)**
+- **`POST /api/auth/login`** — Email + Password Login. Returnt 412 wenn Migration noch nicht gelaufen ist (Hinweis auf Legacy `/api/auth`). Constant-time-Delay bei Fehler. Issued Cookie via `createSessionCookie(token)`. Status: `423` für gesperrte Accounts, `403` für disabled, `401` für invalid-credentials/no-such-user.
+- **`POST /api/auth/logout`** — Token-Revocation, Audit-Event `logout`. `Set-Cookie: claude-auth=; Max-Age=0`.
+- **`GET /api/auth/me`** — Returnt User-Profil + `memberships[]` (alle aktiven Workspaces des Users mit Role + Branding) + `actions[]` für aktiven Workspace. Im Legacy-Modus returnt `{ user: null, mode: 'legacy' }` — Frontend kann darauf branchen.
+- **`POST /api/auth/setup`** — First-Run-Only SetupWizard. Refused mit 409 wenn Users existieren oder Marker valid ist. Erstellt Owner + ersten Workspace + addMember + writeMarker + Audit + Auto-Login.
+- **`POST /api/auth/change-password`** — Old-PW-Verify, neuer Hash, `mustChangePassword: false`, alte Tokens revoked, neuer Token issued. Audit-Event `password_changed`.
+
+**Invite-Routes (2 public + 2 admin)**
+- **`GET /api/invites/$token/info`** — public (kein Auth). Returnt minimale Info für `InviteAcceptScreen`. `valid: false` für malformed/expired/used/unknown Tokens — kein Existence-Leak.
+- **`POST /api/invites/$token/accept`** — public. Validiert Slug, refused 410 für ungültige Tokens, refused 409 wenn `userId` schon vergeben oder Member schon da. Atomic: consume → create user → setPasswordHash → addMember → updateProfile → audit → autoLogin.
+- **`GET/POST /api/workspaces/$id/invites`** — admin only (`members-manage`). POST mit Rate-Limit 10/min/Admin/IP, Audit-Event `invite_created`.
+- **`DELETE /api/workspaces/$id/invites/$token`** — admin only. Refused 404 wenn Token nicht zum Workspace gehört (kein Cross-WS-Existence-Leak). Audit `invite_revoked`.
+
+**Workspace-Routes (3)**
+- **`GET /api/workspaces`** — eigene Memberships (mit Role + Branding).
+- **`POST /api/workspaces`** — Caller wird Owner. Slug-Validation, Audit (global + ws-scope) `workspace_created`.
+- **`GET/PATCH/DELETE /api/workspaces/$id`** — GET 404 für Non-Member (F9). PATCH gated auf `workspace-settings`. DELETE = Soft-Delete (`workspace-delete` Action, nur Owner), Audit `workspace_deleted`.
+- **`POST /api/workspaces/$id/switch`** — setzt `defaultWorkspaceId` für den aktiven User.
+
+**Member-Routes (2)**
+- **`GET /api/workspaces/$id/members`** — admin only. Listet Members + Pending-Invites mit Diagnostik (lastLoginAt, failedLoginCount, lastFailedLoginAt, status).
+- **`PATCH /api/workspaces/$id/members/$uid`** — Role-Change. Promote-zu-Owner braucht zusätzlich `owner-handover` Action. Last-Owner-Demote-Schutz via `workspace-store.changeMemberRole`.
+- **`DELETE /api/workspaces/$id/members/$uid`** — entfernt Member. Two-Path-Modal-Support (Plan **D1**): `?sessions=transfer&transferTo=<uid>` oder `?sessions=delete`. Audit-Event mit `sessionsAction`.
+
+**User-Action-Routes (3)**
+- **`POST /api/users/$id/password-reset`** — Admin-only Temp-PW-Generation. Authority via `canDo(actor, sharedWS, 'user-pw-reset')` — Actor muss Admin/Owner in einem geteilten Workspace sein. Returns Plaintext-PW EINMAL, persistiert nur Hash. Revokes alle Tokens des Targets. Audit `pw_reset_temp` mit `viaWorkspace`. Rate-Limit 5/h.
+- **`POST /api/users/$id/{disable,enable}`** — Admin-only Status-Toggle. Disable revokes alle Tokens. Audit `user_disabled` / `user_enabled`.
+
+**CLI-Recovery-Tools (`scripts/admin/`)**
+- **`confirm-backup-done.ts`** — Pre-Flight für Migration: schreibt `.backup-confirmed` JSON mit `{confirmedAt, snapshotId, confirmedBy}`. 24h TTL. (Plan-Finding **L1**/**N6**)
+- **`confirm-multi-person-tag.ts`** — Bestätigung dass Multi-Person-Heuristik akzeptiert wird. (Plan-Finding **L2**)
+- **`reset-password.ts`** — Break-Glass: generiert Temp-PW, hashed, schreibt, revoked Tokens, druckt Plaintext auf STDOUT. (D3 Recovery)
+- **`promote-to-owner.ts`** — promotet User zu `owner`; addet Member wenn nicht schon drin.
+- **`list-users.ts`**, **`list-workspaces.ts`** — read-only JSON-Output für Operator-Inspektion.
+- **`repair-marker.ts`** — rekonstruiert `migration-completed.json` aus `migration-manifest.json`. Refused wenn Manifest fehlt. (Plan-Finding **F1**)
+- **`_audit.ts`** — Shared-Helper: jeder mutierende CLI-Tool emittiert `cli_<action>` Audit-Event mit `triggeredBy = SUDO_USER || os-user`. (Plan-Finding **F7**)
+- **`README.md`** — Operator-Doc mit `docker exec`-Aufruf-Pattern.
+
+**Test-Suite (5 Files, 70 Cases — alle grün, p99-Bench inkl.)**
+- `invites-store.test.ts` — 15 Cases (TTL-Clamping, Double-Consume-Refusal, Expiry, Slug-Validation, Sweep)
+- `pw-resets-store.test.ts` — 11 Cases (TTLs, Double-Consume, Expiry, Token-Format)
+- `boot-state-check.test.ts` — 5 Cases (alle 4 Drei-Zustände + Throw-on-inconsistent + Korrupter-Marker)
+- `auth-middleware.test.ts` — Erweitert von 8 auf 27 Cases. Inkl. **AK26** (1000 Tokens, p99 <5 ms, gemessen via `process.hrtime.bigint()`), Email-Case-Insensitivity, Failed-Login-Lockout, **L7** Audit (success+failed mit IP), `requireUser`/`requireWorkspaceMember`/`requirePermission` mit allen 401/403/404-Pfaden, **F9** Cross-Workspace-Isolation. Bestehende #123/#125-Tests bleiben unverändert.
+- `__tests__/auth-routes-flow.test.ts` — 12 E2E-Cases als Dünner-Wrapper-Smoke: SetupWizard-Flow, Multi-WS, Invite→Accept→Member, PW-Reset-Force-Change, 10×Failed-Login-Lockout, Soft-Delete-Reaction, F9-Isolation, Audit-Trail mit IPs, Slug-Rejection, Active-Workspace-Switch, Soft-Delete-Meta.
+
+### Changed
+- `src/routeTree.gen.ts` — auto-regenerated via `pnpm build`, 17 neue API-Routes registered (`/api/auth/{login,logout,me,setup,change-password}`, `/api/invites/$token/{info,accept}`, `/api/workspaces`, `/api/workspaces/$id` + `/switch` + `/members` + `/members/$uid` + `/invites` + `/invites/$token`, `/api/users/$id/{password-reset,disable,enable}`).
+
 ### Added — Multi-Workspace Stores & Permissions (Phase A.1, 2026-05-08)
 - **`src/server/audit-log.ts`** — Hash-chained JSONL Audit-Log mit zwei Scopes (`global` + `{ type: 'workspace', wsId }`). Jeder Eintrag carryt `prevHash` + `thisHash` (sha256 über sortierte Keys), die erste Zeile pro File startet mit `'0'.repeat(64)`. `readAuditChain()` rekomputet die Chain beim Read und gibt `brokenAt` + `breakReason` zurück, sobald ein Eintrag tampered wurde, eine Zeile fehlt oder eine Parse-Failure auftritt — Plan-Finding F10 (UI-Alert beim AuditViewer-Read). Alle Appends laufen via `withMutex` keyed auf den File-Pfad. System-Felder können nicht via Caller-Spread überschrieben werden.
 - **`src/server/auth-passwords.ts`** — bcrypt Hash/Verify via `bcryptjs` (pure JS, keine Native-Deps). Cost-Faktor konfigurierbar via `HERMES_BCRYPT_COST` (default 12, clamped auf [10, 14]). `verifyPassword` ist timing-safe und liefert `false` bei korrupten Hashes statt zu werfen. `getCostFromHash()` extrahiert den Cost für künftige Re-Hash-on-Login-Routine. `generateTempPassword()` für Admin PW-Reset (12 Chars, look-alike-freies Alphabet).
