@@ -5,6 +5,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed — CRITICAL: Multi-Tenant Privacy-Leak in `/api/session-status` & `/api/context-usage` (2026-05-09)
+
+**Symptom:** Im Multi-Tenant-Modus konnte jeder authentifizierte User per `?sessionKey=<fremder-id>` (oder `?sessionId=` für context-usage) Status, Token-Counts, Modell-ID UND Session-Label fremder Sessions abrufen. Beide Routes nutzten nur `requireAuthenticated` ohne Workspace-Scope-Check.
+
+**Andere Routes (z. B. `GET /api/sessions`) hatten den Filter** — via `filterVisibleSessions` + `readSessionsMeta` (`src/server/sessions-privacy.ts`). Diese zwei Routes waren übersehen worden bei Phase A.4 / Phase A.8 Refactors.
+
+**Fix:**
+
+1. **Neuer Helper `checkSessionVisibility(userId, sessionKey, meta)` in `src/server/sessions-privacy.ts`** — single-session-Variante des bestehenden `filterVisibleSessions`. Returnt strukturiertes Result `{kind: 'allow' | 'not-found' | 'forbidden'}` für saubere HTTP-Status-Mapping (404 fail-closed bei untagged, 403 bei foreign-owner-non-shared, allow bei owner-match oder workspace-shared). Audit-Sentinel `userId === '*'` returnt immer `allow`.
+
+2. **`src/routes/api/session-status.ts`** — `requireAuthenticated` → `requireWorkspaceAction(request, 'chat')`. Vor dem `getSession(sessionKey)`-Call: in Multi-Tenant-Mode (single-tenant skipped) Privacy-Check. **Local-Sessions (Ollama, Atomic Chat) werden vom Check ausgenommen** — sie leben im portable `local-session-store.json`, sind nicht in `sessions-meta.json` getagged (per Definition workspace-dir-scoped, nicht via Tag-System).
+
+3. **`src/routes/api/context-usage.ts`** — analog. Empty/synthetic `sessionId` skipped den Check (readContextUsage-Fallback returnt sowieso einen empty snapshot).
+
+4. **Tests:** 6 neue Cases in `src/server/sessions-privacy.test.ts` (alle grün, 22/22 Tests passed):
+   - Allow für Owner
+   - Allow für Workspace-Shared
+   - Forbidden für foreign-owner-non-shared
+   - Not-found für untagged (fail-closed)
+   - Audit-Sentinel `*` returnt allow auch für untagged
+   - Cross-Workspace-Isolation: meta von Workspace A erkennt sessionKey von Workspace B nicht
+
+**Why kein Effekt im Single-Tenant-Default:** `isMultiTenantAuthEnabled()` returnt `false` solange `STRATEX_MULTI_TENANT=1` nicht gesetzt — Check wird komplett geskipped. Backward-compatible.
+
+**Marker:** Beide Edit-Stellen tragen `// @stratex-patch:` Kommentar — sind via `scripts/dev/diff-from-upstream.sh` greppbar.
+
 ### Fixed — CRITICAL: Workspace boot crash, `errors.client.ts` collided with TanStack-Start reserved-extension (2026-05-09)
 
 **Symptom:** Sämtliche Workspace-Routes returnten 500 (`{"status":500,"unhandled":true,"message":"HTTPError"}`). VPS-Container bootete nicht durch:

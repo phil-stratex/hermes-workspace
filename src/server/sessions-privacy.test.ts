@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import {
+  checkSessionVisibility,
   filterVisibleSessions,
   listSessionsOwnedBy,
   readSessionsMeta,
@@ -110,6 +111,60 @@ describe('sessions-privacy', () => {
       const all = [{ key: 's1' }]
       const filtered: FilteredSessions<{ key: string }> = filterVisibleSessions(all, 'phil', meta)
       expect(Array.isArray(filtered)).toBe(true)
+    })
+  })
+
+  describe('checkSessionVisibility (single-session privacy guard)', () => {
+    beforeEach(async () => {
+      await tagSession('stratex', 's-phil', 'phil')
+      await tagSession('stratex', 's-partner', 'partner')
+      await tagSession('stratex', 's-shared', 'phil')
+      await shareSession({ wsId: 'stratex', sessionId: 's-shared', sharedBy: 'phil' })
+    })
+
+    it('allow when user is the owner', () => {
+      const meta = readSessionsMeta('stratex')
+      const result = checkSessionVisibility('phil', 's-phil', meta)
+      expect(result.kind).toBe('allow')
+      if (result.kind === 'allow') {
+        expect(result.entry?.ownerId).toBe('phil')
+      }
+    })
+
+    it('allow when session is workspace-shared', () => {
+      const meta = readSessionsMeta('stratex')
+      const result = checkSessionVisibility('stranger', 's-shared', meta)
+      expect(result.kind).toBe('allow')
+    })
+
+    it('forbidden when session is owned by someone else and not shared', () => {
+      const meta = readSessionsMeta('stratex')
+      const result = checkSessionVisibility('phil', 's-partner', meta)
+      expect(result.kind).toBe('forbidden')
+    })
+
+    it('not-found for untagged session (fail-closed)', () => {
+      const meta = readSessionsMeta('stratex')
+      const result = checkSessionVisibility('phil', 's-nonexistent', meta)
+      expect(result.kind).toBe('not-found')
+    })
+
+    it('audit-view sentinel "*" always returns allow', () => {
+      const meta = readSessionsMeta('stratex')
+      // Even for non-existent sessions, the audit sentinel never reveals
+      // them via not-found — that's the contract for forensic review.
+      const existing = checkSessionVisibility('*', 's-partner', meta)
+      const ghost = checkSessionVisibility('*', 's-ghost', meta)
+      expect(existing.kind).toBe('allow')
+      expect(ghost.kind).toBe('allow')
+    })
+
+    it('cross-workspace isolation — wrong meta returns not-found', () => {
+      // Switch to a different workspace's meta — Phil's stratex sessions
+      // shouldn't be visible there.
+      const otherMeta = readSessionsMeta('planb')
+      const result = checkSessionVisibility('phil', 's-phil', otherMeta)
+      expect(result.kind).toBe('not-found')
     })
   })
 

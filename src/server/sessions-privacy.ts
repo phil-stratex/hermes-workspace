@@ -190,6 +190,40 @@ export function filterVisibleSessions<T extends SessionLike>(
   return _markAsFiltered(out)
 }
 
+/**
+ * Single-session visibility check for endpoints that take a `sessionKey`
+ * query-param (e.g. `/api/session-status?sessionKey=...`). Returns the
+ * matching meta-entry on success, or a structured denial with kind:
+ *
+ *   - kind:'allow'      — visible (entry present and owner-matches or shared)
+ *   - kind:'not-found'  — untagged (treat as 404)
+ *   - kind:'forbidden'  — tagged but caller is neither owner nor share-target
+ *
+ * Routes should map allow→continue, not-found→404, forbidden→403.
+ *
+ * `userId` of `'*'` (admin/audit-view sentinel) always returns kind:'allow'.
+ *
+ * Single-tenant callers should NOT call this — use the route's own
+ * `requireAuthenticated` and skip the check entirely.
+ */
+export type SessionVisibility =
+  | { kind: 'allow'; entry: SessionMetaEntry | null }
+  | { kind: 'not-found' }
+  | { kind: 'forbidden' }
+
+export function checkSessionVisibility(
+  userId: string,
+  sessionKey: string,
+  meta: SessionsMeta,
+): SessionVisibility {
+  if (userId === '*') return { kind: 'allow', entry: null }
+  const entry = meta.sessions[sessionKey]
+  if (!entry) return { kind: 'not-found' }
+  if (entry.ownerId === userId) return { kind: 'allow', entry }
+  if (entry.shared) return { kind: 'allow', entry }
+  return { kind: 'forbidden' }
+}
+
 // ─── Share / Unshare ───────────────────────────────────────────────────
 
 export type ShareSessionInput = {

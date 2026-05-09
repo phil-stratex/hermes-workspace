@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { requireAuthenticated } from '../../server/route-auth-helpers'
+import { requireWorkspaceAction } from '../../server/route-auth-helpers'
 import {
   ensureGatewayProbed,
   getConfig,
@@ -9,15 +9,20 @@ import {
   listSessions,
 } from '../../server/claude-api'
 import { isSyntheticSessionKey } from '../../server/session-utils'
-// (auth-middleware import dropped — uses route-auth-helpers below)
+import { isMultiTenantAuthEnabled } from '../../server/auth-middleware'
+import {
+  checkSessionVisibility,
+  readSessionsMeta,
+} from '../../server/sessions-privacy'
+import { getLocalSession } from '../../server/local-session-store'
 import { readContextUsage } from '@/server/context-usage'
 
 export const Route = createFileRoute('/api/session-status')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const auth = requireAuthenticated(request)
-        if (!auth.ok) return auth.response
+        const guard = requireWorkspaceAction(request, 'chat')
+        if (!guard.ok) return guard.response
         await ensureGatewayProbed()
         try {
           const capabilities = getGatewayCapabilities()
@@ -77,6 +82,32 @@ export const Route = createFileRoute('/api/session-status')({
               })
             }
             sessionKey = sessions[0].id
+          }
+
+          // @stratex-patch: multi-tenant privacy check — fixes a leak where
+          // any authenticated user could query status (incl. token-counts
+          // and session-label) of any session by passing its id as
+          // ?sessionKey=. Local sessions (Ollama, Atomic Chat) live in the
+          // portable store and are not tagged in sessions-meta — they're
+          // user-scoped by their host workspace dir, so we skip the check.
+          if (
+            isMultiTenantAuthEnabled() &&
+            guard.value.user &&
+            guard.value.wsId &&
+            !getLocalSession(sessionKey)
+          ) {
+            const meta = readSessionsMeta(guard.value.wsId)
+            const visibility = checkSessionVisibility(
+              guard.value.user.id,
+              sessionKey,
+              meta,
+            )
+            if (visibility.kind === 'not-found') {
+              return json({ ok: false, error: 'Not found' }, { status: 404 })
+            }
+            if (visibility.kind === 'forbidden') {
+              return json({ ok: false, error: 'Forbidden' }, { status: 403 })
+            }
           }
 
           const session = await getSession(sessionKey)
