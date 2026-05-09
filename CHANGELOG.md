@@ -5,6 +5,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed — CRITICAL: Workspace boot crash, `errors.client.ts` collided with TanStack-Start reserved-extension (2026-05-09)
+
+**Symptom:** Sämtliche Workspace-Routes returnten 500 (`{"status":500,"unhandled":true,"message":"HTTPError"}`). VPS-Container bootete nicht durch:
+
+```
+TypeError: Cannot convert object to primitive value
+  at parseSegments (.../router-core/.../new-process-route-tree.js:99)
+  at processRouteTree → RouterCore.buildRouteTree → createRouter
+```
+
+**Root cause:** `src/routes/api/errors.client.ts` (Phase A.1.1, c70948f7) hatte einen Filename mit `.client.ts` Endung. TanStack-Start interpretiert das als reserved-extension für **Client-Only-Code, der NICHT im SSR-Bundle landen darf**. Vite's Rollup-Plugin meldete beim Build:
+
+> Use `createClientOnlyFn(() => ...)` to mark it as client-only (returns undefined on the server)
+
+In Vite-Dev-Mode wird der Bundle aber trotzdem geladen — der Server importiert eine teilweise gestripte Version, `Route` ist ein Proxy/undefined statt eines echten Route-Objekts, und beim `route.id in routesById`-Check wirft `processRouteTree`.
+
+**Fix:**
+- `src/routes/api/errors.client.ts` → `src/routes/api/errors.report.ts` umbenannt.
+- `createFileRoute('/api/errors/client')` → `createFileRoute('/api/errors/report')`.
+- `src/lib/client-error-reporter.ts:POST_URL` von `/api/errors/client` auf `/api/errors/report` umgestellt.
+- `src/routeTree.gen.ts` regeneriert (`pnpm exec vite build` → `✓ built in 9.99s`, vorher rollup-error).
+
+Verifiziert nach VPS-Auto-Deploy: `GET /` → 200, `POST /api/errors/report` → 401 (korrekt: needs auth), `GET /api/errors/health` → 401 (korrekt: Stack-Admin gated). 113/113 Vitest grün.
+
+**Lesson:** API-Route-Filenames dürfen NICHT auf `.client.ts` oder `.server.ts` enden — TanStack-Start reservierte Suffixe. Bei Frontend-Reporting-Endpoints lieber `.report.ts` / `.submit.ts` / `.from-client.ts` verwenden.
+
 ### Added — NotificationBell Mount-Integration (2026-05-09)
 - **`<NotificationBell />`** ist jetzt in der Chat-Sidebar gemountet — als Icon-Button in der "Settings + Theme toggle"-Reihe der User-Card im Footer (zwischen `Settings01Icon`-Button und `<ThemeToggleMini />`). Conditional-render bleibt in der Komponente: bei `useCanSeeErrors().canSee === false` returnt `<NotificationBell />` `null`, also sieht ein Member ohne Stack-Admin-Rolle gar nichts. Sidebar-Visibility-Probe und Bell-Counter teilen sich den `staleTime: 60_000`-TanStack-Query-Key, also dedupliziert. Damit ist die in der CHANGELOG-Hygiene-Notiz markierte TODO-Mount-Integration aufgelöst.
 
