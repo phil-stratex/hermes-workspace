@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — local-session-store Test-Coverage (2026-05-09)
+- `src/server/local-session-store.test.ts` — 14 Tests für `ensureLocalSession`-Idempotenz, sofort-vs-debounce-Persist, 30× concurrent-append, delete/get/list/touch lifecycle. Bisherige Coverage: 0 %.
+- Pattern: `mkdtempSync` + `process.chdir` per Test (Modul liest `DATA_DIR` aus `process.cwd()` bei import-time, nicht via env-var) + `vi.resetModules()` + dynamic-import zwischen Tests, damit Module-level `store` / `saveTimer` zwischen Cases nicht lecken. Fake-timers (`vi.useFakeTimers` + `vi.advanceTimersByTime(2100)`) für den 2s-Debounce, `vi.setSystemTime` für die `updatedAt`-Sortierung. Disk-Verifikation per `readFileSync` gegen `<cwd>/.runtime/local-sessions.json`.
+- Cases: idempotenter Second-Call returnt selbe Session-Identity; `updateLocalSessionTitle` ist sync-flush (disk sofort lesbar); `appendLocalMessage` flushed nicht vor 1900ms aber nach 2100ms; `scheduleSave` coalesced 5 appends in einem Window; 30 parallele Appends — alle persistiert, keine Lost-Updates / kein torn-JSON; `deleteLocalSession` cleanen Session+Messages sync; `getLocalMessages` in Append-Reihenfolge; `listLocalSessions` sortiert by `updatedAt` desc; `touchLocalSession` mutiert nur In-Memory (Disk-Bytes byte-identical), nächster echter Save persistiert dann den bumped ts.
+- Befund: Keine Race-Conditions / Lost-Updates aufgedeckt. `appendLocalMessage` ist vollständig synchron (Array-push vor `scheduleSave`), JS event-loop serialisiert die 30 parallelen Calls automatisch.
+
 ### Fixed — CRITICAL: Workspace boot crash, `errors.client.ts` collided with TanStack-Start reserved-extension (2026-05-09)
 
 **Symptom:** Sämtliche Workspace-Routes returnten 500 (`{"status":500,"unhandled":true,"message":"HTTPError"}`). VPS-Container bootete nicht durch:
