@@ -85,7 +85,7 @@ export function TasksScreen() {
 
   const tasksByColumn = useMemo(() => {
     const map: Record<TaskColumn, Array<ClaudeTask>> = {
-      backlog: [], todo: [], in_progress: [], review: [], blocked: [], done: [],
+      backlog: [], todo: [], in_progress: [], review: [], blocked: [], done: [], deleted: [],
     }
     for (const t of tasks) {
       if (assigneeFilter && t.assignee !== assigneeFilter) continue
