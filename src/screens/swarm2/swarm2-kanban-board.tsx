@@ -28,7 +28,10 @@ type KanbanWorker = {
 }
 
 type KanbanBackendMeta = {
-  id: 'local' | 'claude'
+  // Mirror server-side KanbanBackendId so the dashboard-proxy detection
+  // branch (`backend.id === 'hermes-proxy'`) type-checks. Source-of-truth:
+  // src/server/kanban-backend.ts → KanbanBackendId.
+  id: 'local' | 'claude' | 'hermes-proxy'
   label: string
   detected: boolean
   writable: boolean

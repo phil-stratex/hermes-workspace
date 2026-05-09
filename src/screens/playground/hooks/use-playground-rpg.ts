@@ -332,7 +332,9 @@ export function usePlaygroundRpg() {
   const markObjective = useCallback((questId: string, objectiveId: string) => {
     const quest = PLAYGROUND_QUESTS.find((entry) => entry.id === questId)
     if (!quest) return
-    let completedQuest: PlaygroundQuest | null = null
+    // Use a holder object so TypeScript does not narrow `completedQuest` to
+    // `never` after the setState callback closure mutates it.
+    const completedHolder: { quest: PlaygroundQuest | null } = { quest: null }
     setState((prev) => {
       const progress = prev.playerProfile.questProgress[questId] ?? {
         completed: false,
@@ -355,9 +357,10 @@ export function usePlaygroundRpg() {
       }
       const complete = quest.objectives.every((objective) => completedObjectives.includes(objective.id))
       if (!complete || prev.completedQuests.includes(quest.id)) return next
-      completedQuest = quest
+      completedHolder.quest = quest
       return completeQuestState(next, quest)
     })
+    const completedQuest = completedHolder.quest
     if (completedQuest) {
       pushToast('quest', 'Quest Complete', completedQuest.title)
       pushToast('xp', '+ XP', `+${completedQuest.reward.xp} XP`)

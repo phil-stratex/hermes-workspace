@@ -3,7 +3,7 @@
 import { cn } from '@/lib/utils'
 
 export type TextShimmerProps = {
-  as?: string
+  as?: React.ElementType
   duration?: number
   spread?: number
   children: React.ReactNode
@@ -18,7 +18,16 @@ export function TextShimmer({
   ...props
 }: TextShimmerProps) {
   const dynamicSpread = Math.min(Math.max(spread, 5), 45)
-  const Component = as as React.ElementType
+  // Cast to a permissive elementType so style/children/className type-check
+  // regardless of whether `as` is a string tag (e.g. 'span', 'div') or a
+  // custom component. Using `any` here for the props bag is intentional —
+  // narrowing the polymorphic `as` would require generic inference machinery
+  // that is not worth the surface area for a presentational shimmer wrapper.
+  const Component = as as React.ElementType<{
+    className?: string
+    style?: React.CSSProperties
+    children?: React.ReactNode
+  }>
 
   return (
     <Component
@@ -31,7 +40,7 @@ export function TextShimmer({
         backgroundImage: `linear-gradient(to right, var(--color-primary-600) ${50 - dynamicSpread}%, var(--color-primary-950) 50%, var(--color-primary-600) ${50 + dynamicSpread}%)`,
         animationDuration: `${duration}s`,
       }}
-      {...props}
+      {...(props as Record<string, unknown>)}
     >
       {children}
     </Component>
