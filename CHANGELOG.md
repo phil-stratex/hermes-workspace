@@ -5,6 +5,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — MCP-Federation Foundation für Predict-Stack (2026-05-09)
+
+Foundation-Skelett (NICHT production-ready) für die Ablösung des `predict-proxy`-HTTP-Bridges durch MCP-Tool-Calls. Predict läuft als Sibling-Container im selben VPS-Compose; statt browser-fronted HTTP-Requests durch das Workspace zu pumpen, soll der Hermes-Agent in Zukunft direkt via MCP-Tools auf Predict zugreifen — discoverable Tool-Schemas, audit-log-fähig, transport-agnostisch.
+
+- `src/server/mcp-federation/predict-tools.ts` — 3 Tool-Stubs als plain-async-Funktionen + `PREDICT_TOOLS`-Registry (JSON-Schema, MCP-shape, ohne SDK-Dependency):
+  - `predict_list_projects({ limit? })` → `Array<ProjectSummary>` (GET `/api/projects`)
+  - `predict_get_report({ reportId })` → `ReportDetail` (GET `/api/reports/{id}`)
+  - `predict_get_simulation_status({ simulationId })` → `RunTaskState | null` (GET `/api/simulations/{id}/run-status`)
+  - `dispatchPredictTool(name, args)` — Mini-Dispatcher, damit der zukünftige stdio-MCP-Server nur 20 Zeilen Glue ist.
+  - Env-Resolution: `PREDICT_API_URL` / `STRATEX_PREDICT_API_URL` mit Default `http://stratex-predict-api:5101` (matched predict-proxy). Bearer via `PREDICT_API_TOKEN` / `STRATEX_PREDICT_API_TOKEN`. 10-s-Timeout per Tool-Call.
+- `src/server/mcp-federation/predict-tools.test.ts` — **30 Vitest-Tests** mit `vi.fn()`-stubbed `global.fetch`. Coverage: env-resolution (6), per-tool happy-path + error-paths (16), Registry-Schema-Asserts (3), Dispatcher (4), URL-Encoding-Edge-Case (1). Verifiziert grün.
+- `scripts/dev/mcp-federation-README.md` — Why-MCP-statt-HTTP-Proxy-Vergleichstabelle, Status-Snapshot, 5-stufiger Setup-für-full-deploy (SDK-Install, MCP-stdio-server.ts, Hermes-Agent-Registration, Auth-Modelle: Trusted-Stack vs. Delegated-Token, Streaming/SSE-Optionen), Tool-Inventory als JSON-Schema-Dump, 8-stufiger Migration-Plan predict-proxy → MCP-Federation (iterativ, nie big-bang).
+
+`@modelcontextprotocol/sdk` ist bewusst NICHT als Dependency installiert — Tool-Schemas sind als plain JSON geschrieben, damit das File auch ohne SDK importiert/getestet werden kann. Der README dokumentiert den `pnpm add`-Step für den nächsten PR.
+
+Existing `src/routes/api/predict-proxy/$.ts` HTTP-Bridge bleibt unverändert — die Migration läuft iterativ in separaten PRs (Step 7 des Migration-Plans).
+
 ### Fixed — CRITICAL: Workspace boot crash, `errors.client.ts` collided with TanStack-Start reserved-extension (2026-05-09)
 
 **Symptom:** Sämtliche Workspace-Routes returnten 500 (`{"status":500,"unhandled":true,"message":"HTTPError"}`). VPS-Container bootete nicht durch:
