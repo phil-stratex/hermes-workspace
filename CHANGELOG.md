@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed — Workspace-Switcher in User-Card-Dropdown integriert (2026-05-09)
+
+Footer der Chat-Sidebar hatte zwei separate Cards (separate `WorkspaceSwitcher`-Card oben + User-Card unten). Auf Phils Wunsch zusammengeführt:
+
+- **`src/components/workspace/workspace-switcher-dialog.tsx`** (neu) — SettingsDialog-Style-Modal (`@/components/ui/dialog` + Tailwind-Override für mobile-fullscreen / desktop-zentriert mit `md:max-w-md md:rounded-2xl`, Theme-Tokens `bg-[var(--theme-bg)]` + `border-primary-200`). Body = scrollbare Membership-Liste (Color-Bar + Name + Rolle + ✓ für Active), Footer = Account-Link + Logout-Button. Lazy-Fetch via `fetchCurrentUser()` beim Öffnen — bei `mode !== 'multi-tenant'` Empty-State.
+- **`src/screens/chat/components/chat-sidebar.tsx`** — Footer-Refactor:
+  - `<WorkspaceSwitcher>`-Mount im Footer entfernt.
+  - User-Card-Label zeigt jetzt `"<Workspace> / <User>"` (z. B. „Stratex / Phil") wenn Multi-Tenant, sonst Fallback auf `profileDisplayName`.
+  - Conditional `MenuItem` „Workspace wechseln" (`Building01Icon`) im User-Dropdown — sichtbar nur bei Multi-Tenant + Memberships > 0; öffnet den neuen Dialog.
+  - `<WorkspaceSwitcherDialog>` neben `<SettingsDialog>` gemountet.
+- **`src/components/workspace/workspace-switcher.tsx`** entfernt — Logik vollständig in den Dialog migriert.
+
+### Removed — Separate WorkspaceSwitcher-Card (2026-05-09)
+- Obere von zwei redundanten Footer-Karten.
+
 ### Added — Error-Tracking & Trouble-Shooting-Center (2026-05-09)
 
 Neuer globaler Error-Log-Stack mit UI-Viewer, Live-Tail, Frontend-Capture und Builder-Brief-Export. Stack-Admin-only via Auto-Detect (Pre-Migration: jeder authentifizierte User; Post-Migration: nur User in `data/global/settings.json#stackAdmins`). PII-Redaction by default.
