@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed — Model-Switcher schlug fehl mit `spawn-error code -1` (2026-05-09)
+- **`src/routes/api/switch-model.ts`** — der Code rief das Switch-Skript via `ssh root@…` aus dem Workspace-Container heraus auf, aber das Container-Image (`node:22-alpine` + `apk add docker-cli git python3 make g++`) hat kein `ssh`-Binary. Node's `spawn(ENOENT)` feuerte das `error`-Event, der Promise resolvete mit `{ code: -1, stderr: 'spawn-error' }` — exakt der Toast den der User im UI sah. Jeder Wechsel zwischen den Cloud-Modellen (`kimi-k2.6`, `glm-5.1`, `deepseek-v4-pro`, …) war broken, der Default-Wert in `config.yaml` blieb stehen.
+- **Fix:** `runSwitchScript` nutzt jetzt `swarmExec()` aus `src/server/swarm-docker-exec.ts`, also `docker exec hermes-agent-zjya-hermes-agent-1 /opt/data/switch-model-internal.sh <model>` über den schon gemounteten `/var/run/docker.sock`. Das Skript existiert bereits im hermes-agent-Container und macht den `config.yaml`-Edit + `hermes gateway run --replace`. Lokaler Fallback (kein `HERMES_VPS_CONTAINER` env) bleibt erhalten und ruft `switch-model.sh` direkt auf.
+
 ### Added — Workspaces-Section im SettingsDialog + Create-CTA (2026-05-09)
 
 Phils 3 Anliegen nach dem Footer-Refactor: User-Name korrekt anzeigen, Workspaces erstellen können, alle Workspace-Verwaltung kompakt im SettingsDialog statt im Vollbild-Tab.

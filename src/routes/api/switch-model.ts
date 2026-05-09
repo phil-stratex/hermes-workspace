@@ -1,33 +1,35 @@
 import { spawn } from 'node:child_process'
 import { json } from '@tanstack/react-start'
-import { requireWorkspaceAction } from '../../server/route-auth-helpers'
 import { createFileRoute } from '@tanstack/react-router'
+import { requireWorkspaceAction } from '../../server/route-auth-helpers'
 // (auth-middleware import dropped — uses route-auth-helpers below)
 import { OLLAMA_CLOUD_IDS } from '../../server/ollama-cloud-models'
 import { requireJsonContentType } from '../../server/rate-limit'
+import { swarmExec, useDockerExec } from '../../server/swarm-docker-exec'
 
 const ALLOWED_MODELS = new Set<string>(OLLAMA_CLOUD_IDS)
 
-const SSH_TARGET = process.env.HERMES_VPS_SSH ?? 'root@72.62.50.32'
-const REMOTE_SCRIPT =
-  process.env.HERMES_VPS_SWITCH_SCRIPT ??
-  '/docker/hermes-agent-zjya/switch-model.sh'
+const IN_CONTAINER_SCRIPT =
+  process.env.HERMES_SWITCH_SCRIPT ?? '/opt/data/switch-model-internal.sh'
 
-function runSwitchScript(
+async function runSwitchScript(
   model: string,
 ): Promise<{ code: number; stdout: string; stderr: string }> {
+  // VPS-split topology: docker exec into hermes-agent container via the
+  // mounted /var/run/docker.sock. The workspace image (node:22-alpine) has
+  // no ssh client, so SSH-based invocation fails with spawn-error ENOENT.
+  if (useDockerExec()) {
+    const r = await swarmExec(IN_CONTAINER_SCRIPT, [model], {
+      timeoutMs: 30_000,
+    })
+    return { code: r.code, stdout: r.stdout, stderr: r.stderr }
+  }
+  // Local-dev fallback: invoke the script directly in PATH (or whatever
+  // HERMES_LOCAL_SWITCH_SCRIPT points at).
   return new Promise((resolve) => {
     const proc = spawn(
-      'ssh',
-      [
-        '-o',
-        'BatchMode=yes',
-        '-o',
-        'ConnectTimeout=10',
-        SSH_TARGET,
-        REMOTE_SCRIPT,
-        model,
-      ],
+      process.env.HERMES_LOCAL_SWITCH_SCRIPT ?? 'switch-model.sh',
+      [model],
       { stdio: ['ignore', 'pipe', 'pipe'] },
     )
     let stdout = ''
