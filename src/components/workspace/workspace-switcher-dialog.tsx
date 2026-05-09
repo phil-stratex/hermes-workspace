@@ -1,7 +1,7 @@
 'use client'
 
 import { HugeiconsIcon } from '@hugeicons/react'
-import { Cancel01Icon } from '@hugeicons/core-free-icons'
+import { Cancel01Icon, PlusSignIcon } from '@hugeicons/core-free-icons'
 import { useEffect, useState } from 'react'
 
 import {
@@ -22,9 +22,10 @@ import type { CurrentUser, Membership, MeResponse } from '@/lib/workspace-auth'
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onCreateWorkspace?: () => void
 }
 
-export function WorkspaceSwitcherDialog({ open, onOpenChange }: Props) {
+export function WorkspaceSwitcherDialog({ open, onOpenChange, onCreateWorkspace }: Props) {
   const [me, setMe] = useState<MeResponse | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
 
@@ -120,6 +121,21 @@ export function WorkspaceSwitcherDialog({ open, onOpenChange }: Props) {
                   />
                 ))}
               </ul>
+              {onCreateWorkspace && (
+                <div className="border-t border-primary-200 px-4 py-2 md:px-5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenChange(false)
+                      onCreateWorkspace()
+                    }}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-primary-300 px-3 py-2 text-sm font-medium text-primary-700 hover:bg-primary-100 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                  >
+                    <HugeiconsIcon icon={PlusSignIcon} size={14} strokeWidth={1.5} />
+                    Neuer Workspace
+                  </button>
+                </div>
+              )}
               <div className="border-t border-primary-200 bg-primary-50/40 px-4 py-3 md:rounded-b-2xl md:px-5">
                 <div className="flex items-center justify-between gap-2">
                   <a

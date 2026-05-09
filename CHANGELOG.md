@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — Workspaces-Section im SettingsDialog + Create-CTA (2026-05-09)
+
+Phils 3 Anliegen nach dem Footer-Refactor: User-Name korrekt anzeigen, Workspaces erstellen können, alle Workspace-Verwaltung kompakt im SettingsDialog statt im Vollbild-Tab.
+
+- **Neue Section „Workspaces"** im `SettingsDialog` (`src/components/settings-dialog/workspaces-content.tsx`, ~900 LOC). Master/Detail-View ohne Routing:
+  - **Master**: Liste der Memberships mit Color-Bar, Rolle-Badge, „aktiv"-Marker, `[⚙ Verwalten]` und (für Owner) `[🗑]`-Soft-Delete-Button mit Slug-Confirm. Footer-Card „+ Neuer Workspace" expandiert inline-Form (Name + Auto-Slug + Color → POST `/api/workspaces`).
+  - **Detail**: Allgemein-Sektion (Name/Beschreibung/Farbe via PATCH), Mitglieder-Sektion (Liste + Rolle-Dropdown → PATCH, Entfernen mit Sessions-Action transfer/delete/none, Pending-Invites mit Link-Copy + Revoke), Inline-Invite-Form (Email optional + Rolle + TTL 1–30d), Danger-Zone (Soft-Delete-Confirm). Permission-aware: Members sehen alles read-only, Admin/Owner mit Mutate-Aktionen.
+- **Lib-Helpers** in `src/lib/workspace-auth.ts`: `listWorkspaces`, `getWorkspace`, `createWorkspace`, `updateWorkspace`, `deleteWorkspace`, `listMembers`, `setMemberRole`, `removeMember`, `inviteMember`, `revokeInvite`. Generischer `sendJson(method, url, body?)` ersetzt die zwei Wrapper. Types: `WorkspaceMetaPublic`, `WorkspaceListEntry`, `MemberRow`, `PendingInvite`, `MembersResponse` — Single-Source-of-Truth für beide UI-Varianten (SettingsDialog + Vollbild-`members-tab.tsx`).
+- **„+ Neuer Workspace"-Button im `WorkspaceSwitcherDialog`** (`onCreateWorkspace?: () => void`-Prop). Klick schließt den Switcher, öffnet `SettingsDialog` mit `initialSection='workspaces'` + `initialAction='create-workspace'` → Inline-Create-Form direkt sichtbar.
+- **`SettingsDialog`** erweitert: neue `SectionId` `'workspaces'`, `Building01Icon` in `SECTIONS`, neue `initialAction?: 'create-workspace'`-Prop wird an `WorkspacesContent` durchgereicht (mit `onConsumeInitialAction`-Callback fürs Reset).
+- **`useChatSettings`-Hook** akzeptiert `'workspaces'` als gültigen `settingsSection`-Wert.
+
+### Fixed
+- **User-Card im Sidebar-Footer** zeigt jetzt den echten Auth-Namen (`me.user.name`, z. B. „Phil") statt des Chat-Display-Defaults „User". Fallback auf `profileDisplayName` bleibt für Legacy/Pre-Multi-Tenant-Stacks erhalten. Geändert: `src/screens/chat/components/chat-sidebar.tsx` (User-Card-Title-Attribut + Display-Span).
+
 ### Fixed — CRITICAL: Workspace boot crash, `errors.client.ts` collided with TanStack-Start reserved-extension (2026-05-09)
 
 **Symptom:** Sämtliche Workspace-Routes returnten 500 (`{"status":500,"unhandled":true,"message":"HTTPError"}`). VPS-Container bootete nicht durch:

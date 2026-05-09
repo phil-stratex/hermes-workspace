@@ -73,12 +73,19 @@ export class AuthError extends Error {
 }
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body ?? {}),
+  return sendJson<T>('POST', url, body)
+}
+
+async function sendJson<T>(method: string, url: string, body?: unknown): Promise<T> {
+  const init: RequestInit = {
+    method,
     credentials: 'same-origin',
-  })
+  }
+  if (body !== undefined) {
+    init.headers = { 'Content-Type': 'application/json' }
+    init.body = JSON.stringify(body ?? {})
+  }
+  const res = await fetch(url, init)
   const text = await res.text()
   let data: unknown = {}
   try {
@@ -203,4 +210,123 @@ export function suggestSlug(name: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 64) || 'workspace'
+}
+
+// ─── Workspace lifecycle helpers ───────────────────────────────────────
+
+export type WorkspaceMetaPublic = {
+  id: string
+  name: string
+  description?: string
+  branding: { primaryColor: string; logoUrl?: string }
+  settings?: { defaultModel?: string; features?: Record<string, boolean> }
+  createdAt: string
+  deletedAt?: string
+}
+
+export type WorkspaceListEntry = {
+  id: string
+  name: string
+  role: 'owner' | 'admin' | 'member'
+  branding: { primaryColor: string; logoUrl?: string }
+  deletedAt?: string
+}
+
+export async function listWorkspaces(): Promise<{ ok: true; workspaces: Array<WorkspaceListEntry> }> {
+  return getJson('/api/workspaces')
+}
+
+export async function getWorkspace(wsId: string): Promise<{ ok: true; workspace: WorkspaceMetaPublic }> {
+  return getJson(`/api/workspaces/${encodeURIComponent(wsId)}`)
+}
+
+export async function createWorkspace(input: {
+  id: string
+  name: string
+  description?: string
+  primaryColor?: string
+}): Promise<{ ok: true; workspace: WorkspaceMetaPublic }> {
+  return postJson('/api/workspaces', input)
+}
+
+export async function updateWorkspace(
+  wsId: string,
+  patch: { name?: string; description?: string; primaryColor?: string; logoUrl?: string; defaultModel?: string },
+): Promise<{ ok: true; workspace: WorkspaceMetaPublic }> {
+  return sendJson('PATCH', `/api/workspaces/${encodeURIComponent(wsId)}`, patch)
+}
+
+export async function deleteWorkspace(wsId: string): Promise<void> {
+  await sendJson('DELETE', `/api/workspaces/${encodeURIComponent(wsId)}`)
+}
+
+// ─── Member helpers ────────────────────────────────────────────────────
+
+export type MemberRow = {
+  userId: string
+  role: 'owner' | 'admin' | 'member'
+  joinedAt: string
+  addedBy: string
+  email?: string
+  name?: string
+  status?: 'active' | 'disabled' | 'locked'
+  failedLoginCount?: number
+  lastLoginAt?: string
+}
+
+export type PendingInvite = {
+  token: string
+  email?: string
+  role: 'admin' | 'member'
+  createdAt: string
+  expiresAt: string
+  invitedBy: string
+}
+
+export type MembersResponse = {
+  ok: true
+  members: Array<MemberRow>
+  pendingInvites: Array<PendingInvite>
+}
+
+export async function listMembers(wsId: string): Promise<MembersResponse> {
+  return getJson(`/api/workspaces/${encodeURIComponent(wsId)}/members`)
+}
+
+export async function setMemberRole(
+  wsId: string,
+  userId: string,
+  role: 'admin' | 'member' | 'owner',
+): Promise<void> {
+  await sendJson('PATCH', `/api/workspaces/${encodeURIComponent(wsId)}/members/${encodeURIComponent(userId)}`, { role })
+}
+
+export async function removeMember(
+  wsId: string,
+  userId: string,
+  sessionsAction?: { action: 'transfer' | 'delete'; transferTo?: string },
+): Promise<void> {
+  const params = new URLSearchParams()
+  if (sessionsAction) {
+    params.set('sessions', sessionsAction.action)
+    if (sessionsAction.action === 'transfer' && sessionsAction.transferTo) {
+      params.set('transferTo', sessionsAction.transferTo)
+    }
+  }
+  const query = params.toString()
+  const url = query
+    ? `/api/workspaces/${encodeURIComponent(wsId)}/members/${encodeURIComponent(userId)}?${query}`
+    : `/api/workspaces/${encodeURIComponent(wsId)}/members/${encodeURIComponent(userId)}`
+  await sendJson('DELETE', url)
+}
+
+export async function inviteMember(
+  wsId: string,
+  input: { email?: string; role: 'admin' | 'member'; ttlDays?: number },
+): Promise<{ ok: true; invite: { token: string; inviteUrl: string; expiresAt: string } }> {
+  return postJson(`/api/workspaces/${encodeURIComponent(wsId)}/invites`, input)
+}
+
+export async function revokeInvite(wsId: string, token: string): Promise<void> {
+  await sendJson('DELETE', `/api/workspaces/${encodeURIComponent(wsId)}/invites/${encodeURIComponent(token)}`)
 }

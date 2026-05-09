@@ -544,6 +544,9 @@ function ChatSidebarComponent({
   const { settingsOpen, settingsSection, setSettingsOpen, handleOpenSettings } =
     useSidebarSettings()
   const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false)
+  const [settingsInitialAction, setSettingsInitialAction] = useState<
+    'create-workspace' | undefined
+  >(undefined)
   const [me, setMe] = useState<MeResponse | null>(null)
   useEffect(() => {
     let cancelled = false
@@ -1238,7 +1241,7 @@ function ChatSidebarComponent({
               data-tour="settings"
               title={
                 activeMembership
-                  ? `${activeMembership.name} / ${profileDisplayName}`
+                  ? `${activeMembership.name} / ${me?.user.name ?? profileDisplayName}`
                   : profileDisplayName
               }
               className={cn(
@@ -1262,7 +1265,7 @@ function ChatSidebarComponent({
                   >
                     <span className="block truncate text-sm font-medium text-primary-900 dark:text-neutral-100">
                       {activeMembership
-                        ? `${activeMembership.name} / ${profileDisplayName}`
+                        ? `${activeMembership.name} / ${me?.user.name ?? profileDisplayName}`
                         : profileDisplayName}
                     </span>
                     <StatusDot />
@@ -1333,13 +1336,21 @@ function ChatSidebarComponent({
       {/* ── Dialogs ─────────────────────────────────────────────────── */}
       <SettingsDialog
         open={settingsOpen}
-        onOpenChange={setSettingsOpen}
+        onOpenChange={(open) => {
+          setSettingsOpen(open)
+          if (!open) setSettingsInitialAction(undefined)
+        }}
         initialSection={settingsSection}
+        initialAction={settingsInitialAction}
       />
 
       <WorkspaceSwitcherDialog
         open={workspaceDialogOpen}
         onOpenChange={setWorkspaceDialogOpen}
+        onCreateWorkspace={() => {
+          setSettingsInitialAction('create-workspace')
+          handleOpenSettings('workspaces')
+        }}
       />
 
       <ProvidersDialog open={providersOpen} onOpenChange={setProvidersOpen} />

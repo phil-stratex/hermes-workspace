@@ -3,6 +3,7 @@
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
   ArrowLeft01Icon,
+  Building01Icon,
   Cancel01Icon,
   CheckmarkCircle02Icon,
   CloudIcon,
@@ -57,6 +58,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { WorkspacesContent } from './workspaces-content'
 
 // ── Language ────────────────────────────────────────────────────────────
 
@@ -74,6 +76,7 @@ type SectionId =
   | 'chat'
   | 'notifications'
   | 'language'
+  | 'workspaces'
 
 const SECTIONS: Array<{ id: SectionId; label: string; icon: any }> = [
   { id: 'claude', label: 'Model & Provider', icon: CloudIcon },
@@ -85,6 +88,7 @@ const SECTIONS: Array<{ id: SectionId; label: string; icon: any }> = [
   { id: 'chat', label: 'Chat', icon: MessageMultiple01Icon },
   { id: 'notifications', label: 'Alerts', icon: Notification03Icon },
   { id: 'language', label: 'Language', icon: MessageMultiple01Icon },
+  { id: 'workspaces', label: 'Workspaces', icon: Building01Icon },
 ]
 
 const DARK_ENTERPRISE_THEMES = new Set<ThemeId>([
@@ -2095,39 +2099,49 @@ function LanguageContent() {
 
 // ── Main Dialog ─────────────────────────────────────────────────────────
 
-const CONTENT_MAP: Record<SectionId, () => React.JSX.Element> = {
-  claude: HermesContent,
-  agent: AgentBehaviorContent,
-  routing: SmartRoutingContent,
-  voice: VoiceContent,
-  display: DisplayContent,
-  appearance: AppearanceContent,
-  chat: ChatContent,
-  notifications: NotificationsContent,
-  language: LanguageContent,
-}
-
 type SettingsDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   initialSection?: SectionId
+  initialAction?: 'create-workspace'
 }
 
 export function SettingsDialog({
   open,
   onOpenChange,
   initialSection = 'claude',
+  initialAction,
 }: SettingsDialogProps) {
   const [active, setActive] = useState<SectionId>(initialSection)
   const [mobileView, setMobileView] = useState<'nav' | 'content'>('nav')
+  const [pendingAction, setPendingAction] = useState<'create-workspace' | undefined>(initialAction)
+
+  const CONTENT_MAP: Record<SectionId, () => React.JSX.Element> = {
+    claude: HermesContent,
+    agent: AgentBehaviorContent,
+    routing: SmartRoutingContent,
+    voice: VoiceContent,
+    display: DisplayContent,
+    appearance: AppearanceContent,
+    chat: ChatContent,
+    notifications: NotificationsContent,
+    language: LanguageContent,
+    workspaces: () => (
+      <WorkspacesContent
+        initialAction={pendingAction}
+        onConsumeInitialAction={() => setPendingAction(undefined)}
+      />
+    ),
+  }
   const ActiveContent = CONTENT_MAP[active]
 
   useEffect(() => {
     if (open) {
       setActive(initialSection)
-      setMobileView('nav')
+      setPendingAction(initialAction)
+      setMobileView(initialSection === 'workspaces' ? 'content' : 'nav')
     }
-  }, [initialSection, open])
+  }, [initialSection, initialAction, open])
 
   function handleSectionSelect(sectionId: SectionId) {
     setActive(sectionId)
