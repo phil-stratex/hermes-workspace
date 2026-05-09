@@ -34,6 +34,7 @@ import {
   getLocalMessages,
   getLocalSession,
   listLocalSessions,
+  updateLocalSessionTitle,
 } from '../../server/local-session-store'
 
 // Local patch: persistent session titles for zero-fork mode where the
@@ -348,6 +349,34 @@ export const Route = createFileRoute('/api/sessions')({
                 updatedAt: Date.now(),
               },
               updated: true,
+            })
+          }
+
+          // Local sessions (Ollama, Atomic Chat) live in the workspace
+          // portable store, not the gateway. Persist renames there directly
+          // — calling updateSession() against the gateway would 404 because
+          // the gateway has never heard of these sessions.
+          const localSession = getLocalSession(sessionKey)
+          if (localSession) {
+            if (label) updateLocalSessionTitle(sessionKey, label)
+            return json({
+              ok: true,
+              sessionKey,
+              friendlyId: rawFriendlyId || sessionKey,
+              entry: {
+                key: sessionKey,
+                id: sessionKey,
+                title: label || sessionKey,
+                label: label || sessionKey,
+                derivedTitle: label || sessionKey,
+                startedAt: localSession.createdAt,
+                updatedAt: Date.now(),
+                message_count: localSession.messageCount,
+                model: localSession.model,
+                source: 'local',
+              },
+              updated: true,
+              source: 'local',
             })
           }
 

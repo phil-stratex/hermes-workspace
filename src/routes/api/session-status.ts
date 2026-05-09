@@ -6,9 +6,9 @@ import {
   getConfig,
   getGatewayCapabilities,
   getSession,
-  listSessions,
 } from '../../server/claude-api'
 import { isSyntheticSessionKey } from '../../server/session-utils'
+import { getLocalSession } from '../../server/local-session-store'
 // (auth-middleware import dropped — uses route-auth-helpers below)
 import { readContextUsage } from '@/server/context-usage'
 
@@ -33,13 +33,16 @@ export const Route = createFileRoute('/api/session-status')({
                 inputTokens: 0,
                 outputTokens: 0,
                 totalTokens: 0,
+                contextPercent: 0,
+                maxTokens: 0,
+                usedTokens: 0,
                 sessions: [],
               },
             })
           }
           const url = new URL(request.url)
           const requestedKey = url.searchParams.get('sessionKey')?.trim() || ''
-          let sessionKey = requestedKey || 'new'
+          const sessionKey = requestedKey || 'new'
 
           if (sessionKey === 'new') {
             return json({
@@ -53,30 +56,61 @@ export const Route = createFileRoute('/api/session-status')({
                 inputTokens: 0,
                 outputTokens: 0,
                 totalTokens: 0,
+                contextPercent: 0,
+                maxTokens: 0,
+                usedTokens: 0,
                 sessions: [],
               },
             })
           }
 
+          // Synthetic keys (e.g. transient `api-*` keys before the gateway has
+          // a real session) used to fall back to listSessions[0] — but that
+          // makes a brand-new chat inherit context-usage from a totally
+          // unrelated old session.  Return idle-empty instead.
           if (isSyntheticSessionKey(sessionKey)) {
-            const sessions = await listSessions(1, 0)
-            if (sessions.length === 0) {
-              return json({
-                ok: true,
-                payload: {
-                  status: 'idle',
-                  sessionKey: 'new',
-                  sessionLabel: '',
-                  model: '',
-                  modelProvider: '',
-                  inputTokens: 0,
-                  outputTokens: 0,
-                  totalTokens: 0,
-                  sessions: [],
-                },
-              })
-            }
-            sessionKey = sessions[0].id
+            return json({
+              ok: true,
+              payload: {
+                status: 'idle',
+                sessionKey,
+                sessionLabel: '',
+                model: '',
+                modelProvider: '',
+                inputTokens: 0,
+                outputTokens: 0,
+                totalTokens: 0,
+                contextPercent: 0,
+                maxTokens: 0,
+                usedTokens: 0,
+                sessions: [],
+              },
+            })
+          }
+
+          // Local sessions (Ollama, Atomic Chat) live in the workspace
+          // portable store, not the gateway. Return their status from local
+          // data instead of trying getSession() which would 404.
+          const localSession = getLocalSession(sessionKey)
+          if (localSession) {
+            const contextUsage = await readContextUsage(sessionKey)
+            return json({
+              ok: true,
+              payload: {
+                status: 'idle',
+                sessionKey,
+                sessionLabel: localSession.title ?? '',
+                model: localSession.model ?? contextUsage.model,
+                modelProvider: 'local',
+                inputTokens: contextUsage.usedTokens,
+                outputTokens: 0,
+                totalTokens: contextUsage.usedTokens,
+                contextPercent: contextUsage.contextPercent,
+                maxTokens: contextUsage.maxTokens,
+                usedTokens: contextUsage.usedTokens,
+                sessions: [],
+              },
+            })
           }
 
           const session = await getSession(sessionKey)
