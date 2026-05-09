@@ -11,7 +11,7 @@ type DecomposeRequest = {
   model?: unknown
 }
 
-type WorkerHint = {
+export type WorkerHint = {
   id: string
   role?: string
   model?: string
@@ -129,7 +129,7 @@ async function callOrchestrator(prompt: string, workers: WorkerHint[], model: st
 }
 
 
-function scoreWorker(prompt: string, worker: WorkerHint): number {
+export function scoreWorker(prompt: string, worker: WorkerHint): number {
   const text = [worker.id, worker.role, worker.model, worker.specialty, worker.mission, ...(worker.skills ?? []), ...(worker.capabilities ?? []), worker.notes]
     .filter(Boolean)
     .join(' ')
