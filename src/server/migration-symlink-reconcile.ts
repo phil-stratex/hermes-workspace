@@ -32,6 +32,7 @@ import { dirname, join } from 'node:path'
 
 import { appendAuditEvent } from './audit-log'
 import { getWorkspaceDir, isValidSlug } from './data-paths'
+import { logger } from './logger'
 import { listWorkspaces } from './workspace-store'
 
 export type ReconcileEntry = {
@@ -102,6 +103,12 @@ export async function reconcileLegacySymlinks(opts: {
         result: 'error',
         errorMessage: err instanceof Error ? err.message : String(err),
       })
+      logger.error('symlink reconcile failed', {
+        source: 'migration',
+        wsId,
+        target,
+        legacy,
+      }, err instanceof Error ? err : undefined)
     }
   }
   return out

@@ -14,6 +14,8 @@
 
 import { spawn } from 'node:child_process'
 
+import { logger } from './logger'
+
 export const HERMES_VPS_CONTAINER = process.env.HERMES_VPS_CONTAINER ?? ''
 
 export function useDockerExec(): boolean {
@@ -130,6 +132,13 @@ export function swarmExec(
     })
     proc.on('error', (err) => {
       clearTimeout(timer)
+      logger.warn('docker-exec spawn failed', {
+        source: 'swarm',
+        cmd,
+        argsCount: args.length,
+        container: opts.container,
+        dockerMode,
+      }, err instanceof Error ? err : undefined)
       resolve({
         ok: false,
         stdout: '',

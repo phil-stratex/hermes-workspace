@@ -45,6 +45,7 @@ import { createHash } from 'node:crypto'
 
 import { getWorkspaceDir, isValidSlug } from './data-paths'
 import { writeJsonAtomic } from './atomic-write'
+import { logger } from './logger'
 import { resolveSafe } from './federation-mcp-server'
 import type { ServerContext } from './federation-mcp-server'
 import { emitFederationEvent } from './federation-audit'
@@ -460,6 +461,12 @@ export async function applyDiff(opts: ApplyOpts): Promise<ApplyResult> {
         path: item.path,
         reason: err instanceof Error ? err.message : String(err),
       })
+      logger.warn('federation apply skipped', {
+        source: 'federation',
+        wsId: opts.wsId,
+        path: item.path,
+        op: item.op,
+      }, err instanceof Error ? err : undefined)
     }
   }
 
@@ -493,6 +500,12 @@ export async function applyDiff(opts: ApplyOpts): Promise<ApplyResult> {
           path: conflict.path,
           reason: err instanceof Error ? err.message : String(err),
         })
+        logger.warn('federation conflict resolve failed', {
+          source: 'federation',
+          wsId: opts.wsId,
+          path: conflict.path,
+          resolution: 'remote',
+        }, err instanceof Error ? err : undefined)
       }
     }
   }

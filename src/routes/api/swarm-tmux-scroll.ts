@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { requireLocalOrAuth } from '../../server/auth-middleware'
+import { logger } from '../../server/logger'
 import { requireJsonContentType } from '../../server/rate-limit'
 import { swarmExec, useDockerExec } from '../../server/swarm-docker-exec'
 import { rosterByWorkerId } from '../../server/swarm-roster'
@@ -113,6 +114,13 @@ export const Route = createFileRoute('/api/swarm-tmux-scroll')({
             { timeoutMs: 4_000, container: containerOverride },
           )
           if (!enter.ok) {
+            logger.warn('swarm tmux scroll: copy-mode failed (vps-mode)', {
+              source: 'swarm',
+              workerId,
+              session,
+              container: containerOverride,
+              stderr: enter.stderr,
+            })
             return json({ error: enter.stderr || 'copy-mode failed' }, { status: 500 })
           }
           const scrolled = await swarmExec(

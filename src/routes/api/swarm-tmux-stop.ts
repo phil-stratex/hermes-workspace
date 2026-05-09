@@ -6,6 +6,7 @@ import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 // (auth-middleware import dropped — uses route-auth-helpers below)
+import { logger } from '../../server/logger'
 import { requireJsonContentType } from '../../server/rate-limit'
 import {
   getSwarmProfilePath,
@@ -124,6 +125,13 @@ export const Route = createFileRoute('/api/swarm-tmux-stop')({
             { timeoutMs: 5_000, container: containerOverride },
           )
           if (!kill.ok) {
+            logger.warn('swarm tmux kill failed (vps-mode)', {
+              source: 'swarm',
+              workerId,
+              sessionName,
+              container: containerOverride,
+              stderr: kill.stderr,
+            })
             return json(
               { error: kill.stderr || 'tmux kill-session failed' },
               { status: 500 },

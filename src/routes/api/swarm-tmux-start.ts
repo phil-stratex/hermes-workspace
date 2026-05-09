@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 // (auth-middleware import dropped — uses route-auth-helpers below)
+import { logger } from '../../server/logger'
 import { requireJsonContentType } from '../../server/rate-limit'
 import { rosterByWorkerId } from '../../server/swarm-roster'
 import { resolveSwarmModelLabel } from '../../server/swarm-model-resolver'
@@ -266,6 +267,13 @@ export const Route = createFileRoute('/api/swarm-tmux-start')({
             { timeoutMs: 8_000, container: containerOverride },
           )
           if (!start.ok) {
+            logger.warn('swarm tmux start failed (vps-mode)', {
+              source: 'swarm',
+              workerId,
+              sessionName,
+              container: containerOverride,
+              stderr: start.stderr,
+            })
             return json(
               {
                 error: start.stderr || start.stdout || 'tmux new-session failed',
