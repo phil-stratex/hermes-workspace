@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Refactored — Session-Title-Store Konsolidierung (2026-05-09)
+
+Klare Trennung: Local-Sessions in `local-session-store.json`, Gateway-Sessions in `session-titles.json`. Vor diesem Refactor konnte ein Local-Session-Titel in beiden Stores landen (mit potentiellem Drift). Speziell im Zero-Fork-Mode hat der `writeSessionTitle()`-Pfad in `PATCH /api/sessions` den `getLocalSession`-Branch (PR #1) komplett übersprungen, weil er VOR dem Local-Check stand — Local-Renames landeten in `session-titles.json`, parallel der Auto-Title-Hook in `withDerivedLocalTitles()` denselben Pfad nahm. Beide Stores divergierten bei jedem Edit.
+
+- **`src/routes/api/sessions.ts`**:
+  - `applyStoredTitles()` skipped jetzt Local-Sessions (`source: 'local'`) — stale Einträge in `session-titles.json` aus Pre-Refactor-Zeiten werden ignoriert (nicht migriert).
+  - `withDerivedLocalTitles()` ruft `updateLocalSessionTitle()` statt `writeSessionTitle()` — Auto-Title für Local-Sessions persistiert in den richtigen Store.
+  - PATCH-Handler: `getLocalSession`-Check (aus PR #1) wurde VOR den Zero-Fork-`writeSessionTitle`-Pfad gezogen, damit Local-Renames im Zero-Fork-Mode korrekt geroutet werden.
+  - JSDoc-Kommentare auf `writeSessionTitle`, `applyStoredTitles` dokumentieren die Source-of-Truth-Regel.
+- **`src/routes/api/-sessions.test.ts`** (neu): 9 Tests verifizieren die Trennung — `writeSessionTitle` schreibt nur Gateway-Keys, `applyStoredTitles` skipped Local-Rows (auch bei stale Pre-Refactor-Einträgen), `withDerivedLocalTitles` ruft ausschließlich `updateLocalSessionTitle`, kombinierte Chain produziert für beide Source-Typen die richtigen Titel ohne Cross-Contamination.
+
+**Kein Datenverlust**: Bestehende Local-Session-Einträge in `session-titles.json` (vor Refactor) werden ignoriert (nicht gelöscht — manueller cleanup wenn gewünscht).
+
+**Builds auf**: PR #1 / `chore/upstream-v2.3.0-pickups` (`getLocalSession`-Branch im PATCH-Handler).
+
 ### Added — Upstream v2.3.0 Pickups (2026-05-09)
 - **kimi-k2.6 256k Context Window** in `MODEL_CONTEXT_WINDOWS` (`src/server/context-usage.ts`) — fixes false 100% Context-Pressure-Alerts auf unserem Default-Modell, das bisher auf den 200k-Default zurückfiel. Cherry-pick upstream `3c7d84b0` (PR #357).
 - **Tasks-API Backend Auto-Detect** (`src/lib/tasks-api.ts`) — probt parallel `/api/hermes-tasks` und `/api/claude-tasks` beim ersten `fetchTasks()`, wählt den mit Daten (Hermes wins bei Gleichstand), cached pro Page-Session. Fixt leeres Kanban-Board für Installs, die Cron-/Agent-Tasks im Flat-File-Store (`~/.hermes/tasks.json`) halten. Adds `linkSession()`, `launchSession()`, `getActiveBackend()`, `resetBackendResolution()`, `'deleted'` Column. Cherry-pick upstream `2385c506` (PR #361). Folgefix: `tasks-screen.tsx:88` ergänzt `deleted: []` im `Record<TaskColumn, ClaudeTask[]>`-Init.

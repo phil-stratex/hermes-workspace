@@ -39,6 +39,13 @@ import {
 
 // Local patch: persistent session titles for zero-fork mode where the
 // upstream gateway doesn't accept session label updates.
+//
+// Source-of-truth split (refactor 2026-05-09):
+// - `session-titles.json` (this file) stores ONLY gateway-session titles.
+// - `local-session-store.json` (managed by `local-session-store.ts`) stores
+//   ONLY local-session (Ollama / Atomic Chat) titles via `updateLocalSessionTitle`.
+// Local-sessions must NEVER end up in `session-titles.json`. Old entries from
+// before this refactor are tolerated but ignored — see `applyStoredTitles`.
 const TITLES_FILE = path.join(
   process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes'),
   'session-titles.json',
@@ -59,7 +66,16 @@ function readSessionTitles(): Record<string, string> {
   }
   return {}
 }
-function writeSessionTitle(key: string, title: string): Promise<void> {
+/**
+ * Persist a gateway-session title locally for zero-fork mode (where the
+ * gateway doesn't accept label updates).
+ *
+ * Local-sessions (`source: 'local'`) must NOT call this — they use
+ * `updateLocalSessionTitle()` which writes to `local-session-store.json`.
+ * Routing local-session writes through here would fork their title between
+ * two stores, with potential drift.
+ */
+export function writeSessionTitle(key: string, title: string): Promise<void> {
   // Serialise read-modify-write per file path so concurrent PATCH calls
   // can't lose updates (one read => map mutation => atomic rename).
   return withMutex(TITLES_FILE, () => {
@@ -73,12 +89,23 @@ function writeSessionTitle(key: string, title: string): Promise<void> {
     }
   })
 }
-function applyStoredTitles<T extends Record<string, unknown>>(
+/**
+ * Overlay stored gateway-session titles onto a list of session summaries.
+ *
+ * Important: the title map is intended to hold ONLY gateway-session keys.
+ * Local-sessions (`source: 'local'`) get their title from `local-session-store`
+ * via `withDerivedLocalTitles()` and the listSessions merge — they are skipped
+ * here. Stale local-session entries that may exist in `session-titles.json`
+ * from before the source-of-truth split are simply ignored (no migration).
+ */
+export function applyStoredTitles<T extends Record<string, unknown>>(
   sessions: Array<T>,
 ): Array<T> {
   const titles = readSessionTitles()
   if (Object.keys(titles).length === 0) return sessions
   return sessions.map((s) => {
+    // Skip local-sessions: their title lives in local-session-store.json.
+    if (s.source === 'local') return s
     const ids = [s.key, s.id, s.friendlyId].filter(
       (v): v is string => typeof v === 'string',
     )
@@ -105,7 +132,7 @@ function truncateForTitle(text: string): string {
   return `${normalized.slice(0, MAX_DERIVED_TITLE_LENGTH - 1).trimEnd()}…`
 }
 
-function withDerivedLocalTitles<T extends Record<string, unknown>>(
+export function withDerivedLocalTitles<T extends Record<string, unknown>>(
   sessions: Array<T>,
 ): Array<T> {
   return sessions.map((s) => {
@@ -124,9 +151,11 @@ function withDerivedLocalTitles<T extends Record<string, unknown>>(
     const derived = truncateForTitle(content)
     if (!derived) return s
 
-    // Fire-and-forget persistence — next GET reads it via applyStoredTitles
-    // (which serialises read-modify-write under withMutex).
-    void writeSessionTitle(sessionId, derived)
+    // Persist into local-session-store (the source-of-truth for local-session
+    // titles). The next listSessions() merge will surface this title without
+    // any further intervention. NEVER call writeSessionTitle here — that
+    // would fork the title between two stores.
+    updateLocalSessionTitle(sessionId, derived)
 
     return { ...s, label: derived, title: derived, derivedTitle: derived }
   })
@@ -329,33 +358,12 @@ export const Route = createFileRoute('/api/sessions')({
             )
           }
 
-          if (capabilities.dashboard.available && !capabilities.enhancedChat) {
-            // Zero-fork mode: backend gateway can't accept session updates,
-            // so we persist titles locally in HERMES_HOME/session-titles.json.
-            if (label) await writeSessionTitle(sessionKey, label)
-            if (rawFriendlyId && rawFriendlyId !== sessionKey && label) {
-              await writeSessionTitle(rawFriendlyId, label)
-            }
-            return json({
-              ok: true,
-              sessionKey,
-              entry: {
-                key: sessionKey,
-                id: sessionKey,
-                friendlyId: rawFriendlyId || sessionKey,
-                title: label || sessionKey,
-                label: label || sessionKey,
-                derivedTitle: label || sessionKey,
-                updatedAt: Date.now(),
-              },
-              updated: true,
-            })
-          }
-
           // Local sessions (Ollama, Atomic Chat) live in the workspace
           // portable store, not the gateway. Persist renames there directly
-          // — calling updateSession() against the gateway would 404 because
-          // the gateway has never heard of these sessions.
+          // — calling updateSession() against the gateway would 404, AND in
+          // zero-fork mode the writeSessionTitle path below would otherwise
+          // (incorrectly) write local-session titles into session-titles.json,
+          // forking the title between two stores.
           const localSession = getLocalSession(sessionKey)
           if (localSession) {
             if (label) updateLocalSessionTitle(sessionKey, label)
@@ -377,6 +385,31 @@ export const Route = createFileRoute('/api/sessions')({
               },
               updated: true,
               source: 'local',
+            })
+          }
+
+          if (capabilities.dashboard.available && !capabilities.enhancedChat) {
+            // Zero-fork mode: backend gateway can't accept session updates,
+            // so we persist titles locally in HERMES_HOME/session-titles.json.
+            // Reaches only gateway-session keys (local-sessions are handled
+            // above via updateLocalSessionTitle).
+            if (label) await writeSessionTitle(sessionKey, label)
+            if (rawFriendlyId && rawFriendlyId !== sessionKey && label) {
+              await writeSessionTitle(rawFriendlyId, label)
+            }
+            return json({
+              ok: true,
+              sessionKey,
+              entry: {
+                key: sessionKey,
+                id: sessionKey,
+                friendlyId: rawFriendlyId || sessionKey,
+                title: label || sessionKey,
+                label: label || sessionKey,
+                derivedTitle: label || sessionKey,
+                updatedAt: Date.now(),
+              },
+              updated: true,
             })
           }
 
