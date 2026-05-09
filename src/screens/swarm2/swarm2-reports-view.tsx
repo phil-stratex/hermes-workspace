@@ -120,6 +120,7 @@ type WorkerReportCard = {
   readyCount: number
   blockedCount: number
   artifactCount: number
+  prUrl: string | null
 }
 
 const STATE_FILTERS: Array<{ id: ReportState; label: string }> = [
@@ -404,6 +405,7 @@ function buildWorkerReportCards(rows: Array<Swarm2ReportRow>): Array<WorkerRepor
       readyCount: workerRows.filter((row) => row.state === 'ready').length,
       blockedCount: workerRows.filter((row) => row.state === 'blocked').length,
       artifactCount: workerRows.reduce((sum, row) => sum + row.artifacts.length + row.previews.length, 0),
+      prUrl: extractPullRequestUrl(latest),
     }
   }).sort((a, b) => {
     const stateRank = statePriority(a.state) - statePriority(b.state)

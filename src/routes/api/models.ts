@@ -28,6 +28,9 @@ type ModelEntry = {
   [key: string]: unknown
 }
 
+// After normalizeModel() returns non-null, id is guaranteed (line ~54).
+type NormalizedModelEntry = ModelEntry & { id: string }
+
 function asRecord(value: unknown): Record<string, unknown> {
   if (value && typeof value === 'object' && !Array.isArray(value))
     return value as Record<string, unknown>
@@ -38,7 +41,7 @@ function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function normalizeModel(entry: unknown): ModelEntry | null {
+function normalizeModel(entry: unknown): NormalizedModelEntry | null {
   if (typeof entry === 'string') {
     const id = entry.trim()
     if (!id) return null
@@ -67,8 +70,12 @@ function normalizeModel(entry: unknown): ModelEntry | null {
   }
 }
 
-export function mergeModelEntries(...sources: Array<Array<ModelEntry>>): Array<ModelEntry> {
-  const merged: Array<ModelEntry> = []
+// Accepts any source shape (string ids from /v1/models, raw objects from
+// dashboard/local catalog, etc.) — normalizeModel() narrows each entry.
+export function mergeModelEntries(
+  ...sources: Array<Array<unknown>>
+): Array<NormalizedModelEntry> {
+  const merged: Array<NormalizedModelEntry> = []
   const seen = new Set<string>()
 
   for (const source of sources) {
@@ -173,7 +180,7 @@ function readClaudeDefaultModel(): ModelEntry | null {
 /**
  * Fallback: fetch models from the hermes-agent /v1/models endpoint.
  */
-async function fetchClaudeModels(): Promise<Array<ModelEntry>> {
+async function fetchClaudeModels(): Promise<Array<NormalizedModelEntry>> {
   const headers: Record<string, string> = {}
   if (BEARER_TOKEN) headers['Authorization'] = `Bearer ${BEARER_TOKEN}`
   const response = await fetch(`${CLAUDE_API}/v1/models`, { headers })
@@ -187,7 +194,7 @@ async function fetchClaudeModels(): Promise<Array<ModelEntry>> {
       : []
   return rawModels
     .map(normalizeModel)
-    .filter((e): e is ModelEntry => e !== null)
+    .filter((e): e is NormalizedModelEntry => e !== null)
 }
 
 export const Route = createFileRoute('/api/models')({

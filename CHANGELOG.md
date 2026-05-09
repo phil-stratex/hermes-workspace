@@ -5,6 +5,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed — TS-Error-Triage Quick-Wins (2026-05-09)
+
+Reduzierte 64 → 33 TypeScript-Errors (-31) in einem Schwung. Macht künftige Typecheck-Outputs lesbar und Regressionen auffindbar.
+
+- **`tsconfig.json`** — `playground-ws-worker` aus dem Root-`include` ausgeschlossen. Worker hat eigenes `tsconfig.json` mit `@cloudflare/workers-types`; Root-tsconfig zog die Worker-Files mit `vite/client`-Types ein → 10 Errors zu `DurableObjectNamespace`, `WebSocketPair`, `serializeAttachment`. Eigene Worker-tsconfig ist für `wrangler dev` da, Root-tsconfig nicht. → 10 Errors weg.
+- **`src/components/slash-command-menu.tsx:152-156`** — `export {}`-Block am Ende re-exportierte `SlashCommandDefinition` und `SlashCommandMenuHandle` die schon mit `export type` deklariert waren (Zeile 16, 27). Nur `SlashCommandMenu` re-exportiert. → 2 Errors weg.
+- **`src/routes/api/swarm-lifecycle.ts:47,51`** — `json({ ok: result.ok, ..., ...result })` hatte `ok` doppelt (explizit + spread). Spread ist canonical, expliziten `ok` entfernt. → 2 Errors weg.
+- **`src/routes/api/models.ts`** — Neuer `NormalizedModelEntry = ModelEntry & { id: string }`-Type für die Rückgabe von `normalizeModel()` (id ist im Funktions-Body garantiert). `mergeModelEntries` akzeptiert jetzt `Array<Array<unknown>>` (in Praxis nimmt es Strings + Objekte) und returnt `NormalizedModelEntry[]`. `fetchClaudeModels()` Return-Type entsprechend angepasst. → 4 Errors weg (2 in models.ts, 1 in -models.test.ts, 1 implicit).
+- **`src/routes/api/-context-usage.test.ts`** — Datei gelöscht. Testete `estimateContextTokensFromCacheRead` und `estimateContextTokensFromMessages` die nirgends mehr exportiert werden (refactor leftover). Funktionalität ist jetzt inline in `readContextUsage()`. → 2 Errors weg + 4-5 failing-Tests entfernt.
+- **`src/screens/chat/components/chat-message-list.test.tsx`** — `getTrailingToolOnlyTurnSummary`-Import + zugehöriges `describe`-Block entfernt (Funktion nicht mehr exportiert). `buildDisplayEntries`-Tests bleiben. → 1 Error weg + 2 failing-Tests entfernt.
+- **`src/screens/swarm2/swarm2-screen.tsx:142-160`** — `RuntimeEntry`-Type um `lastRealSummary?` und `lastRealResult?` erweitert. Felder werden von `swarm-dispatch.ts:539` und `swarm-orchestrator-loop.ts:79` gesetzt (echtes Checkpoint-Output vs. heuristische Fallbacks `lastSummary`/`lastResult`). Reports-View und Screen lesen sie bereits — Type-Drift war zwischen Runtime-Schreibern und Type-Deklaration. → 6 Errors weg.
+- **`src/screens/swarm2/swarm2-reports-view.tsx:111-123`** — `WorkerReportCard`-Type um `prUrl: string | null` erweitert; `buildWorkerReportCards()` Zeile 406 setzt es via `extractPullRequestUrl(latest)`. Bisher las das UI `card.prUrl` ohne Type-Garantie. → 2 Errors weg.
+- **`src/screens/swarm2/swarm2-screen.tsx:1062-1083`** — `toast({title, description, variant})`-Aufrufe (shadcn-Style) auf unsere `toast(message, {type})`-Signatur (siehe `src/components/ui/toast.tsx:23`) umgestellt. `variant: 'destructive'` → `type: 'error'`. → 3 Errors weg.
+
+**Verbleibende 33 Errors** sind Architektur-Issues für separaten Sprint:
+- 6× `src/screens/playground/hooks/use-playground-rpg.ts` — `ThinkingLevel`/`AgentWorkingStatus`-Union-Mismatches
+- 3× je in `playground-environment.tsx`, `playground-world-3d.tsx`, `text-shimmer.tsx`, `workspace-shell.tsx` — Three.js-Type-Drift, children-prop, Search-Param-Type-Generation
+- Restliche in scattered files (Three.js-Components, `swarm-kanban.ts`, etc.)
+
 ### Fixed — CRITICAL: Workspace boot crash, `errors.client.ts` collided with TanStack-Start reserved-extension (2026-05-09)
 
 **Symptom:** Sämtliche Workspace-Routes returnten 500 (`{"status":500,"unhandled":true,"message":"HTTPError"}`). VPS-Container bootete nicht durch:
