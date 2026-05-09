@@ -68,9 +68,7 @@ import {
   MenuTrigger,
 } from '@/components/ui/menu'
 import { applyTheme, useSettingsStore } from '@/hooks/use-settings'
-import { WorkspaceSwitcherDialog } from '@/components/workspace/workspace-switcher-dialog'
-import { fetchCurrentUser } from '@/lib/workspace-auth'
-import type { MeResponse } from '@/lib/workspace-auth'
+import { WorkspaceSwitcher } from '@/components/workspace/workspace-switcher'
 
 type WorkspaceStats = Record<string, unknown>
 
@@ -542,26 +540,6 @@ function ChatSidebarComponent({
 }: ChatSidebarProps) {
   const { settingsOpen, settingsSection, setSettingsOpen, handleOpenSettings } =
     useSidebarSettings()
-  const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false)
-  const [me, setMe] = useState<MeResponse | null>(null)
-  useEffect(() => {
-    let cancelled = false
-    void fetchCurrentUser().then((res) => {
-      if (cancelled) return
-      if (res && 'mode' in res && res.mode === 'multi-tenant') {
-        setMe(res as MeResponse)
-      } else {
-        setMe(null)
-      }
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-  const activeMembership = me
-    ? me.memberships.find((m) => m.workspaceId === me.activeWorkspaceId)
-      ?? me.memberships[0]
-    : null
   const profileDisplayName = useChatSettingsStore(selectChatProfileDisplayName)
   const profileAvatarDataUrl = useChatSettingsStore(
     selectChatProfileAvatarDataUrl,
@@ -1224,6 +1202,8 @@ function ChatSidebarComponent({
 
       {/* ── Footer with User Menu ─────────────────────────────────── */}
       <div className="px-0 py-2 border-t shrink-0 theme-border theme-panel">
+        {/* Multi-tenant workspace switcher (renders null in legacy mode) */}
+        <WorkspaceSwitcher collapsed={isVisuallyCollapsed} />
         {/* User card + actions */}
         <div
           className={cn(
@@ -1235,11 +1215,6 @@ function ChatSidebarComponent({
           <MenuRoot>
             <MenuTrigger
               data-tour="settings"
-              title={
-                activeMembership
-                  ? `${activeMembership.name} / ${profileDisplayName}`
-                  : profileDisplayName
-              }
               className={cn(
                 'flex items-center gap-2.5 rounded-lg py-1 transition-colors hover:bg-primary-200 dark:hover:bg-neutral-800 flex-1 min-w-0',
                 isVisuallyCollapsed ? 'justify-center px-0' : 'px-1.5',
@@ -1260,9 +1235,7 @@ function ChatSidebarComponent({
                     className="flex-1 min-w-0 flex items-center gap-1.5"
                   >
                     <span className="block truncate text-sm font-medium text-primary-900 dark:text-neutral-100">
-                      {activeMembership
-                        ? `${activeMembership.name} / ${profileDisplayName}`
-                        : profileDisplayName}
+                      {profileDisplayName}
                     </span>
                     <StatusDot />
                   </motion.div>
@@ -1285,23 +1258,6 @@ function ChatSidebarComponent({
                   Settings
                 </span>
               </MenuItem>
-              {me && me.memberships.length > 0 && (
-                <MenuItem
-                  onClick={function onOpenWorkspaceSwitcher() {
-                    setWorkspaceDialogOpen(true)
-                  }}
-                  className="justify-between"
-                >
-                  <span className="flex items-center gap-2">
-                    <HugeiconsIcon
-                      icon={Building01Icon}
-                      size={20}
-                      strokeWidth={1.5}
-                    />
-                    Workspace wechseln
-                  </span>
-                </MenuItem>
-              )}
             </MenuContent>
           </MenuRoot>
 
@@ -1331,11 +1287,6 @@ function ChatSidebarComponent({
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
         initialSection={settingsSection}
-      />
-
-      <WorkspaceSwitcherDialog
-        open={workspaceDialogOpen}
-        onOpenChange={setWorkspaceDialogOpen}
       />
 
       <ProvidersDialog open={providersOpen} onOpenChange={setProvidersOpen} />
