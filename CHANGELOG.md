@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — Council-Route Smoke-Tests (2026-05-09)
+- `src/routes/api/-council.test.ts` — 13 Smoke-Tests gegen POST/GET-Validierung + 404-paths. Bisherige Coverage 0 %, Datei ist ~610 Zeilen (drei Modi chairman/debate/moa, SSE-Streaming gegen Ollama-Cloud).
+- Scope: nur HTTP-input-handling + persistence-error-paths. SSE-stream-content, Ollama-Cloud-Fetch und MoA-Synthese sind separater Integration-Test-Sprint (würden Mock-SSE-Server / Network-Stub brauchen).
+- Cases: invalid JSON → 400, invalid mode → 400, < 2 models → 400, missing models → 400, missing/whitespace question → 400, mode default = chairman (verifies validation pipeline order), wrong Content-Type → 415; GET ohne Sessions-Dir → 200/leer, GET mit leerem Dir → 200/leer, GET mit unbekanntem id → 404 (nicht 500), GET mit `?id=.` → 400 (path-traversal-guard regression), GET mit valid id → 200/voller Record, GET-list trunkiert `question` auf 200 Zeichen + omitted `log`.
+- Mocks: `@tanstack/react-router.createFileRoute` (identity-wrapper), `@tanstack/react-start.json` (Response-factory), `route-auth-helpers.requireWorkspaceAction` (always ok), `file-reader.extractAttachmentText` + `renderTextAttachmentsAsBlock` (defaults), `globalThis.fetch` (throws — defence in depth, kein Network-Call gegen ollama.com darf entweichen). HERMES_HOME → tmpdir per Test, `OLLAMA_API_KEY` auf Sentinel.
+- Befund: keine Bugs, alle 13 Tests grün. Path-traversal-Guard `/^[a-zA-Z0-9_-]{4,128}$/` (council.ts:553) ist in den Tests pinned — regressioniert nicht still.
+
 ### Fixed — CRITICAL: Workspace boot crash, `errors.client.ts` collided with TanStack-Start reserved-extension (2026-05-09)
 
 **Symptom:** Sämtliche Workspace-Routes returnten 500 (`{"status":500,"unhandled":true,"message":"HTTPError"}`). VPS-Container bootete nicht durch:
