@@ -5,6 +5,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — `scripts/dev/diff-from-upstream.sh` für Patches-Tracking (2026-05-09)
+
+**Problem:** Bisher wurde der Stratex-Patch-Stand in einer Memory-Datei (`hermes_workspace_patches.md`) hand-gepflegt. Drift garantiert — Patches die nach dem letzten Memory-Update dazukommen, werden bei jedem upstream-merge übersehen.
+
+**Fix:** Neues Script `scripts/dev/diff-from-upstream.sh` generiert auf Knopfdruck einen frischen Patch-Status-Report aus dem git-tree:
+
+```bash
+bash scripts/dev/diff-from-upstream.sh           # default: vs upstream/main
+bash scripts/dev/diff-from-upstream.sh v2.4.0    # vs specific tag
+bash scripts/dev/diff-from-upstream.sh --short   # ohne file-by-file stats
+```
+
+**Output:**
+1. Commits ahead/behind merge-base (ours vs upstream)
+2. Liste unserer Stratex-Commits seit merge-base
+3. Liste der upstream-Commits seit merge-base
+4. **OVERLAP** — Files die beide geändert haben (Konflikt-Zone für hand-merge)
+5. File-by-file diff stats für beide Seiten (mit `--short` ausgeblendet)
+6. Grep nach `// @stratex-patch:` Marker-Kommentaren im Code
+7. Cheatsheet für nächsten upstream-merge
+
+**Optionale Marker-Konvention:** An kritischen Edit-Stellen kann ein `// @stratex-patch: <reason>` Kommentar gesetzt werden — das Script greppt sie und zeigt sie am Ende des Reports. Fragil-aber-grepbar Alternative zum Memory-Pflegen. Beispiel:
+```ts
+// @stratex-patch: failsafe timer 10000→500ms — hängende Thinking-Bubble verschwindet schneller
+const FAILSAFE_TIMEOUT_MS = 500
+```
+
+Das Script ist seit jetzt die **Source of Truth** für "was haben wir gepatcht". `hermes_workspace_patches.md` (in der Memory) bleibt als kuratierter Spickzettel mit `Why:`-Erklärungen pro Patch, ist aber nicht mehr autoritativ.
+
 ### Fixed — CRITICAL: Workspace boot crash, `errors.client.ts` collided with TanStack-Start reserved-extension (2026-05-09)
 
 **Symptom:** Sämtliche Workspace-Routes returnten 500 (`{"status":500,"unhandled":true,"message":"HTTPError"}`). VPS-Container bootete nicht durch:
