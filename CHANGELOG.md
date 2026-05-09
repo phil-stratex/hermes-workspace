@@ -53,9 +53,11 @@ Neuer globaler Error-Log-Stack mit UI-Viewer, Live-Tail, Frontend-Capture und Bu
 - **`swarm-docker-exec.ts`** — `proc.on('error', ...)` Spawn-Failure-Handler loggt jetzt `logger.warn('docker-exec spawn failed', { cmd, argsCount, container, dockerMode })`. Vorher war ein "docker not found" oder "container missing" silent — gestopptes Result, kein Eintrag.
 - **`swarm-tmux-start.ts` / `swarm-tmux-stop.ts` / `swarm-tmux-scroll.ts`** — VPS-mode Error-Paths (start.ok=false / kill.ok=false / copy-mode-failed) loggen jetzt `logger.warn('swarm tmux <op> failed (vps-mode)', { workerId, sessionName, container, stderr })` bevor sie 500 zurückgeben. Operator sieht stderr direkt im Error-Log, ohne `docker logs` zu querer.
 
+### Added — Hermes-Hook-Wave 3 (2026-05-09)
+- **`atomic-write.ts:writeTextAtomic`** — Catch-Branch loggt jetzt `logger.error('atomic-write failed', { source: 'storage', op: 'writeText', target, byteLength })` neben dem bestehenden `throw err`. Lazy-Import von `./logger` (`void import('./logger').then(...)`), so dass der Module-Init-Cycle (logger → error-store → atomic-write → logger) zur Boot-Zeit nicht greift. Logger-Failures werden swallowed, der Original-Throw propagiert weiter zum Caller. 121/121 Tests grün, 57 affected files (audit-log/users-store/workspace-store/sessions-privacy) ungebrochen.
+
 Bewusst weiterhin ausgelassen:
-- `atomic-write.ts` Write-Fail — würde einen Module-Cycle erzeugen (logger → error-store → atomic-write → logger). Caller catched + loggt.
-- `swarm-tmux-*` Worker-Crash 60-s-Health-Probe — separate Infrastruktur (background interval), nicht nur ein Catch-Hook. Eigener Patch wenn benötigt.
+- `swarm-tmux-*` Worker-Crash 60-s-Health-Probe — separate Infrastruktur (background interval mit roster-vs-tmux-session diff), nicht nur ein Catch-Hook. Eigener Patch wenn benötigt.
 
 ### Tests
 - **113 neue Vitest-Cases** in `request-context.test.ts` (5), `error-redact.test.ts` (27 incl. **N4** Recursion-Tests), `error-acl.test.ts` (12, alle drei Auto-Detect-Fixtures), `global-settings.test.ts` (16, incl. 50 parallele `addStackAdmin`), `logger.test.ts` (10), `error-store.test.ts` (25, incl. **N1** Dedup mit `lastOccurrenceAt`, Hash-Chain-Validation, Tampering-Detection), `error-retention.test.ts` (6, incl. **I1** Per-Date-Mutex-Race-Test), `builder-brief.test.ts` (7), `stack-admin-bootstrap.test.ts` (5).

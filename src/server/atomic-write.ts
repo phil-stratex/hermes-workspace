@@ -29,6 +29,19 @@ export function writeTextAtomic(target: string, text: string): void {
     } catch {
       // tmp may not exist if writeFileSync failed before flush — ignore
     }
+    // Lazy-import logger to avoid the module-init cycle (logger →
+    // error-store → atomic-write). At call-time both modules are
+    // long initialised. We swallow logger errors so the original
+    // throw still propagates to the caller for handling.
+    void import('./logger')
+      .then(({ logger }) => {
+        logger.error(
+          'atomic-write failed',
+          { source: 'storage', op: 'writeText', target, byteLength: text.length },
+          err instanceof Error ? err : new Error(String(err)),
+        )
+      })
+      .catch(() => undefined)
     throw err
   }
 }
