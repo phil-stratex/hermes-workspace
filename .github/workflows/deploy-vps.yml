@@ -33,12 +33,53 @@ jobs:
               ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
               2>&1 | tee deploy.log
 
-      - name: Verify deploy succeeded
+      - name: Verify deploy script succeeded
         run: |
           if ! grep -qE "(deployed at|nothing to do)" deploy.log; then
             echo "::error::Deploy script did not produce expected output"
             tail -30 deploy.log
             exit 1
           fi
-          echo "✓ Deploy verified"
+          echo "✓ Deploy script ran"
           tail -5 deploy.log
+
+      # Even when deploy.sh prints "deployed at …", a Vite-side error
+      # (Tailwind token, broken import, port collision) can leave the
+      # workspace returning 500/502.  Probe the **public** URL — the SSH
+      # key is restricted to running deploy.sh only, so we can't curl over
+      # SSH; instead we hit the nginx-fronted endpoint directly from the
+      # GitHub runner.
+      #
+      # nginx fronts the workspace with BasicAuth, so a healthy server
+      # returns 401 (auth required) on /api/setup-status without
+      # credentials.  We accept 200/401 as healthy (server is up).
+      # 502/503/504 = workspace down behind nginx.  Anything else = nginx
+      # or DNS issue (also a deploy failure).
+      - name: Health-check workspace via public URL
+        env:
+          PUBLIC_URL: ${{ secrets.VPS_PUBLIC_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PUBLIC_URL:-}" ]; then
+            echo "::warning::VPS_PUBLIC_URL secret not set — skipping health check"
+            exit 0
+          fi
+          for i in 1 2 3 4 5 6; do
+            RES=$(curl -fs -o /dev/null -w "%{http_code}" --max-time 8 \
+                       "${PUBLIC_URL%/}/api/setup-status" 2>/dev/null \
+                  || curl -s -o /dev/null -w "%{http_code}" --max-time 8 \
+                          "${PUBLIC_URL%/}/api/setup-status" 2>/dev/null \
+                  || echo "fail")
+            case "$RES" in
+              200|401)
+                echo "✓ Workspace healthy after $((i*5))s (HTTP $RES)"
+                exit 0
+                ;;
+              *)
+                echo "Attempt $i: HTTP=$RES, waiting 5s..."
+                sleep 5
+                ;;
+            esac
+          done
+          echo "::error::Workspace did not return 200/401 within 30s after deploy (last: $RES)"
+          exit 1
