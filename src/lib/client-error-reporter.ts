@@ -1,8 +1,14 @@
 /**
  * Browser-side error capture. Two listeners + a fetch wrapper post to
- * `/api/errors/client` so React-render-errors aren't the only thing we
+ * `/api/errors/report` so React-render-errors aren't the only thing we
  * see — uncaught throws, rejected promises and failing fetches all
  * land in the same JSONL store as backend errors.
+ *
+ * URL note: `/api/errors/report`, NOT `/api/errors/client`. The
+ * filename `errors.client.ts` collided with TanStack-Start's
+ * reserved `.client.ts` extension (client-only code stripped from the
+ * SSR bundle), causing `Cannot convert object to primitive value` at
+ * route-tree-build → workspace boot 500. Renamed to `errors.report.ts`.
  *
  * Rate-limit: a token-bucket of 10 reports per 60 s per tab. The 11th
  * Error in 60 s gets dropped client-side with a console.warn — protects
@@ -14,7 +20,7 @@
  * ErrorBoundary fallback).
  */
 
-const POST_URL = '/api/errors/client'
+const POST_URL = '/api/errors/report'
 const RATE_WINDOW_MS = 60_000
 const RATE_MAX = 10
 

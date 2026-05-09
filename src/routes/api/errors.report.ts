@@ -1,12 +1,21 @@
 /**
- * POST /api/errors/client
+ * POST /api/errors/report
  *
  * Browser → Backend error reporting. Any authenticated user (Member,
  * Admin, Owner — not just Stack-Admin) may submit, otherwise a Member
  * couldn't report a frontend bug she's hitting.
  *
+ * Filename note: was `errors.client.ts` originally, but TanStack-Start
+ * reserves the `.client.ts` extension for client-only code that must
+ * NOT be imported by server bundles. Naming a server-side route handler
+ * `errors.client.ts` made the build silently strip the handler from
+ * the SSR bundle — at boot, `route.id` resolved to `undefined`/proxy
+ * and `routeTree` parsing crashed with
+ * `TypeError: Cannot convert object to primitive value`.
+ * Renamed to `errors.report.ts` so the URL is `/api/errors/report`.
+ *
  * Anti-spoof:
- *   - `source` is hard-coded to `'frontend'` server-side; the body
+ *   - `source` is hard-coded to ``frontend`` server-side; the body
  *     value is ignored, so a malicious caller can't pretend to be a
  *     backend entry.
  *   - `stack` is run through the same redact pipeline as backend
@@ -55,7 +64,7 @@ function asBrowser(
   return ua || url || viewport ? { userAgent: ua, url, viewport } : undefined
 }
 
-export const Route = createFileRoute('/api/errors/client')({
+export const Route = createFileRoute('/api/errors/report')({
   server: {
     handlers: {
       POST: async ({ request }) => {

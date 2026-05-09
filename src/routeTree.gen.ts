@@ -170,9 +170,9 @@ import { Route as ApiKnowledgeGraphRouteImport } from './routes/api/knowledge/gr
 import { Route as ApiKnowledgeConfigRouteImport } from './routes/api/knowledge/config'
 import { Route as ApiFileArtifactsArtifactIdRouteImport } from './routes/api/file-artifacts/$artifactId'
 import { Route as ApiErrorsStreamRouteImport } from './routes/api/errors.stream'
+import { Route as ApiErrorsReportRouteImport } from './routes/api/errors.report'
 import { Route as ApiErrorsHealthRouteImport } from './routes/api/errors.health'
 import { Route as ApiErrorsExportRouteImport } from './routes/api/errors.export'
-import { Route as ApiErrorsClientRouteImport } from './routes/api/errors.client'
 import { Route as ApiErrorsIdRouteImport } from './routes/api/errors.$id'
 import { Route as ApiDashboardOverviewRouteImport } from './routes/api/dashboard/overview'
 import { Route as ApiClaudeTasksTaskIdRouteImport } from './routes/api/claude-tasks.$taskId'
@@ -1021,6 +1021,11 @@ const ApiErrorsStreamRoute = ApiErrorsStreamRouteImport.update({
   path: '/stream',
   getParentRoute: () => ApiErrorsRoute,
 } as any)
+const ApiErrorsReportRoute = ApiErrorsReportRouteImport.update({
+  id: '/report',
+  path: '/report',
+  getParentRoute: () => ApiErrorsRoute,
+} as any)
 const ApiErrorsHealthRoute = ApiErrorsHealthRouteImport.update({
   id: '/health',
   path: '/health',
@@ -1029,11 +1034,6 @@ const ApiErrorsHealthRoute = ApiErrorsHealthRouteImport.update({
 const ApiErrorsExportRoute = ApiErrorsExportRouteImport.update({
   id: '/export',
   path: '/export',
-  getParentRoute: () => ApiErrorsRoute,
-} as any)
-const ApiErrorsClientRoute = ApiErrorsClientRouteImport.update({
-  id: '/client',
-  path: '/client',
   getParentRoute: () => ApiErrorsRoute,
 } as any)
 const ApiErrorsIdRoute = ApiErrorsIdRouteImport.update({
@@ -1372,9 +1372,9 @@ export interface FileRoutesByFullPath {
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
   '/api/errors/$id': typeof ApiErrorsIdRoute
-  '/api/errors/client': typeof ApiErrorsClientRoute
   '/api/errors/export': typeof ApiErrorsExportRoute
   '/api/errors/health': typeof ApiErrorsHealthRoute
+  '/api/errors/report': typeof ApiErrorsReportRoute
   '/api/errors/stream': typeof ApiErrorsStreamRoute
   '/api/file-artifacts/$artifactId': typeof ApiFileArtifactsArtifactIdRoute
   '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
@@ -1577,9 +1577,9 @@ export interface FileRoutesByTo {
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
   '/api/errors/$id': typeof ApiErrorsIdRoute
-  '/api/errors/client': typeof ApiErrorsClientRoute
   '/api/errors/export': typeof ApiErrorsExportRoute
   '/api/errors/health': typeof ApiErrorsHealthRoute
+  '/api/errors/report': typeof ApiErrorsReportRoute
   '/api/errors/stream': typeof ApiErrorsStreamRoute
   '/api/file-artifacts/$artifactId': typeof ApiFileArtifactsArtifactIdRoute
   '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
@@ -1783,9 +1783,9 @@ export interface FileRoutesById {
   '/api/claude-tasks/$taskId': typeof ApiClaudeTasksTaskIdRoute
   '/api/dashboard/overview': typeof ApiDashboardOverviewRoute
   '/api/errors/$id': typeof ApiErrorsIdRoute
-  '/api/errors/client': typeof ApiErrorsClientRoute
   '/api/errors/export': typeof ApiErrorsExportRoute
   '/api/errors/health': typeof ApiErrorsHealthRoute
+  '/api/errors/report': typeof ApiErrorsReportRoute
   '/api/errors/stream': typeof ApiErrorsStreamRoute
   '/api/file-artifacts/$artifactId': typeof ApiFileArtifactsArtifactIdRoute
   '/api/knowledge/config': typeof ApiKnowledgeConfigRoute
@@ -1991,9 +1991,9 @@ export interface FileRouteTypes {
     | '/api/claude-tasks/$taskId'
     | '/api/dashboard/overview'
     | '/api/errors/$id'
-    | '/api/errors/client'
     | '/api/errors/export'
     | '/api/errors/health'
+    | '/api/errors/report'
     | '/api/errors/stream'
     | '/api/file-artifacts/$artifactId'
     | '/api/knowledge/config'
@@ -2196,9 +2196,9 @@ export interface FileRouteTypes {
     | '/api/claude-tasks/$taskId'
     | '/api/dashboard/overview'
     | '/api/errors/$id'
-    | '/api/errors/client'
     | '/api/errors/export'
     | '/api/errors/health'
+    | '/api/errors/report'
     | '/api/errors/stream'
     | '/api/file-artifacts/$artifactId'
     | '/api/knowledge/config'
@@ -2401,9 +2401,9 @@ export interface FileRouteTypes {
     | '/api/claude-tasks/$taskId'
     | '/api/dashboard/overview'
     | '/api/errors/$id'
-    | '/api/errors/client'
     | '/api/errors/export'
     | '/api/errors/health'
+    | '/api/errors/report'
     | '/api/errors/stream'
     | '/api/file-artifacts/$artifactId'
     | '/api/knowledge/config'
@@ -3760,6 +3760,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiErrorsStreamRouteImport
       parentRoute: typeof ApiErrorsRoute
     }
+    '/api/errors/report': {
+      id: '/api/errors/report'
+      path: '/report'
+      fullPath: '/api/errors/report'
+      preLoaderRoute: typeof ApiErrorsReportRouteImport
+      parentRoute: typeof ApiErrorsRoute
+    }
     '/api/errors/health': {
       id: '/api/errors/health'
       path: '/health'
@@ -3772,13 +3779,6 @@ declare module '@tanstack/react-router' {
       path: '/export'
       fullPath: '/api/errors/export'
       preLoaderRoute: typeof ApiErrorsExportRouteImport
-      parentRoute: typeof ApiErrorsRoute
-    }
-    '/api/errors/client': {
-      id: '/api/errors/client'
-      path: '/client'
-      fullPath: '/api/errors/client'
-      preLoaderRoute: typeof ApiErrorsClientRouteImport
       parentRoute: typeof ApiErrorsRoute
     }
     '/api/errors/$id': {
@@ -4163,18 +4163,18 @@ const ApiClaudeTasksRouteWithChildren = ApiClaudeTasksRoute._addFileChildren(
 
 interface ApiErrorsRouteChildren {
   ApiErrorsIdRoute: typeof ApiErrorsIdRoute
-  ApiErrorsClientRoute: typeof ApiErrorsClientRoute
   ApiErrorsExportRoute: typeof ApiErrorsExportRoute
   ApiErrorsHealthRoute: typeof ApiErrorsHealthRoute
+  ApiErrorsReportRoute: typeof ApiErrorsReportRoute
   ApiErrorsStreamRoute: typeof ApiErrorsStreamRoute
   ApiErrorsRelatedRequestIdRoute: typeof ApiErrorsRelatedRequestIdRoute
 }
 
 const ApiErrorsRouteChildren: ApiErrorsRouteChildren = {
   ApiErrorsIdRoute: ApiErrorsIdRoute,
-  ApiErrorsClientRoute: ApiErrorsClientRoute,
   ApiErrorsExportRoute: ApiErrorsExportRoute,
   ApiErrorsHealthRoute: ApiErrorsHealthRoute,
+  ApiErrorsReportRoute: ApiErrorsReportRoute,
   ApiErrorsStreamRoute: ApiErrorsStreamRoute,
   ApiErrorsRelatedRequestIdRoute: ApiErrorsRelatedRequestIdRoute,
 }
