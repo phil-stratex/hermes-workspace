@@ -5,6 +5,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — Tests für Stratex-Custom-Module: scoreWorker + file-reader (2026-05-09)
+
+**Problem:** Drei kritische Stratex-Custom-Module hatten **null Test-Coverage** — kein Safety-Net bei Refactor oder Code-Änderung. Bei silent break würde uns nichts schreien.
+
+**Fix:** Neue Test-Suites für die zwei pure-function-lastigsten Module:
+
+- **`src/routes/api/-swarm-decompose.test.ts`** — 17 Tests für `scoreWorker(prompt, worker) → number`. Coverage:
+  - Topic-pattern bonuses (research/analysis, builder/implementation, reviewer/review, ops/runtime, docs/scribe) — pro Term-Hit +3
+  - `preferredTaskTypes`-Bonus (+5/Hit, gecapt bei 15)
+  - Busy-State-Penalty (running/active/thinking/reviewing/writing → -4; blocked/error → -8; idle/offline → kein Penalty)
+  - Case-Insensitivity beim state-Matching
+  - B2-Invariante: free-worker schlägt equally-matched busy-worker
+  - `preferredTaskTypes` überschreibt busy-state penalty bei stark genug
+  - Determinismus + Idempotenz
+  - Edge-Cases: minimal worker (only id), empty prompt, undefined optional fields
+  - **Code-Change:** `scoreWorker` und `WorkerHint` exportiert (waren intern). Pure functions, kein Behavior-Change.
+
+- **`src/server/file-reader.test.ts`** — 24 Tests für `extractAttachmentText()` + `renderTextAttachmentsAsBlock()`. Coverage:
+  - Text-MIME-Types (`text/plain`, `text/markdown`, `application/json`, `application/x-typescript`)
+  - Extension-basierte Detection (`.ts`, `.py`) wenn MIME fehlt/wrong
+  - 200KB-Truncation mit Marker
+  - Image-Passthrough (kind:`image`)
+  - PDF ohne docker-exec → kind:`unsupported` mit klarer Hint
+  - PDF mit zero bytes → unsupported
+  - Unsupported types (`application/zip`, fehlender contentType)
+  - Robustness: missing name → `'attachment'`, base64-Field-Alternative, raw-text dataUrl ohne `data:`-Prefix
+  - `renderTextAttachmentsAsBlock`: empty-input, no-text-attachments, empty-text-skip, attachment-tag-format, truncated-flag, **XSS-Safety** (special chars in name/contentType escaped), multi-attachment-separator
+  - **Mocking:** `swarm-docker-exec` via vitest mock — keine echte docker-exec-Calls, Tests laufen offline.
+
+**Test-Status:** 41/41 neue Tests grün. Existing tests: 1056 passed (unverändert).
+
+**Why nicht council.ts?** 600+ Zeilen mit SSE-Streaming gegen Ollama-Cloud — pure-function-Test wäre nur 5-10% Coverage. Voll-Test wäre Integration-Test-Territory (Mock-SSE-Server). Bewusst aus diesem Sprint.
+
+**Why nicht local-session-store?** Würde Real-FS-Roundtrips mit Atomic-Write-Race-Tests brauchen — nice-to-have aber nicht critical-path. Aus diesem Sprint, hat schon `atomic-write.test.ts` als Foundation.
+
 ### Fixed — CRITICAL: Workspace boot crash, `errors.client.ts` collided with TanStack-Start reserved-extension (2026-05-09)
 
 **Symptom:** Sämtliche Workspace-Routes returnten 500 (`{"status":500,"unhandled":true,"message":"HTTPError"}`). VPS-Container bootete nicht durch:
