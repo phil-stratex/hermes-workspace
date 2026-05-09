@@ -5,6 +5,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed — Three.js + @react-three/fiber TS-Errors in playground/components (2026-05-09)
+
+Reduzierte TS-Errors um 10 (von 64 auf 54) durch reine Typing-Fixes — kein Behavior-Change im 3D-Rendering. Alle 10 Errors in `src/screens/playground/components/` adressiert.
+
+- **`pnpm add -D @types/three@0.184.0`** — 3 implicit-any-Errors (TS7016) auf `playground-environment.tsx`, `playground-glb-body.tsx`, `playground-world-3d.tsx` weg.
+- **`pnpm.overrides["@types/three"] = "0.184.0"`** — pinnt einzige Version, sonst zog `ecctrl@1.0.97` ein altes `@types/three@0.177.0` und es entstanden Vector3-Mismatch-Errors zwischen `0.177` und `0.184` Type-Imports.
+- **`GroupProps`-Import** in `npc-character.tsx` und `player-character.tsx` ersetzt durch `type GroupProps = ThreeElements['group']` (`@react-three/fiber@9` exportiert `GroupProps` nicht mehr direkt, statt dessen `ThreeElements`-Map).
+- **`glow?: string`** zur inline-`Decoration`-Type in `playground-environment.tsx:588` ergänzt — wurde an Lines 661+715 für Pine-Tree-Glow benutzt.
+- **`playground-dialog.tsx`**: `npcId`-Narrowing in hoisted `function handleChoice(...)` ging verloren (TS-Limitation bei function-declarations vs arrow-functions). Fix: nach `if (!npcId) return null` ein `const activeNpcId = npcId` capturen und im hoisted-Body verwenden.
+- **`playground-world-3d.tsx:1310`**: `<PlaygroundNpcGlb npcId={...} />` → `<PlaygroundNpcGlb avatar={...} />` — die Component-Props-Type heißt `avatar`, nicht `npcId`. Bug-Finding: Code hat trotzdem funktioniert weil `npcId` an React durchgeleitet aber von der Component ignoriert wurde — der GLB-Pfad wurde immer auf `'villager-common'` (Default) probed statt auf den echten NPC.
+- **`playground-environment.tsx:583`**: `worldId`-Union erweitert um `'training'` (von `'agora' | 'forge' | 'grove' | 'oracle' | 'arena'`), passt jetzt zum globalen `PlaygroundWorldId`. Für `'training'` produziert `ScatteredScenery` nur die gemeinsame Common-Scenery (kein Train-Block) — das ist by-design, weil die Training-Welt eigene NPCs/Decor in `playground-world-3d.tsx` direkt setzt.
+
+Constraints honoriert: kein `as any`, kein `// @ts-ignore`, kein `// @ts-expect-error`. Reine Typing-Fixes.
+
 ### Fixed — CRITICAL: Workspace boot crash, `errors.client.ts` collided with TanStack-Start reserved-extension (2026-05-09)
 
 **Symptom:** Sämtliche Workspace-Routes returnten 500 (`{"status":500,"unhandled":true,"message":"HTTPError"}`). VPS-Container bootete nicht durch:
