@@ -5,6 +5,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — Deploy-Workflow Health-Validation via public-URL probe (2026-05-09)
+
+**Problem:** `.github/workflows/deploy-vps.yml` greppt aktuell nur den SSH-Output nach `(deployed at|nothing to do)` — ein erfolgreich gelaufenes `deploy.sh` ist aber **kein Beweis dass der Vite-Workspace tatsächlich antwortet**. Wenn nach dem Container-Restart ein Vite-Boot-Fehler greift (Tailwind-Token, kaputter Import, Port-Collision), bleibt die Site `500/502`, der Workflow meldet aber ✓.
+
+**Bisherige Erkennung:** Manuell — User merkt es erst beim nächsten Page-Load.
+
+**Fix:** Neuer Step `Health-check workspace via public URL` nach `Verify deploy script succeeded` in `.github/workflows/deploy-vps.yml`. Probt 6× mit 5s-Abstand (max 30s) die public URL.
+
+- **Probe-Strategie:** `curl ${PUBLIC_URL}/api/setup-status` direkt vom GitHub-Runner (NICHT via SSH — der restricted SSH-Key erlaubt nur `deploy.sh`, kein freies `curl` auf VPS-side).
+- **Akzeptiert:** HTTP `200` ODER `401` (nginx-BasicAuth = Server lebt + Server-Process antwortet hinter nginx). Beide beweisen dass die Workspace-Route gerendert wird.
+- **Fail:** `502/503/504/404`/Timeout — Workspace down oder nginx-Routing-Bug. Workflow exited mit code 1, GitHub-Actions-Run rot.
+- **Skip:** Wenn `VPS_PUBLIC_URL`-Secret nicht gesetzt → `::warning::` und exit 0 (backwards-compatible für andere Forks/Setups).
+
+**Setup nötig:** Repo-Secret `VPS_PUBLIC_URL` setzen (z. B. `https://hermes.stratex-ai.cloud`). Ohne Secret läuft alles wie vorher.
+
+**Why public URL und nicht localhost via SSH?** Der Deploy-SSH-Key ist via `forced_command` auf `/docker/.../deploy.sh` beschränkt (Commit `7f0ffbb9`) — er kann auf der VPS-Host-Side keine andere Command ausführen. Public-URL-Probe ist der saubere Workaround und testet zusätzlich die Reverse-Proxy-Kette (DNS → nginx auf Hostinger-VPS → Vite-Workspace-Container) end-to-end.
+
 ### Fixed — CRITICAL: Workspace boot crash, `errors.client.ts` collided with TanStack-Start reserved-extension (2026-05-09)
 
 **Symptom:** Sämtliche Workspace-Routes returnten 500 (`{"status":500,"unhandled":true,"message":"HTTPError"}`). VPS-Container bootete nicht durch:
