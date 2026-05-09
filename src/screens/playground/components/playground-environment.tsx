@@ -580,12 +580,12 @@ export function ScatteredScenery({
   worldId,
   seed = 1,
 }: {
-  worldId: 'agora' | 'forge' | 'grove' | 'oracle' | 'arena'
+  worldId: 'training' | 'agora' | 'forge' | 'grove' | 'oracle' | 'arena'
   seed?: number
 }) {
   const items = useMemo(() => {
     const r = rng(seed * 100 + worldId.length)
-    const out: { type: string; pos: [number, number, number]; color?: string; scale?: number }[] = []
+    const out: { type: string; pos: [number, number, number]; color?: string; scale?: number; glow?: string }[] = []
 
     function maybeOnEdge(): [number, number, number] {
       // Place on ring 14-22 from center

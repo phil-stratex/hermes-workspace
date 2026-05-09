@@ -1,5 +1,7 @@
-import { GroupProps } from '@react-three/fiber'
+import type { ThreeElements } from '@react-three/fiber'
 import { HERMESWORLD_CHARACTER_ARCHETYPES } from '../lib/character-config'
+
+type GroupProps = ThreeElements['group']
 
 const PLAYER_ARCHETYPE = HERMESWORLD_CHARACTER_ARCHETYPES.find(
   (entry) => entry.id === 'player-adventurer',

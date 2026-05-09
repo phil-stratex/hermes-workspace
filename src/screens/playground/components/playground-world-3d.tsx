@@ -1307,7 +1307,7 @@ function NPC({
       </mesh>
       {hasGlb ? (
         // GLB body replaces voxel meshes when /avatars-3d/<id>.glb is present.
-        <PlaygroundNpcGlb npcId={npcId || avatar} />
+        <PlaygroundNpcGlb avatar={npcId || avatar} />
       ) : (
         <>
           {/* legs */}
