@@ -32,6 +32,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { useCanSeeErrors } from '@/hooks/use-can-see-errors'
+import { NotificationBell } from '@/components/notification-bell'
 import { CHAT_OPEN_SETTINGS_EVENT } from '../chat-events'
 import { useChatSettings as useSidebarSettings } from '../hooks/use-chat-settings'
 import { useDeleteSession } from '../hooks/use-delete-session'
@@ -1305,7 +1306,7 @@ function ChatSidebarComponent({
             </MenuContent>
           </MenuRoot>
 
-          {/* Settings + Theme toggle */}
+          {/* Settings + Notification + Theme toggle */}
           {!isVisuallyCollapsed && (
             <div className="flex items-center gap-0.5">
               <button
@@ -1320,6 +1321,9 @@ function ChatSidebarComponent({
                   strokeWidth={1.5}
                 />
               </button>
+              {/* NotificationBell self-renders null when canSeeErrors=false,
+                  so non-stack-admins see no chip at all. */}
+              <NotificationBell />
               <ThemeToggleMini />
             </div>
           )}
