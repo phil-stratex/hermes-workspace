@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed — CHANGELOG hygiene (2026-05-09)
+- **WorkspaceSwitcher-Doppeleintrag konsolidiert** — der separate `### Removed — Separate WorkspaceSwitcher-Card`-Block ist gelöscht; das gleiche Faktum steht bereits im `### Changed — Workspace-Switcher in User-Card-Dropdown integriert`-Block (`src/components/workspace/workspace-switcher.tsx` entfernt). Dadurch wird der `[Unreleased]`-Block von zwei widersprüchlich aussehenden Bullets befreit, die beim Top-Down-Lesen Verwirrung erzeugten.
+- **`### Changed` (topic-loos) im Error-Tracking-Block** mit explizitem Topic-Suffix versehen, damit klar ist, wozu die drei Bullets (`__root.tsx` initializes `installClientErrorReporter`, `error-boundary.tsx` ruft `reportClientError`, `chat-event-bus.ts:69` nutzt `logger.warn`) gehören.
+- **NotificationBell-Status präzisiert** — der Komponenten-Bullet im Error-Tracking-Block sagte "Multi-Tenant-only Header-Button", aber die Komponente ist aktuell **nirgends gemountet** (kein Treffer in `src/routes/__root.tsx` / `src/screens/`); Mount-Integration ist als TODO markiert. Der `useCanSeeErrors()`-Hook und die Backend-API existieren — nur das Mount-Element fehlt.
+
 ### Changed — Workspace-Switcher in User-Card-Dropdown integriert (2026-05-09)
 
 Footer der Chat-Sidebar hatte zwei separate Cards (separate `WorkspaceSwitcher`-Card oben + User-Card unten). Auf Phils Wunsch zusammengeführt:
@@ -16,9 +21,6 @@ Footer der Chat-Sidebar hatte zwei separate Cards (separate `WorkspaceSwitcher`-
   - Conditional `MenuItem` „Workspace wechseln" (`Building01Icon`) im User-Dropdown — sichtbar nur bei Multi-Tenant + Memberships > 0; öffnet den neuen Dialog.
   - `<WorkspaceSwitcherDialog>` neben `<SettingsDialog>` gemountet.
 - **`src/components/workspace/workspace-switcher.tsx`** entfernt — Logik vollständig in den Dialog migriert.
-
-### Removed — Separate WorkspaceSwitcher-Card (2026-05-09)
-- Obere von zwei redundanten Footer-Karten.
 
 ### Added — Error-Tracking & Trouble-Shooting-Center (2026-05-09)
 
@@ -38,11 +40,11 @@ Neuer globaler Error-Log-Stack mit UI-Viewer, Live-Tail, Frontend-Capture und Bu
 - **Frontend-Capture** — bestehende `ErrorBoundary` (`src/components/error-boundary.tsx`) erweitert um POST an `/api/errors/client`. Production-Build zeigt nur die Report-ID, kein Stack. Dev behält Stack im UI. Plus `src/lib/client-error-reporter.ts` mit `window.error` + `unhandledrejection` Listenern und `trackedFetch`-Wrapper. Token-Bucket-Rate-Limit 10 Errors/min/Tab — die 11. wird client-side gedroppt.
 - **`POST /api/errors/client`** — jeder authentifizierte User (nicht nur Stack-Admin) darf eigene Frontend-Errors melden. `source` ist server-side hardcoded auf `'frontend'` (anti-spoof). Stack-Truncation und Auto-Redaction wie Backend-Pfad.
 - **SSE Live-Tail** unter `GET /api/errors/stream` — Heartbeat-Comment alle 30 s, Auto-Disconnect nach 30 min Idle, Filter via Query-Parameter (`?level=fatal,error&source=backend`). In-Process Pub/Sub via `error-events.ts` mit Cap auf 20 Subscribers.
-- **NotificationBell** (`src/components/notification-bell.tsx`) — Multi-Tenant-only Header-Button mit unread-Counter (Fatal+Error, 24h), Dropdown mit Top-5 + "Alle ansehen". Persistierung via `data/users/<id>/preferences.json` (neue `user-preferences.ts` Helper + `PATCH /api/users/me/preferences` Endpoint). **N3** `staleTime: 60_000` matcht die Sidebar-Visibility-Probe — beide Queries deduplizieren auf demselben Key.
+- **NotificationBell** (`src/components/notification-bell.tsx`) — Multi-Tenant-only Header-Button mit unread-Counter (Fatal+Error, 24h), Dropdown mit Top-5 + "Alle ansehen". Persistierung via `data/users/<id>/preferences.json` (neue `user-preferences.ts` Helper + `PATCH /api/users/me/preferences` Endpoint). **N3** `staleTime: 60_000` matcht die Sidebar-Visibility-Probe — beide Queries deduplizieren auf demselben Key. **TODO**: Komponente ist fertig, aber noch nicht in `__root.tsx`/Header gemountet — Mount-Integration in einem Folge-Patch (siehe CHANGELOG-hygiene-Bullet oben).
 - **`/api/test-error`** — manueller Smoke-Trigger für die Live-Tail-UI. Disabled in Production (es sei denn `HERMES_ENABLE_TEST_ERROR_ENDPOINT=1`), Stack-Admin-only auch in Dev (Defense-in-Depth), Per-User-Rate-Limit 30/min. Einträge mit `source: 'test'` markiert und im Default-Filter ausgeblendet.
 - **Hermes-Hook-Wave 1** — `chat-event-bus.ts` (Subscriber-Cap), `gateway-capabilities.ts` (override-write-fail, gateway-unreachable), `auth-middleware.ts:loginWithEmailPassword` (Failed-Login zusätzlich zum bestehenden Audit-Channel — `logger.warn` mit IP, UA und reason — plus Lockout-Trigger), `send-stream.ts` Main-Catch + **N2** SSE-Stuck-Watchdog (`setTimeout(30 s)` reset bei jedem `controller.enqueue`; warn-Log wenn Stream silent für >30 s, ohne Auto-Close).
 
-### Changed
+### Changed — Error-Tracking Integration in bestehende Module (2026-05-09)
 - **`src/routes/__root.tsx`** initialisiert beim Boot `installClientErrorReporter()` und teardown'd im Effect-Cleanup.
 - **`src/components/error-boundary.tsx`** ruft `reportClientError({ message, stack, context })` und zeigt die Server-Report-ID im Fallback.
 - **`src/server/chat-event-bus.ts:69`** nutzt `logger.warn` statt `console.warn` für die Subscriber-Cap-Warnung.
