@@ -62,8 +62,12 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
+  // Read raw search params (untyped). `embed` / `mode` are global query
+  // overrides that may appear on any route to opt the surface into embed
+  // chrome — they are intentionally not declared per-route validateSearch.
   const search = useRouterState({
-    select: (state) => state.location.search,
+    select: (state) =>
+      state.location.search as Record<string, unknown> | undefined,
   })
   const isElectron = useMemo(
     () =>
