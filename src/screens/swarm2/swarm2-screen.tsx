@@ -152,6 +152,11 @@ type RuntimeEntry = {
   phase?: string | null
   lastSummary?: string | null
   lastResult?: string | null
+  // Set by swarm-dispatch / swarm-orchestrator-loop with the real
+  // checkpoint output (vs. the heuristic-extracted lastSummary/lastResult).
+  // Reports-view + screen prefer these when present.
+  lastRealSummary?: string | null
+  lastRealResult?: string | null
   blockedReason?: string | null
   checkpointStatus?: string | null
   needsHuman?: boolean | null
@@ -1054,28 +1059,21 @@ export function Swarm2Screen() {
           try { parsed = JSON.parse(text) } catch {}
           const msg = parsed.error || text || `HTTP ${res.status}`
           if (msg.includes('tmux not installed')) {
-            toast({
-              title: 'tmux not installed',
-              description:
-                `Swarm worker ${workerId} couldn't start because tmux is not installed on this host. Install tmux (‘brew install tmux’ or ‘apt install tmux’) and try again. See #244.`,
-              variant: 'destructive',
-            })
+            toast(
+              `tmux not installed: Swarm worker ${workerId} couldn't start because tmux is not installed on this host. Install tmux (‘brew install tmux’ or ‘apt install tmux’) and try again. See #244.`,
+              { type: 'error' },
+            )
           } else {
-            toast({
-              title: `Failed to start ${workerId}`,
-              description: msg,
-              variant: 'destructive',
-            })
+            toast(`Failed to start ${workerId}: ${msg}`, { type: 'error' })
           }
           // eslint-disable-next-line no-console
           console.error('[swarm2] start session failed:', res.status, text)
         }
       } catch (err) {
-        toast({
-          title: `Failed to start ${workerId}`,
-          description: err instanceof Error ? err.message : String(err),
-          variant: 'destructive',
-        })
+        toast(
+          `Failed to start ${workerId}: ${err instanceof Error ? err.message : String(err)}`,
+          { type: 'error' },
+        )
       } finally {
         setPendingTmux((prev) => {
           const next = new Set(prev)
