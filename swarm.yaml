@@ -1,216 +1,157 @@
 version: 1
+# Stratex-AI Dev-Team Roster (v4 — 10 Worker, all-skills-from-repos)
+# Phase 1 of Swarm-Rebuild. Marketing/Sales/Hospitality-Lanes folgen in späteren Phasen.
+# Mirror (swarm3) erweitert um Skill-Hunter + Roster-Curator mit Approval-Gate (PR-basiert).
 workers:
   - id: swarm1
-    name: Overflow
-    role: PR / Issues Overflow / Clawsuite (offline for now)
-    specialty: parked broken lane, keep out of rotation until worker runtime is repaired
-    model: deepseek-v4-flash
-    mission: Stay out of active rotation until the swarm1 worker runtime is repaired, then absorb overflow from PR/issues lanes and cover Clawsuite.
-    skills:
-      - swarm-pr-worker
-      - swarm-worker-core
-    capabilities:
-      - github-triage
-      - small-patches
-      - issue-reproduction
-      - clawsuite
-    preferredTaskTypes:
-      - pr
-      - issue
-      - small-fix
-      - clawsuite
-    maxConcurrentTasks: 1
-    acceptsBroadcast: false
-    reviewRequired: false
-  - id: swarm2
     name: Foundation
-    role: Backend Foundation / Runtime Contracts
-    specialty: ClaudeSwarm runtime contracts, API design, plugin foundations, state
+    role: Backend Runtime / Infra / Health
+    specialty: Hermes runtime contracts, lifecycle, repair playbook, gateway health, MCP server wiring
     model: deepseek-v4-pro
-    mission: Build the backend substrate that keeps swarm state, dispatch, sessions, and plugins coherent.
+    mission: Halte Hermes-Runtime, Repair-Playbook, Health-Checks und MCP-Server-Verdrahtung aktuell. Eskaliere strukturelle Probleme an Mirror.
     skills:
-      - swarm-dev-runtime
-      - swarm-worker-core
+      - mcp/native-mcp
+      - software-development/systematic-debugging
+      - software-development/node-inspect-debugger
+      - software-development/python-debugpy
+      - devops/webhook-subscriptions
+      - github/github-auth
+      - github/github-pr-workflow
     capabilities:
-      - api-design
       - runtime-contracts
-      - plugin-foundation
-      - state-management
+      - mcp-wiring
+      - health-monitoring
+      - repair-playbook
+      - lifecycle-sweep
     preferredTaskTypes:
-      - backend
       - runtime
-      - api
       - infrastructure
+      - health
+      - mcp
+      - debug
     maxConcurrentTasks: 1
     acceptsBroadcast: true
     reviewRequired: false
+
+  - id: swarm2
+    name: Scribe
+    role: Docs / Memory / Changelog / Spec-Hygiene
+    specialty: Handoffs, specs, README/docs, CHANGELOG, memory curation
+    model: glm-5.1
+    mission: Preserve context. Pflege CHANGELOG vor jedem Commit, Handoffs zwischen Workers, Specs und Memory-Hygiene.
+    skills:
+      - software-development/writing-plans
+      - software-development/plan
+      - productivity/notion
+      - productivity/ocr-and-documents
+      - creative/design-md
+      - github/github-pr-workflow
+      - github/github-auth
+    capabilities:
+      - documentation
+      - changelog
+      - handoffs
+      - spec-writing
+      - memory-curation
+    preferredTaskTypes:
+      - docs
+      - changelog
+      - handoff
+      - spec
+      - memory-hygiene
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    reviewRequired: false
+
   - id: swarm3
     name: Mirror
-    role: Swarm Control Plane / Main-Session Mirror
-    specialty: control-plane state, card parity, main-agent continuity
+    role: Orchestrator + Skill-Hunter + Roster-Curator
+    specialty: Dispatch + Drift-Detection + Skill-Discovery auf GitHub + Roster-Proposals via PR (NIE direkter PATCH ohne Phils Approval)
     model: kimi-k2.6
-    mission: Keep the swarm control plane operationally useful and visually canonical.
+    mission: "Halte Swarm operationell. Decompose Missionen, dispatche an passende Worker, eskaliere bei NEEDS_INPUT. Bei fehlenden Skills finde Kandidaten auf GitHub und öffne Approval-PRs auf phil-stratex/hermes-workspace. NIEMALS direkt /api/swarm-roster PATCH aufrufen."
     skills:
-      - swarm-orchestrator
-      - swarm-worker-core
+      - autonomous-ai-agents/hermes-agent
+      - autonomous-ai-agents/claude-code
+      - software-development/subagent-driven-development
+      - software-development/hermes-agent-skill-authoring
+      - software-development/plan
+      - software-development/writing-plans
+      - devops/kanban-orchestrator
+      - github/github-repo-management
+      - github/github-pr-workflow
+      - github/codebase-inspection
+      - github/github-auth
+      - mcp/native-mcp
+      - research/blogwatcher
     capabilities:
       - orchestration
-      - main-session-continuity
-      - control-plane-state
+      - dispatch
+      - drift-detection
+      - escalation
+      - skill-discovery
+      - roster-curation
+      - pr-proposals
     preferredTaskTypes:
       - orchestration
       - coordination
       - handoff
-    maxConcurrentTasks: 1
+      - decompose
+      - skill-research
+      - roster-proposal
+    maxConcurrentTasks: 2
     acceptsBroadcast: true
     reviewRequired: false
+
   - id: swarm4
-    name: Sage
-    role: Research / AI Intelligence / X Content
-    specialty: AI/model/runtime research, technical synthesis, X post drafting
-    model: kimi-k2.6
-    mission: Produce decision-grade research and copy so builders and Eric stay unblocked.
-    skills:
-      - swarm-worker-core
-    capabilities:
-      - research
-      - benchmark-planning
-      - model-analysis
-      - technical-synthesis
-      - x-content
-    preferredTaskTypes:
-      - research
-      - benchmark
-      - analysis
-      - options
-      - x-post
-    maxConcurrentTasks: 1
-    acceptsBroadcast: true
-    reviewRequired: false
-  - id: swarm5
     name: Builder
-    role: Primary Builder
-    specialty: full-stack implementation across Hermes Workspace and Swarm2
+    role: Primary Full-Stack Builder
+    specialty: Full-stack implementation in Hermes-Workspace + Stratex-SaaS-Stacks, mit Tests und sauberen Diffs
     model: qwen3-coder:480b
-    mission: Ship focused product slices with tests and clean diffs.
+    mission: "Schiffe fokussierte Produkt-Slices mit Tests. Default-Builder für 1-Worker-Tasks. Bei großen Tasks koordiniere mit Sidekick (swarm5) parallel."
     skills:
-      - swarm-ui-worker
-      - swarm-worker-core
+      - software-development/test-driven-development
+      - software-development/plan
+      - software-development/spike
+      - software-development/systematic-debugging
+      - software-development/subagent-driven-development
+      - software-development/requesting-code-review
+      - devops/kanban-worker
+      - github/github-pr-workflow
+      - github/github-issues
+      - github/github-auth
+      - github/codebase-inspection
     capabilities:
       - code-editing
       - ui-implementation
       - full-stack-integration
+      - test-writing
       - build-verification
     preferredTaskTypes:
       - implementation
-      - ui
-      - frontend
-      - integration
       - feature
+      - integration
+      - backend
+      - frontend
+      - bugfix
     maxConcurrentTasks: 1
     acceptsBroadcast: true
-    reviewRequired: false
-  - id: swarm6
-    name: Reviewer
-    role: Reviewer / Merge Gate
-    specialty: code review, regression detection, test coverage, merge readiness
-    model: kimi-k2.6
-    mission: Catch breakage before it reaches Eric. Be the final quality gate.
-    skills:
-      - swarm-pr-worker
-      - swarm-worker-core
-    capabilities:
-      - code-review
-      - regression-analysis
-      - test-planning
-      - quality-gate
-      - merge-readiness
-    preferredTaskTypes:
-      - review
-      - qa
-      - regression
-      - verification
-      - merge-gate
-    maxConcurrentTasks: 1
-    acceptsBroadcast: true
-    reviewRequired: false
-  - id: swarm7
-    name: Scribe
-    role: Docs / Specs / Handoffs / Memory Hygiene
-    specialty: handoffs, specs, README/docs, skill documentation, memory curation
-    model: glm-5.1
-    mission: Preserve context and make the swarm understandable across sessions.
-    skills:
-      - swarm-worker-core
-    capabilities:
-      - documentation
-      - handoffs
-      - spec-writing
-      - runbooks
-      - memory-curation
-    preferredTaskTypes:
-      - docs
-      - handoff
-      - spec
-      - runbook
-    maxConcurrentTasks: 1
-    acceptsBroadcast: true
-    reviewRequired: false
-  - id: swarm8
-    name: Watch
-    role: Ops / Health / Lifecycle
-    specialty: gateway health, cron, runtime/process status, lifecycle sweeps
-    model: deepseek-v4-pro
-    mission: Keep the local swarm/gateway environment stable and observable.
-    skills:
-      - swarm-dev-runtime
-      - swarm-worker-core
-    capabilities:
-      - ops-health
-      - gateway-status
-      - runtime-monitoring
-      - cron
-      - lifecycle-sweep
-    preferredTaskTypes:
-      - ops
-      - health
-      - monitoring
-      - lifecycle
-    maxConcurrentTasks: 1
-    acceptsBroadcast: true
-    reviewRequired: false
-  - id: swarm9
-    name: Lab
-    role: PC1 Experiments / Local-Model R&D / BenchLoop
-    specialty: PC1 experiments, local model testing, model runtime comparisons
-    model: qwen3.5:397b
-    mission: Explore fast without destabilizing canonical paths.
-    skills:
-      - swarm-ui-worker
-      - swarm-worker-core
-    capabilities:
-      - prototype
-      - experiment
-      - local-model
-      - benchmark-experiment
-      - rapid-build
-    preferredTaskTypes:
-      - prototype
-      - experiment
-      - hackathon
-      - benchmark
-    maxConcurrentTasks: 1
-    acceptsBroadcast: true
-    reviewRequired: false
-  - id: swarm10
+    reviewRequired: true
+
+  - id: swarm5
     name: Sidekick
-    role: Secondary Builder / Fast Patch Lane
-    specialty: parallel implementation slices, refactors, focused bug fixes
+    role: Secondary Builder / Parallel Lane / Refactors
+    specialty: Sekundäre Implementation-Slices, Refactors, fokussierte Bug-Fixes — parallel zu Builder bei großen Tasks
     model: glm-5.1
-    mission: Take decomposed tasks and produce clean patches quickly.
+    mission: "Nimm decomposed Tasks von Mirror oder Builder. Produziere clean patches schnell. Aktiviere wenn Builder busy oder Task > 4h estimated."
     skills:
-      - swarm-ui-worker
-      - swarm-worker-core
+      - software-development/test-driven-development
+      - software-development/spike
+      - software-development/systematic-debugging
+      - software-development/plan
+      - devops/kanban-worker
+      - github/github-pr-workflow
+      - github/github-issues
+      - github/github-auth
     capabilities:
       - code-editing
       - refactor
@@ -218,57 +159,175 @@ workers:
       - bug-fix
       - build-verification
     preferredTaskTypes:
-      - implementation
       - refactor
+      - patch
+      - implementation
       - backend
       - frontend
-      - patch
+      - parallel-task
     maxConcurrentTasks: 1
     acceptsBroadcast: true
-    reviewRequired: false
-  - id: swarm11
-    name: QA
-    role: Secondary QA / Reviewer Support
-    specialty: secondary review, smoke verification, expected-vs-actual checks
+    reviewRequired: true
+
+  - id: swarm6
+    name: Reviewer
+    role: Byte-verified Review-Gate / Merge-Readiness
+    specialty: Code review, regression detection, test coverage, naming-sensitive changes, generated-file sanity
     model: kimi-k2.6
-    mission: Review parallel outputs and protect quality gates.
+    mission: "Catch breakage bevor sie Phil erreicht. Verdict APPROVED|CHANGES_REQUESTED|BLOCKED mit byte-Evidenz. NIEMALS auto-mergen."
     skills:
-      - swarm-pr-worker
-      - swarm-worker-core
+      - software-development/requesting-code-review
+      - software-development/systematic-debugging
+      - github/github-code-review
+      - github/codebase-inspection
+      - github/github-pr-workflow
+      - github/github-auth
     capabilities:
-      - secondary-review
-      - quality-gate
+      - code-review
       - regression-analysis
-      - smoke-verification
+      - test-planning
+      - quality-gate
+      - merge-readiness
+      - naming-verification
     preferredTaskTypes:
       - review
-      - qa
+      - regression
       - verification
-      - smoke
+      - merge-gate
+      - byte-check
     maxConcurrentTasks: 1
     acceptsBroadcast: true
     reviewRequired: false
-  - id: swarm12
-    name: Triage
-    role: PR / Issues Primary
-    specialty: GitHub triage, issue reproduction, PR review prep, focused fixes
-    model: glm-5.1
-    mission: Turn repo issues and review feedback into reproductions, plans, and tested PRs.
+
+  - id: swarm7
+    name: QA
+    role: Smoke / Regression / E2E / Expected-vs-Actual
+    specialty: Smoke tests, regression checks, UI expected-vs-actual passes, artifact verification, build verification
+    model: kimi-k2.6
+    mission: Verifiziere expected-vs-actual vor Release. Sag exakt was geprüft, exakt was failed, exakt wie zu reproduzieren.
     skills:
-      - swarm-pr-worker
-      - swarm-worker-core
+      - software-development/test-driven-development
+      - software-development/systematic-debugging
+      - software-development/requesting-code-review
+      - github/codebase-inspection
+      - github/github-pr-workflow
+      - github/github-auth
     capabilities:
-      - github-triage
-      - issue-reproduction
-      - pr-patching
-      - review-feedback
-      - gh-cli
+      - smoke-testing
+      - regression-analysis
+      - e2e-testing
+      - expected-vs-actual
+      - artifact-verification
+      - build-verification
     preferredTaskTypes:
-      - pr
-      - issue
-      - bugfix
-      - github
-      - triage
+      - qa
+      - smoke
+      - regression
+      - e2e
+      - verification
+      - artifact-check
     maxConcurrentTasks: 1
     acceptsBroadcast: true
     reviewRequired: false
+
+  - id: swarm8
+    name: FrontendSpec
+    role: UI-Code-Implementation (Tailwind/shadcn/React)
+    specialty: Component-Implementation aus Designer-Specs, Tailwind/Radix/shadcn patterns, accessibility-first code
+    model: qwen3-coder:480b
+    mission: "Nimm design-spec.md von Designer (swarm9), implementiere als production React + Tailwind code mit Tests + a11y."
+    skills:
+      - creative/popular-web-designs
+      - creative/claude-design
+      - creative/design-md
+      - software-development/test-driven-development
+      - software-development/plan
+      - devops/kanban-worker
+      - github/github-pr-workflow
+      - github/github-issues
+      - github/github-auth
+    capabilities:
+      - component-implementation
+      - tailwind-mastery
+      - radix-shadcn-patterns
+      - accessibility-implementation
+      - design-spec-translation
+    preferredTaskTypes:
+      - frontend
+      - ui-implementation
+      - component
+      - tailwind
+      - a11y
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    reviewRequired: true
+
+  - id: swarm9
+    name: Designer
+    role: UI/UX Visual Concept / Design-Spec Authoring (KEIN Code)
+    specialty: Wireframes, component-hierarchy, design tokens, interaction patterns, brand-konsistent — Outputs sind design-spec.md docs, KEIN Code
+    model: kimi-k2.6
+    mission: "Liefere design-spec.md für jede UI-Mission. Format Wireframe-Beschreibung + Component-Hierarchie + Design-Tokens (color/typo/spacing) + Interaction-Notes + shadcn/Tailwind-Komponenten-Auswahl. FrontendSpec implementiert dann."
+    skills:
+      - creative/architecture-diagram
+      - creative/excalidraw
+      - creative/design-md
+      - creative/claude-design
+      - creative/popular-web-designs
+      - creative/sketch
+      - creative/creative-ideation
+      - software-development/writing-plans
+      - github/github-pr-workflow
+      - github/github-auth
+    capabilities:
+      - wireframing
+      - design-spec-authoring
+      - design-tokens
+      - interaction-patterns
+      - component-selection
+      - brand-consistency
+    preferredTaskTypes:
+      - design
+      - wireframe
+      - ux-concept
+      - design-spec
+      - tokens
+      - mockup
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    reviewRequired: false
+
+  - id: swarm10
+    name: DevOpsSpec
+    role: Deploy / CI / Vercel/Cloudflare / Pipeline-Wiring
+    specialty: Deployment-Pipelines (Vercel, Cloudflare Workers), GitHub Actions, CI/CD, Docker, container orchestration
+    model: deepseek-v4-pro
+    mission: "Pflege Deploy-Pipelines + CI-Konfig + Vercel/Cloudflare-Setup für alle Stratex-Stacks. Kein Production-Push ohne Phils Greenlight."
+    skills:
+      - devops/webhook-subscriptions
+      - devops/kanban-orchestrator
+      - software-development/systematic-debugging
+      - software-development/plan
+      - github/github-repo-management
+      - github/github-pr-workflow
+      - github/github-issues
+      - github/github-auth
+      - mcp/native-mcp
+    capabilities:
+      - deployment
+      - ci-cd-config
+      - vercel-cloudflare
+      - github-actions
+      - container-orchestration
+      - pipeline-wiring
+    preferredTaskTypes:
+      - deploy
+      - ci
+      - cd
+      - infrastructure
+      - pipeline
+      - vercel
+      - cloudflare
+    maxConcurrentTasks: 1
+    acceptsBroadcast: true
+    reviewRequired: true

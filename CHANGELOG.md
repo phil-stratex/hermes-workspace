@@ -5,6 +5,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed — Dev-Team Swarm Roster v4 (10 Worker, all-skills-from-repos) (2026-05-12)
+
+Phils Wunsch: „Lass erstmal nur mit dem Dev-Team starten dass da alles perfekt funktioniert" + „ALLE Skills aus echten GitHub-Repos — keine self-written". Roster komplett umgeschrieben — vorher 12 Worker (11 davon nur Roster-only ohne Profile), jetzt **10 Worker auf reine Dev-Lane fokussiert**, Marketing/Sales/Hospitality kommen später:
+
+**Neue Roster-Struktur (`swarm.yaml`):**
+- **swarm1 Foundation** (deepseek-v4-pro) — Backend Runtime / Infra / Health
+- **swarm2 Scribe** (glm-5.1) — Docs / Memory / Changelog / Spec-Hygiene
+- **swarm3 Mirror** (kimi-k2.6) — **Orchestrator + Skill-Hunter + Roster-Curator**; sucht neue Skills auf GitHub und öffnet Approval-PRs (NIE direkter PATCH ohne Phils Approval)
+- **swarm4 Builder** (qwen3-coder:480b) — Primary Full-Stack
+- **swarm5 Sidekick** (glm-5.1) — Secondary Builder / Parallel Lane / Refactors
+- **swarm6 Reviewer** (kimi-k2.6) — Byte-verified Review-Gate
+- **swarm7 QA** (kimi-k2.6) — Smoke / Regression / E2E
+- **swarm8 FrontendSpec** (qwen3-coder:480b) — UI-Code-Implementation (Tailwind/shadcn/React)
+- **swarm9 Designer** (kimi-k2.6) — UI/UX-Konzept / design-spec.md Authoring (KEIN Code; FrontendSpec implementiert)
+- **swarm10 DevOpsSpec** (deepseek-v4-pro) — Deploy / CI / Vercel/Cloudflare
+
+**Skills (32 unique referenziert):** alle aus existierendem VPS-Skill-Inventar (Hermes-Agent shipped, 24 Kategorien wie `mcp/native-mcp`, `github/github-pr-workflow`, `software-development/test-driven-development`, `devops/kanban-orchestrator`, `creative/design-md`, `autonomous-ai-agents/hermes-agent`). **GitHub-Superpowers** (`github/github-auth` + `github/github-pr-workflow` + `mcp/native-mcp`) laden alle Worker.
+
+**Mirror's neue Rolle als Roster-Curator:** statt direktem `PATCH /api/swarm-roster` schreibt Mirror Skill-Proposals via `gh pr create` auf `phil-stratex/hermes-workspace`. Phil merged → VPS-Pull → Skill live. Audit-trail via Git-History, kein bypass möglich.
+
+**Neue Files:**
+- `swarm.yaml` — komplett umgeschrieben
+- `scripts/start-dev-team.sh` — Bulk-Bootstrap aller 10 Worker via `POST /api/swarm-tmux-start` mit Auth-Header (idempotent, started/already_running/failed-Reporting)
+- `scripts/install-skills-from-repos.sh` — optional Pull zusätzlicher Skills aus GitHub (ui-ux-pro-max, awesome-design-skills, playwright-skill, code-review-skill, vercel-agent-skills, anthropic-skills, trailofbits-skills) nach `/opt/data/skills/external/`. Nur Repos, kein self-written Content.
+
+Bootstrap-Mechanik nutzt vorhandenen `ensureWorkerProfile()` (`swarm-docker-exec.ts:167`): mkdir profile-dir, copy globale `config.yaml`/`.env`, mkdir `sessions/skills/memories/`, `syncSwarmProfileModel()` schreibt Roster-Modell in profile-config, tmux new-session mit `HERMES_HOME=<profile> hermes chat --tui`.
+
+Smoke-Tests folgen: (a) End-to-End-Dev-Loop (Mirror → Designer → Builder+Sidekick parallel → FrontendSpec → Reviewer → QA → Scribe → PR), (b) Mirror-Curator-Workflow (Mirror sucht visual-regression-Skill auf GitHub, öffnet Proposal-PR).
+
 ### Added — Direkt-Account-Anlegen für Members (2026-05-12)
 
 Phil hat geschrieben: „Ich will eine Funktion, dass ich direkt einen Account anlegen kann und der Person ein PW und Namen schon erstelle. Die Person kann sich, wenn sie will, ein neues erstellen oder es behalten." Bisher war nur der Invite-Link-Flow drin (Person legt selbst userId/Name/PW an). Jetzt zwei Modi nebeneinander im **„Mitglied hinzufügen"-Form** mit Tab-Toggle:
