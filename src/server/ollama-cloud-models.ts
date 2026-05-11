@@ -13,6 +13,7 @@ export const OLLAMA_CLOUD_IDS = [
   'qwen3-coder:480b',
   'glm-5.1',
   'deepseek-v4-flash',
+  'gemma4:31b',
 ] as const
 
 export type OllamaCloudId = (typeof OLLAMA_CLOUD_IDS)[number]

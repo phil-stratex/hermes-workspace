@@ -94,7 +94,7 @@ describe('resolveSwarmModelLabel', () => {
     expect(resolveSwarmModelLabel('UPPER/foo')).toBeNull() // provider must be lowercase-first
   })
 
-  it('accepts the 6 Ollama Cloud bare ids', () => {
+  it('accepts the 7 Ollama Cloud bare ids', () => {
     for (const id of [
       'kimi-k2.6',
       'deepseek-v4-pro',
@@ -102,6 +102,7 @@ describe('resolveSwarmModelLabel', () => {
       'qwen3-coder:480b',
       'glm-5.1',
       'deepseek-v4-flash',
+      'gemma4:31b',
     ]) {
       expect(resolveSwarmModelLabel(id)).toEqual({
         provider: 'ollama-cloud',
