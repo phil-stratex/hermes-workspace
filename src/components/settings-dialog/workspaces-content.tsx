@@ -16,6 +16,7 @@ import type { FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   AuthError,
+  createMemberAccount,
   createWorkspace,
   deleteWorkspace,
   fetchCurrentUser,
@@ -1025,6 +1026,21 @@ function PendingInviteItem({
   )
 }
 
+function generateRandomPassword(length = 16): string {
+  const alphabet = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  const arr = new Uint32Array(length)
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    crypto.getRandomValues(arr)
+  } else {
+    for (let i = 0; i < length; i++) arr[i] = Math.floor(Math.random() * 2 ** 32)
+  }
+  let out = ''
+  for (let i = 0; i < length; i++) {
+    out += alphabet[arr[i] % alphabet.length]
+  }
+  return out
+}
+
 function InviteForm({
   wsId,
   onCreated,
@@ -1033,6 +1049,335 @@ function InviteForm({
   onCreated: () => void
 }) {
   const [open, setOpen] = useState(false)
+  const [mode, setMode] = useState<'invite' | 'direct'>('direct')
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-primary-300 dark:border-neutral-700 px-3 py-2 text-xs font-medium text-primary-700 dark:text-neutral-200 hover:bg-primary-100 dark:hover:bg-neutral-800"
+      >
+        <HugeiconsIcon icon={PlusSignIcon} size={14} strokeWidth={1.5} />
+        Mitglied hinzufügen
+      </button>
+    )
+  }
+
+  return (
+    <div className="mt-3 space-y-2 rounded-lg border border-primary-200 dark:border-neutral-700 bg-primary-50/40 dark:bg-neutral-900/40 px-3 py-2">
+      <div className="flex items-center gap-1 border-b border-primary-200 dark:border-neutral-700 pb-2">
+        <button
+          type="button"
+          onClick={() => setMode('direct')}
+          className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+            mode === 'direct'
+              ? 'bg-accent-500 text-white'
+              : 'text-primary-600 hover:bg-primary-100 dark:text-neutral-300 dark:hover:bg-neutral-800'
+          }`}
+        >
+          Direkt anlegen
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode('invite')}
+          className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+            mode === 'invite'
+              ? 'bg-accent-500 text-white'
+              : 'text-primary-600 hover:bg-primary-100 dark:text-neutral-300 dark:hover:bg-neutral-800'
+          }`}
+        >
+          Per Einladungs-Link
+        </button>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="ml-auto rounded-md p-1 text-primary-500 hover:bg-primary-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+          aria-label="Schließen"
+        >
+          <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={1.5} />
+        </button>
+      </div>
+      {mode === 'direct' ? (
+        <DirectAccountForm
+          wsId={wsId}
+          onCreated={onCreated}
+          onCancel={() => setOpen(false)}
+        />
+      ) : (
+        <InviteLinkForm
+          wsId={wsId}
+          onCreated={onCreated}
+          onCancel={() => setOpen(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+function DirectAccountForm({
+  wsId,
+  onCreated,
+  onCancel,
+}: {
+  wsId: string
+  onCreated: () => void
+  onCancel: () => void
+}) {
+  const [userId, setUserId] = useState('')
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState(() => generateRandomPassword())
+  const [showPassword, setShowPassword] = useState(true)
+  const [role, setRole] = useState<'admin' | 'member'>('member')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [result, setResult] = useState<{
+    userId: string
+    name: string
+    password: string
+    role: 'admin' | 'member'
+  } | null>(null)
+  const [copiedField, setCopiedField] = useState<'userId' | 'password' | 'all' | null>(null)
+  const [userIdTouched, setUserIdTouched] = useState(false)
+
+  function handleNameChange(value: string) {
+    setName(value)
+    if (!userIdTouched) setUserId(suggestSlug(value))
+  }
+
+  async function copyToClipboard(text: string, kind: 'userId' | 'password' | 'all') {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedField(kind)
+      setTimeout(() => setCopiedField(null), 2000)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    setErr(null)
+    if (!name.trim()) {
+      setErr('Name darf nicht leer sein.')
+      return
+    }
+    if (!isValidSlug(userId)) {
+      setErr('User-ID muss aus a–z, 0–9 und Bindestrichen bestehen.')
+      return
+    }
+    if (password.length < 8) {
+      setErr('Passwort muss mindestens 8 Zeichen lang sein.')
+      return
+    }
+    setBusy(true)
+    try {
+      await createMemberAccount(wsId, {
+        userId,
+        name: name.trim(),
+        email: email.trim() || undefined,
+        password,
+        role,
+      })
+      setResult({ userId, name: name.trim(), password, role })
+      onCreated()
+    } catch (e) {
+      if (e instanceof AuthError && e.kind === 'conflict') {
+        setErr('User-ID „' + userId + '" ist bereits vergeben.')
+      } else {
+        setErr(e instanceof Error ? e.message : 'Account-Erstellung fehlgeschlagen')
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (result) {
+    const credentialsText =
+      `Hermes Workspace Login\nUser-ID: ${result.userId}\nPasswort: ${result.password}`
+    return (
+      <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-3 dark:border-green-700/40 dark:bg-green-900/20">
+        <p className="mb-2 text-xs font-medium text-green-700 dark:text-green-200">
+          Account für „{result.name}" angelegt. Gib diese Credentials weiter — die Person kann das Passwort bei Bedarf später ändern.
+        </p>
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <div className="w-20 shrink-0 text-[11px] uppercase tracking-wide text-green-700 dark:text-green-200">
+              User-ID
+            </div>
+            <input
+              readOnly
+              value={result.userId}
+              className="flex-1 rounded-md border border-green-200 bg-primary-50 dark:bg-neutral-900 px-2 py-1 font-mono text-xs text-primary-900 dark:text-neutral-100"
+            />
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => copyToClipboard(result.userId, 'userId')}
+              className="bg-accent-500 text-white hover:bg-accent-600"
+            >
+              {copiedField === 'userId' ? '✓' : 'Kopieren'}
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-20 shrink-0 text-[11px] uppercase tracking-wide text-green-700 dark:text-green-200">
+              Passwort
+            </div>
+            <input
+              readOnly
+              value={result.password}
+              className="flex-1 rounded-md border border-green-200 bg-primary-50 dark:bg-neutral-900 px-2 py-1 font-mono text-xs text-primary-900 dark:text-neutral-100"
+            />
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => copyToClipboard(result.password, 'password')}
+              className="bg-accent-500 text-white hover:bg-accent-600"
+            >
+              {copiedField === 'password' ? '✓' : 'Kopieren'}
+            </Button>
+          </div>
+        </div>
+        <div className="mt-2 flex items-center justify-between">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => copyToClipboard(credentialsText, 'all')}
+            className="text-xs"
+          >
+            {copiedField === 'all' ? '✓ Beide kopiert' : 'Beide zusammen kopieren'}
+          </Button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setResult(null)
+                setName('')
+                setUserId('')
+                setEmail('')
+                setUserIdTouched(false)
+                setPassword(generateRandomPassword())
+              }}
+              className="text-xs text-green-700 hover:underline dark:text-green-200"
+            >
+              Weiteren Account anlegen
+            </button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={onCancel}
+              className="text-xs"
+            >
+              Schließen
+            </Button>
+          </div>
+        </div>
+        <p className="mt-2 text-[10px] text-green-700/80 dark:text-green-200/80">
+          Wichtig: Diese Credentials werden nur einmal angezeigt. Schick sie über einen sicheren Kanal.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-2">
+      <p className="text-[11px] text-primary-600 dark:text-neutral-400">
+        Erstellt einen fertigen Account. Die Person bekommt User-ID + Passwort und kann sich direkt einloggen — Passwort optional später ändern.
+      </p>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => handleNameChange(e.target.value)}
+          placeholder="Name (z.B. Max Mustermann)"
+          className="rounded-md border border-primary-200 dark:border-neutral-700 bg-primary-50 dark:bg-neutral-900 px-2 py-1.5 text-xs text-primary-900 dark:text-neutral-100"
+        />
+        <input
+          type="text"
+          value={userId}
+          onChange={(e) => {
+            setUserId(e.target.value.toLowerCase())
+            setUserIdTouched(true)
+          }}
+          placeholder="user-id (slug)"
+          className="rounded-md border border-primary-200 dark:border-neutral-700 bg-primary-50 dark:bg-neutral-900 px-2 py-1.5 font-mono text-xs text-primary-900 dark:text-neutral-100"
+        />
+      </div>
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="Email (optional, nur zur Identifikation)"
+        className="w-full rounded-md border border-primary-200 dark:border-neutral-700 bg-primary-50 dark:bg-neutral-900 px-2 py-1.5 text-xs text-primary-900 dark:text-neutral-100"
+      />
+      <div className="flex items-stretch gap-1.5">
+        <input
+          type={showPassword ? 'text' : 'password'}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Passwort (min. 8 Zeichen)"
+          className="flex-1 rounded-md border border-primary-200 dark:border-neutral-700 bg-primary-50 dark:bg-neutral-900 px-2 py-1.5 font-mono text-xs text-primary-900 dark:text-neutral-100"
+        />
+        <button
+          type="button"
+          onClick={() => setShowPassword((s) => !s)}
+          className="rounded-md border border-primary-200 dark:border-neutral-700 bg-primary-50 dark:bg-neutral-900 px-2 text-[11px] text-primary-700 dark:text-neutral-300 hover:bg-primary-100 dark:hover:bg-neutral-800"
+          title={showPassword ? 'Verbergen' : 'Anzeigen'}
+        >
+          {showPassword ? 'Verb.' : 'Zeig.'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setPassword(generateRandomPassword())}
+          className="rounded-md border border-primary-200 dark:border-neutral-700 bg-primary-50 dark:bg-neutral-900 px-2 text-[11px] text-primary-700 dark:text-neutral-300 hover:bg-primary-100 dark:hover:bg-neutral-800"
+          title="Neues Passwort generieren"
+        >
+          ↻
+        </button>
+      </div>
+      <div className="flex items-center gap-2">
+        <label className="text-[11px] text-primary-600 dark:text-neutral-400">
+          Rolle
+        </label>
+        <select
+          value={role}
+          onChange={(e) => setRole(e.target.value as 'admin' | 'member')}
+          className="rounded-md border border-primary-200 dark:border-neutral-700 bg-primary-50 dark:bg-neutral-900 px-2 py-1 text-xs text-primary-900 dark:text-neutral-100"
+        >
+          <option value="member">Member</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      {err && <ErrorBox>{err}</ErrorBox>}
+      <div className="flex justify-end gap-2">
+        <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
+          Abbrechen
+        </Button>
+        <Button
+          type="submit"
+          size="sm"
+          disabled={busy || !name.trim() || !isValidSlug(userId) || password.length < 8}
+          className="bg-accent-500 text-white hover:bg-accent-600 disabled:opacity-50"
+        >
+          {busy ? '…' : 'Account erstellen'}
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+function InviteLinkForm({
+  wsId,
+  onCreated,
+  onCancel,
+}: {
+  wsId: string
+  onCreated: () => void
+  onCancel: () => void
+}) {
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<'admin' | 'member'>('member')
   const [ttlDays, setTtlDays] = useState(7)
@@ -1066,9 +1411,9 @@ function InviteForm({
 
   if (result) {
     return (
-      <div className="mt-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 dark:border-green-700/40 dark:bg-green-900/20">
+      <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 dark:border-green-700/40 dark:bg-green-900/20">
         <p className="mb-2 text-xs text-green-700 dark:text-green-200">
-          Einladung erstellt — Link kopieren und an die Person senden:
+          Einladungs-Link erstellt — Person legt ihre eigene User-ID + Passwort selbst an:
         </p>
         <div className="flex items-center gap-2">
           <input
@@ -1091,35 +1436,30 @@ function InviteForm({
         </div>
         <div className="mt-1.5 flex items-center justify-between text-[10px] text-green-700 dark:text-green-200">
           <span>gültig bis {formatDate(result.expiresAt)}</span>
-          <button type="button" onClick={() => setResult(null)} className="hover:underline">
-            Weitere einladen
-          </button>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setResult(null)} className="hover:underline">
+              Weiteren Link erstellen
+            </button>
+            <Button type="button" size="sm" variant="ghost" onClick={onCancel} className="text-[10px]">
+              Schließen
+            </Button>
+          </div>
         </div>
       </div>
     )
   }
 
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-primary-300 dark:border-neutral-700 px-3 py-2 text-xs font-medium text-primary-700 dark:text-neutral-200 hover:bg-primary-100 dark:hover:bg-neutral-800"
-      >
-        <HugeiconsIcon icon={PlusSignIcon} size={14} strokeWidth={1.5} />
-        Mitglied einladen
-      </button>
-    )
-  }
-
   return (
-    <form onSubmit={handleSubmit} className="mt-3 space-y-2 rounded-lg border border-primary-200 dark:border-neutral-700 bg-primary-50/40 dark:bg-neutral-900/40 px-3 py-2">
+    <form onSubmit={handleSubmit} className="space-y-2">
+      <p className="text-[11px] text-primary-600 dark:text-neutral-400">
+        Erstellt einen Token-Link. Die Person öffnet ihn und wählt selbst User-ID + Passwort. Kein Mailversand — Link manuell weitergeben.
+      </p>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="email@beispiel.com (optional)"
+          placeholder="Email (optional, nur zur Identifikation)"
           className="col-span-1 rounded-md border border-primary-200 dark:border-neutral-700 bg-primary-50 dark:bg-neutral-900 px-2 py-1.5 text-xs text-primary-900 dark:text-neutral-100 sm:col-span-2"
         />
         <select
@@ -1147,7 +1487,7 @@ function InviteForm({
       </div>
       {err && <ErrorBox>{err}</ErrorBox>}
       <div className="flex justify-end gap-2">
-        <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
+        <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
           Abbrechen
         </Button>
         <Button
@@ -1156,7 +1496,7 @@ function InviteForm({
           disabled={busy}
           className="bg-accent-500 text-white hover:bg-accent-600 disabled:opacity-50"
         >
-          {busy ? '…' : 'Einladen'}
+          {busy ? '…' : 'Link erstellen'}
         </Button>
       </div>
     </form>

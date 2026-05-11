@@ -330,3 +330,16 @@ export async function inviteMember(
 export async function revokeInvite(wsId: string, token: string): Promise<void> {
   await sendJson('DELETE', `/api/workspaces/${encodeURIComponent(wsId)}/invites/${encodeURIComponent(token)}`)
 }
+
+export async function createMemberAccount(
+  wsId: string,
+  input: {
+    userId: string
+    name: string
+    email?: string
+    password: string
+    role: 'admin' | 'member'
+  },
+): Promise<{ ok: true; userId: string; name: string; role: 'admin' | 'member' }> {
+  return postJson(`/api/workspaces/${encodeURIComponent(wsId)}/create-member`, input)
+}

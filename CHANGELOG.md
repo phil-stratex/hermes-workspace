@@ -5,6 +5,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — Direkt-Account-Anlegen für Members (2026-05-12)
+
+Phil hat geschrieben: „Ich will eine Funktion, dass ich direkt einen Account anlegen kann und der Person ein PW und Namen schon erstelle. Die Person kann sich, wenn sie will, ein neues erstellen oder es behalten." Bisher war nur der Invite-Link-Flow drin (Person legt selbst userId/Name/PW an). Jetzt zwei Modi nebeneinander im **„Mitglied hinzufügen"-Form** mit Tab-Toggle:
+
+- **„Direkt anlegen" (neu, Default)** — Owner/Admin tippt Name + User-ID (Auto-Slug aus Name) + Email (optional) + Initial-Passwort (Auto-generiert, 16-Zeichen, Crypto-Random, mit Anzeigen/Verbergen + Neu-Generieren-Buttons) + Rolle. Submit → `POST /api/workspaces/<id>/create-member` legt Account + Membership atomisch an (`mustChangePassword: false` — Person kann optional ändern, muss nicht). Success-Panel zeigt User-ID + Passwort mit getrenntem Kopier-Button plus „Beide zusammen kopieren". Hinweis: „Diese Credentials werden nur einmal angezeigt."
+- **„Per Einladungs-Link" (alt)** — bisheriger Flow: Token + Setup-Form beim Akzeptieren. Bleibt für Cases wo der Eingeladene sein eigenes Passwort wählen soll.
+
+Backend:
+- `src/routes/api/workspaces.$id.create-member.ts` — `requirePermission(ws, 'members-manage')` + Rate-Limit (10/min/IP) + Slug-Validation. Steps: createUser → setPasswordHash → addMember → Audit-Event `member_created_directly`. Konflikt-Check: 409 wenn user-id existiert.
+- `src/lib/workspace-auth.ts#createMemberAccount(wsId, {userId, name, email?, password, role})` als Frontend-Helper.
+
+Frontend:
+- `InviteForm` (`workspaces-content.tsx`) refactored: zeigt jetzt Tab-Toggle „Direkt anlegen" / „Per Einladungs-Link". Neue Komponenten `DirectAccountForm` + `InviteLinkForm` (bisheriger Code unter neuem Namen, unverändert).
+- `generateRandomPassword(length=16)` Helper nutzt `crypto.getRandomValues` (Fallback `Math.random` für Legacy-Browser). Alphabet ohne Verwechslungs-Zeichen (kein `0/O`, `1/l/I`).
+
+Sicherheits-Note: Das Passwort wird nur einmal im Browser des Admins angezeigt — Server speichert nur den bcrypt-Hash. Audit-Event `member_created_directly` mit `actorUserId` + `hadEmail`-Flag wird automatisch geschrieben.
+
 ### Fixed — SettingsDialog WorkspacesContent Re-Mount-Storm (2026-05-12)
 
 Phil meldete: „Wenn ich einen neuen Workspace oder User anlegen möchte, reloaded sich der Tab von selber." Tatsächlich war es kein Reload — `WorkspacesContent` wurde bei jedem Parent-Re-Render unmountet und neu gemountet, sämtlicher lokaler Form-State (Name, ID, Email, Color) ging verloren.
