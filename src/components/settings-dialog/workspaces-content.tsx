@@ -5,6 +5,7 @@ import {
   ArrowLeft01Icon,
   Building01Icon,
   Cancel01Icon,
+  Crown02Icon,
   Delete02Icon,
   PlusSignIcon,
   Settings01Icon,
@@ -358,6 +359,7 @@ function CreateWorkspaceForm({
       } else {
         setErr(e instanceof Error ? e.message : 'Erstellen fehlgeschlagen')
       }
+    } finally {
       setBusy(false)
     }
   }
@@ -518,14 +520,24 @@ function DetailView({
             wsId={wsId}
             data={data}
             currentUserId={me.user.id}
+            currentUserRole={membership.role}
             canManage={canManageMembers}
-            onChanged={reload}
+            onChanged={() => { reload(); onChanged() }}
           />
         )}
         {data && canManageMembers && (
           <InviteForm wsId={wsId} onCreated={reload} />
         )}
       </div>
+
+      {canDelete && data && (
+        <TransferWorkspaceCard
+          wsId={wsId}
+          allMembers={data.members}
+          currentUserId={me.user.id}
+          onDone={() => { reload(); onChanged() }}
+        />
+      )}
 
       {canDelete && (
         <DangerZone
@@ -657,15 +669,18 @@ function MembersList({
   wsId,
   data,
   currentUserId,
+  currentUserRole,
   canManage,
   onChanged,
 }: {
   wsId: string
   data: MembersResponse
   currentUserId: string
+  currentUserRole: 'owner' | 'admin' | 'member'
   canManage: boolean
   onChanged: () => void
 }) {
+  const ownerCount = data.members.filter((m) => m.role === 'owner').length
   return (
     <div className="space-y-2">
       {data.members.map((m) => (
@@ -674,6 +689,8 @@ function MembersList({
           wsId={wsId}
           member={m}
           isSelf={m.userId === currentUserId}
+          currentUserRole={currentUserRole}
+          ownerCount={ownerCount}
           canManage={canManage}
           allMembers={data.members}
           onChanged={onChanged}
@@ -703,6 +720,8 @@ function MemberItem({
   wsId,
   member,
   isSelf,
+  currentUserRole,
+  ownerCount,
   canManage,
   allMembers,
   onChanged,
@@ -710,6 +729,8 @@ function MemberItem({
   wsId: string
   member: MemberRow
   isSelf: boolean
+  currentUserRole: 'owner' | 'admin' | 'member'
+  ownerCount: number
   canManage: boolean
   allMembers: ReadonlyArray<MemberRow>
   onChanged: () => void
@@ -717,8 +738,18 @@ function MemberItem({
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [removing, setRemoving] = useState(false)
+  const [promoting, setPromoting] = useState(false)
 
-  async function handleRoleChange(newRole: 'admin' | 'member') {
+  const callerIsOwner = currentUserRole === 'owner'
+  const isLastOwner = member.role === 'owner' && ownerCount === 1
+  const showManageColumn = canManage && !isSelf
+  // Only Owner can promote to Owner; not Self (you're already higher or
+  // can't promote yourself); not for an existing Owner.
+  const canPromoteToOwner = callerIsOwner && member.role !== 'owner' && !isSelf
+  // Self-demote is blocked here — explicit "Workspace übertragen" flow only.
+  const selectDisabled = busy || isSelf || isLastOwner
+
+  async function handleRoleChange(newRole: 'admin' | 'member' | 'owner') {
     if (newRole === member.role) return
     setBusy(true)
     setErr(null)
@@ -726,7 +757,26 @@ function MemberItem({
       await setMemberRole(wsId, member.userId, newRole)
       onChanged()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Fehler')
+      const msg = e instanceof Error ? e.message : 'Fehler'
+      if (member.role === 'owner' && /last owner/i.test(msg)) {
+        setErr('Letzten Owner kannst du nicht demoten — ernenne erst einen anderen Member zum Owner.')
+      } else {
+        setErr(msg)
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handlePromoteToOwner() {
+    setBusy(true)
+    setErr(null)
+    try {
+      await setMemberRole(wsId, member.userId, 'owner')
+      setPromoting(false)
+      onChanged()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Promotion fehlgeschlagen')
     } finally {
       setBusy(false)
     }
@@ -751,17 +801,36 @@ function MemberItem({
             {member.email ?? member.userId}
           </div>
         </div>
-        {canManage && member.role !== 'owner' && !isSelf && (
+        {showManageColumn && (
           <div className="flex items-center gap-1.5">
             <select
               value={member.role}
-              onChange={(e) => void handleRoleChange(e.target.value as 'admin' | 'member')}
-              disabled={busy}
-              className="rounded-md border border-primary-200 dark:border-neutral-700 bg-primary-50 dark:bg-neutral-900 px-2 py-1 text-xs text-primary-900 dark:text-neutral-100"
+              onChange={(e) => void handleRoleChange(e.target.value as 'admin' | 'member' | 'owner')}
+              disabled={selectDisabled}
+              title={
+                isLastOwner
+                  ? 'Letzten Owner kannst du nicht demoten — ernenne erst einen anderen Member zum Owner.'
+                  : undefined
+              }
+              className="rounded-md border border-primary-200 dark:border-neutral-700 bg-primary-50 dark:bg-neutral-900 px-2 py-1 text-xs text-primary-900 dark:text-neutral-100 disabled:opacity-60"
             >
-              <option value="member">Member</option>
+              {member.role === 'owner' && <option value="owner">Owner</option>}
               <option value="admin">Admin</option>
+              <option value="member">Member</option>
             </select>
+            {canPromoteToOwner && (
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="ghost"
+                onClick={() => setPromoting((p) => !p)}
+                aria-label="Zu Owner ernennen"
+                title="Zu Owner ernennen"
+                className="text-purple-700 hover:bg-purple-100 dark:text-purple-300 dark:hover:bg-purple-900/30"
+              >
+                <HugeiconsIcon icon={Crown02Icon} size={14} strokeWidth={1.5} />
+              </Button>
+            )}
             <Button
               type="button"
               size="icon-sm"
@@ -776,6 +845,14 @@ function MemberItem({
         )}
       </div>
       {err && <p className="mt-2 text-xs text-red-600">{err}</p>}
+      {promoting && (
+        <PromoteToOwnerPanel
+          memberName={member.name ?? member.userId}
+          onCancel={() => setPromoting(false)}
+          onConfirm={handlePromoteToOwner}
+          busy={busy}
+        />
+      )}
       {removing && (
         <RemoveMemberPanel
           wsId={wsId}
@@ -1083,6 +1160,184 @@ function InviteForm({
         </Button>
       </div>
     </form>
+  )
+}
+
+function PromoteToOwnerPanel({
+  memberName,
+  onCancel,
+  onConfirm,
+  busy,
+}: {
+  memberName: string
+  onCancel: () => void
+  onConfirm: () => void
+  busy: boolean
+}) {
+  return (
+    <div className="mt-2 space-y-2 rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 dark:border-purple-700/40 dark:bg-purple-900/20">
+      <p className="text-xs text-purple-800 dark:text-purple-200">
+        <strong>{memberName}</strong> bekommt volle Owner-Rechte (kann den
+        Workspace löschen, andere Owner ernennen, Members verwalten). Du
+        behältst deine Owner-Rechte — der Workspace hat dann mehrere Owner.
+      </p>
+      <div className="flex justify-end gap-2">
+        <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
+          Abbrechen
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          onClick={onConfirm}
+          disabled={busy}
+          className="bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50"
+        >
+          {busy ? '…' : 'Zu Owner ernennen'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function TransferWorkspaceCard({
+  wsId,
+  allMembers,
+  currentUserId,
+  onDone,
+}: {
+  wsId: string
+  allMembers: ReadonlyArray<MemberRow>
+  currentUserId: string
+  onDone: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [recipientId, setRecipientId] = useState('')
+  const [confirmText, setConfirmText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  const targets = allMembers.filter((m) => m.userId !== currentUserId)
+
+  async function handleSubmit() {
+    setErr(null)
+    if (!recipientId) {
+      setErr('Bitte wähle einen Empfänger.')
+      return
+    }
+    if (confirmText !== wsId) {
+      setErr('Bestätigung passt nicht — tippe „' + wsId + '" exakt.')
+      return
+    }
+    setBusy(true)
+    try {
+      // Step 1: promote recipient
+      await setMemberRole(wsId, recipientId, 'owner')
+      // Step 2: self-demote
+      try {
+        await setMemberRole(wsId, currentUserId, 'admin')
+        setOpen(false)
+        setRecipientId('')
+        setConfirmText('')
+        onDone()
+      } catch (e) {
+        setErr(
+          'Empfänger wurde Owner — dein Self-Demote ist fehlgeschlagen ('
+            + (e instanceof Error ? e.message : 'unbekannt')
+            + '). Bitte erneut versuchen oder manuell zurücksetzen.',
+        )
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Übertragung fehlgeschlagen')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (targets.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-700/40 dark:bg-amber-900/20">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+            Workspace übertragen
+          </div>
+          <p className="mt-1 text-xs text-amber-800/80 dark:text-amber-200/80">
+            Gibt deine Owner-Rechte komplett an einen anderen Member ab. Du
+            wirst danach Admin. Im Unterschied zu „Zu Owner ernennen" (Multi-
+            Owner-additiv) ist das ein Transfer.
+          </p>
+        </div>
+        {!open && (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => setOpen(true)}
+            className="shrink-0 border border-amber-300 bg-primary-50 text-amber-800 hover:bg-amber-100 dark:border-amber-700/60 dark:bg-neutral-900 dark:text-amber-200 dark:hover:bg-amber-900/30"
+          >
+            Übertragen…
+          </Button>
+        )}
+      </div>
+      {open && (
+        <div className="mt-3 space-y-3">
+          <Field label="Empfänger">
+            <select
+              value={recipientId}
+              onChange={(e) => setRecipientId(e.target.value)}
+              className="w-full rounded-lg border border-amber-200 dark:border-amber-700/40 bg-primary-50 dark:bg-neutral-900 px-3 py-2 text-sm text-primary-900 dark:text-neutral-100"
+            >
+              <option value="">— wählen —</option>
+              {targets.map((m) => (
+                <option key={m.userId} value={m.userId}>
+                  {m.name ?? m.userId} ({m.role})
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field
+            label="Bestätigung"
+            hint={`Tippe „${wsId}" exakt zur Bestätigung.`}
+          >
+            <input
+              type="text"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder={wsId}
+              className="w-full rounded-lg border border-amber-200 dark:border-amber-700/40 bg-primary-50 dark:bg-neutral-900 px-3 py-2 text-sm text-primary-900 dark:text-neutral-100"
+            />
+          </Field>
+          {err && <ErrorBox>{err}</ErrorBox>}
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setOpen(false)
+                setRecipientId('')
+                setConfirmText('')
+                setErr(null)
+              }}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleSubmit}
+              disabled={busy || !recipientId || confirmText !== wsId}
+              className="bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
+            >
+              {busy ? '…' : 'Übertragen'}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 

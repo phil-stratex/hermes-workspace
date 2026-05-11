@@ -2106,6 +2106,25 @@ type SettingsDialogProps = {
   initialAction?: 'create-workspace'
 }
 
+// Static content map for sections without dynamic props. Defined OUTSIDE
+// the component so its identity is stable across re-renders — otherwise
+// `<ActiveContent />` would unmount/remount on every parent state change
+// and child form state (e.g. WorkspacesContent inputs) would be wiped.
+const STATIC_CONTENT_MAP: Record<
+  Exclude<SectionId, 'workspaces'>,
+  () => React.JSX.Element
+> = {
+  claude: HermesContent,
+  agent: AgentBehaviorContent,
+  routing: SmartRoutingContent,
+  voice: VoiceContent,
+  display: DisplayContent,
+  appearance: AppearanceContent,
+  chat: ChatContent,
+  notifications: NotificationsContent,
+  language: LanguageContent,
+}
+
 export function SettingsDialog({
   open,
   onOpenChange,
@@ -2115,25 +2134,6 @@ export function SettingsDialog({
   const [active, setActive] = useState<SectionId>(initialSection)
   const [mobileView, setMobileView] = useState<'nav' | 'content'>('nav')
   const [pendingAction, setPendingAction] = useState<'create-workspace' | undefined>(initialAction)
-
-  const CONTENT_MAP: Record<SectionId, () => React.JSX.Element> = {
-    claude: HermesContent,
-    agent: AgentBehaviorContent,
-    routing: SmartRoutingContent,
-    voice: VoiceContent,
-    display: DisplayContent,
-    appearance: AppearanceContent,
-    chat: ChatContent,
-    notifications: NotificationsContent,
-    language: LanguageContent,
-    workspaces: () => (
-      <WorkspacesContent
-        initialAction={pendingAction}
-        onConsumeInitialAction={() => setPendingAction(undefined)}
-      />
-    ),
-  }
-  const ActiveContent = CONTENT_MAP[active]
 
   useEffect(() => {
     if (open) {
@@ -2231,7 +2231,17 @@ export function SettingsDialog({
                     Back
                   </Button>
                 </div>
-                <ActiveContent />
+                {active === 'workspaces' ? (
+                  <WorkspacesContent
+                    initialAction={pendingAction}
+                    onConsumeInitialAction={() => setPendingAction(undefined)}
+                  />
+                ) : (
+                  (() => {
+                    const Comp = STATIC_CONTENT_MAP[active]
+                    return <Comp />
+                  })()
+                )}
               </div>
             </div>
           </SettingsErrorBoundary>

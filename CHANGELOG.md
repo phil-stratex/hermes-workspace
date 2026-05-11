@@ -5,6 +5,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed — SettingsDialog WorkspacesContent Re-Mount-Storm (2026-05-12)
+
+Phil meldete: „Wenn ich einen neuen Workspace oder User anlegen möchte, reloaded sich der Tab von selber." Tatsächlich war es kein Reload — `WorkspacesContent` wurde bei jedem Parent-Re-Render unmountet und neu gemountet, sämtlicher lokaler Form-State (Name, ID, Email, Color) ging verloren.
+
+- **Root-Cause**: `CONTENT_MAP` war innerhalb der `SettingsDialog`-Component definiert. Der `workspaces`-Eintrag war eine neue Funktions-Referenz bei jedem Render → React identifizierte `<ActiveContent />` als neuen Component-Type → Full Unmount/Remount.
+- **Fix**: `STATIC_CONTENT_MAP` außerhalb der Component definiert (Type `Exclude<SectionId, 'workspaces'>`). Die `workspaces`-Section wird inline im JSX gerendert mit stabiler `WorkspacesContent`-Component-Reference. State bleibt jetzt über Re-Renders erhalten.
+- **Bonus-Fix**: `CreateWorkspaceForm.handleSubmit` ruft `setBusy(false)` jetzt im `finally`-Block (vorher nur im `catch`-Path; Button hing nach erfolgreichem Anlegen auf „…").
+
+Geänderte Files:
+- `src/components/settings-dialog/settings-dialog.tsx` — CONTENT_MAP-Refactor.
+- `src/components/settings-dialog/workspaces-content.tsx` — `setBusy`-Fix im Create-Form.
+
+### Added — Multi-Owner + Workspace-Übertragung im UI (2026-05-12)
+
+Phils Wunsch: „Ich will Multi-Owner als Zusatzfunktion — also entweder hinzufügen oder übertragen." Backend unterstützt Multi-Owner längst (`workspace-store.ts#changeMemberRole` macht **keinen** Auto-Demote des alten Owners, nur Lockout-Schutz für den letzten Owner). UI hat jetzt beide Aktionen klar getrennt:
+
+- **„Zu Owner ernennen"** (Multi-Owner additiv) — neuer 👑-Button im `MemberItem` neben dem Rolle-Dropdown. Nur sichtbar wenn aktueller User Owner ist, das Ziel-Member kein Owner und nicht selbst. Klick öffnet `PromoteToOwnerPanel` mit Warntext „bekommt volle Owner-Rechte. Du behältst deine Owner-Rechte — Workspace hat dann mehrere Owner." → 1× `PATCH /api/workspaces/<id>/members/<uid>` mit `{ role: 'owner' }`. Kein Slug-Confirm (nicht destruktiv).
+- **„Workspace übertragen"** (Composit) — neue `TransferWorkspaceCard` im Detail-View (über der Gefahrenzone, nur für Owner). Aufgeklappt: Empfänger-Dropdown (alle anderen Members) + Slug-Confirm. Submit ist 2-Step-Composit: Step 1 = PATCH neuer Owner, Step 2 = PATCH Self → `admin`. Bei Failure in Step 2 zeigt UI: „Empfänger wurde Owner — dein Self-Demote ist fehlgeschlagen. Bitte erneut versuchen." (kein Auto-Rollback weil Step 1 erfolgreich war).
+- **Owner-Demote im Rolle-Dropdown freigeschaltet** — der Select für andere Owner zeigt jetzt `Owner`/`Admin`/`Member` als Optionen. Lockout-Schutz: Backend wirft Error bei letztem Owner (`last owner`-Match), UI zeigt klare Meldung „Letzten Owner kannst du nicht demoten — ernenne erst einen anderen Member zum Owner."
+- **Self-Demote blockiert** — eigenes `MemberItem` hat Select disabled (`selectDisabled = isSelf || …`). Tooltip-Hinweis greift bei letztem Owner. Self-Demote geht nur über „Workspace übertragen" mit explizitem Empfänger.
+
+Backend bleibt unverändert (alle Aktionen über bestehende `setMemberRole`-Helper). Audit-Events `member_role_changed` werden automatisch pro PATCH geschrieben.
+
 ### Added — Modell `gemma4:31b` in der Cloud-Allowlist (2026-05-11)
 - **`src/server/ollama-cloud-models.ts`** — `gemma4:31b` ergänzt; `OLLAMA_CLOUD_IDS` hat jetzt 7 Einträge.
 - **`src/server/swarm-model-resolver.test.ts`** — Test-Array + Beschreibung von "6 Ollama Cloud bare ids" auf 7 hochgezogen.
