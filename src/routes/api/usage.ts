@@ -1,13 +1,17 @@
 /**
- * Usage / Cost telemetry — aggregates token counts and call counts
- * from the workspace's locally-known sources:
+ * Usage / Cost telemetry — workspace-scoped aggregation.
  *
- *   - Council session records (from /opt/data/council/sessions/*.json)
- *     → exact token totals per mode + chairman.
- *   - Hermes API sessions (from /opt/data/sessions/session_api-*.json)
- *     → message counts and model usage. We don't get raw token usage
- *       there because Hermes doesn't persist `usage` in those files —
- *       we expose message_count as a proxy.
+ * Sources:
+ *   - Hermes API sessions (`HERMES_HOME/sessions/session_api-<hex>.json`)
+ *     are filtered against the **active workspace's** `sessions-meta.json`
+ *     — only sessions tagged as belonging to this workspace count. New
+ *     workspaces start at zero; the migrated default workspace (Stratex)
+ *     sees its full history.
+ *   - Council session records (`HERMES_HOME/council/sessions/*.json`)
+ *     have no workspace tags yet. We surface them only for the
+ *     migration-default workspace (env `DEFAULT_WORKSPACE_ID`, fallback
+ *     `stratex`); other workspaces see council=null until the council
+ *     data path itself is wsId-keyed.
  *
  * Window slices: last 24h / 7d / 30d / all.
  */
@@ -18,11 +22,13 @@ import os from 'node:os'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { requireWorkspaceAction } from '../../server/route-auth-helpers'
+import { readSessionsMeta } from '../../server/sessions-privacy'
 
 const HERMES_HOME =
   process.env.HERMES_HOME ?? path.join(os.homedir(), '.hermes')
 const COUNCIL_DIR = path.join(HERMES_HOME, 'council', 'sessions')
 const SESSIONS_DIR = path.join(HERMES_HOME, 'sessions')
+const DEFAULT_WORKSPACE_ID = process.env.DEFAULT_WORKSPACE_ID ?? 'stratex'
 
 const WINDOWS_MS = {
   '24h': 24 * 60 * 60 * 1000,
@@ -104,15 +110,32 @@ function readCouncilStats(sinceMs: number): CouncilStats {
   return stats
 }
 
-function readSessionStats(sinceMs: number): SessionStats {
+function extractSessionId(filename: string): string | null {
+  // Hermes writes `session_api-<hex>.json` per request — extract the hex
+  // portion so we can cross-reference against the workspace meta.
+  const m = filename.match(/^session_api-([0-9a-f]+)\.json$/i)
+  return m ? m[1] : null
+}
+
+function readSessionStats(sinceMs: number, wsId: string | null): SessionStats {
   const stats: SessionStats = {
     total: 0,
     totalMessages: 0,
     perModel: {},
   }
   if (!fs.existsSync(SESSIONS_DIR)) return stats
+  // Build the allow-set of session IDs that belong to this workspace.
+  // Without a wsId (legacy) the gate has already failed elsewhere — but
+  // surface an empty stat rather than leaking everything.
+  if (!wsId) return stats
+  const meta = readSessionsMeta(wsId)
+  const allowed = new Set(Object.keys(meta.sessions ?? {}))
+  if (allowed.size === 0) return stats
+
   const entries = fs.readdirSync(SESSIONS_DIR).filter((f) => f.endsWith('.json'))
   for (const f of entries) {
+    const sid = extractSessionId(f)
+    if (!sid || !allowed.has(sid)) continue
     try {
       const stat = fs.statSync(path.join(SESSIONS_DIR, f))
       if (sinceMs > 0 && stat.mtimeMs < sinceMs) continue
@@ -147,13 +170,22 @@ export const Route = createFileRoute('/api/usage')({
         const cutoff = WINDOWS_MS[win]
           ? Date.now() - WINDOWS_MS[win]
           : 0 // 'all' or unknown → no cutoff
+        const wsId = guard.value.wsId
+        // Council data has no workspaceId tags yet. Show full history only
+        // to the migration-default workspace; other workspaces see empty
+        // until the council data path is itself wsId-keyed.
+        const councilStats =
+          wsId === DEFAULT_WORKSPACE_ID
+            ? readCouncilStats(cutoff)
+            : { total: 0, totalTokens: 0, perMode: {}, perChairman: {}, recent: [] }
         return json({
           ok: true,
           window: win,
+          workspaceId: wsId,
           cutoff,
           generatedAt: Date.now(),
-          council: readCouncilStats(cutoff),
-          sessions: readSessionStats(cutoff),
+          council: councilStats,
+          sessions: readSessionStats(cutoff, wsId),
         })
       },
     },
