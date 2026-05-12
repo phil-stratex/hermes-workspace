@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { z } from 'zod'
 import { createKanbanCard, getKanbanBackendMeta, listKanbanCards, updateKanbanCard } from '../../server/kanban-backend'
+import { requireActiveWorkspaceMember, requireWorkspaceAction } from '../../server/route-auth-helpers'
 
 const CreateCardSchema = z.object({
   title: z.string().trim().min(1).max(200),
@@ -22,7 +23,9 @@ const UpdateCardSchema = CreateCardSchema.partial().extend({
 export const Route = createFileRoute('/api/swarm-kanban')({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
+        const guard = requireActiveWorkspaceMember(request)
+        if (!guard.ok) return guard.response
         return json({
           ok: true,
           cards: await listKanbanCards(),
@@ -30,6 +33,8 @@ export const Route = createFileRoute('/api/swarm-kanban')({
         })
       },
       POST: async ({ request }) => {
+        const guard = requireWorkspaceAction(request, 'roster-edit')
+        if (!guard.ok) return guard.response
         let body: unknown
         try {
           body = await request.json()
@@ -44,6 +49,8 @@ export const Route = createFileRoute('/api/swarm-kanban')({
         return json({ ok: true, card, backend: getKanbanBackendMeta() })
       },
       PATCH: async ({ request }) => {
+        const guard = requireWorkspaceAction(request, 'roster-edit')
+        if (!guard.ok) return guard.response
         let body: unknown
         try {
           body = await request.json()

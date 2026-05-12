@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { requireAuthenticated } from '../../server/route-auth-helpers'
+import { requireWorkspaceAction } from '../../server/route-auth-helpers'
 // (auth-middleware import dropped — uses route-auth-helpers below)
 import {
   appendSwarmMemoryEvent,
@@ -60,7 +60,7 @@ export const Route = createFileRoute('/api/swarm-memory')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const auth = requireAuthenticated(request)
+        const auth = requireWorkspaceAction(request, 'memory-read')
         if (!auth.ok) return auth.response
         const url = new URL(request.url)
         const workerId = url.searchParams.get('workerId')
@@ -74,7 +74,7 @@ export const Route = createFileRoute('/api/swarm-memory')({
         }
       },
       POST: async ({ request }) => {
-        const auth = requireAuthenticated(request)
+        const auth = requireWorkspaceAction(request, 'memory-write')
         if (!auth.ok) return auth.response
 
         let body: SwarmMemoryPostBody

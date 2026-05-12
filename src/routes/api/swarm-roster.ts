@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { requireAuthenticated, requireWorkspaceAction } from '../../server/route-auth-helpers'
+import { requireActiveWorkspaceMember, requireWorkspaceAction } from '../../server/route-auth-helpers'
 import { requireJsonContentType } from '../../server/rate-limit'
 import {
   SWARM_ROSTER_PATH,
@@ -15,7 +15,7 @@ export const Route = createFileRoute('/api/swarm-roster')({
     handlers: {
       // GET — every active-workspace member can read the roster.
       GET: async ({ request }) => {
-        const auth = requireAuthenticated(request)
+        const auth = requireActiveWorkspaceMember(request)
         if (!auth.ok) return auth.response
         const ids = listSwarmWorkerIds()
         return json({

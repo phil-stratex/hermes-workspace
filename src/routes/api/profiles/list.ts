@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { requireAuthenticated } from '../../../server/route-auth-helpers'
+import { requireActiveWorkspaceMember } from '../../../server/route-auth-helpers'
 // (auth-middleware import dropped — uses route-auth-helpers below)
 import {
   getActiveProfileName,
@@ -11,7 +11,7 @@ export const Route = createFileRoute('/api/profiles/list')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const auth = requireAuthenticated(request)
+        const auth = requireActiveWorkspaceMember(request)
         if (!auth.ok) return auth.response
         try {
           return json({

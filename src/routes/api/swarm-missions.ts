@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { requireAuthenticated } from '../../server/route-auth-helpers'
+import { requireActiveWorkspaceMember } from '../../server/route-auth-helpers'
 // (auth-middleware import dropped — uses route-auth-helpers below)
 import { getSwarmMission, listSwarmMissions, listSwarmReports, SWARM_MISSIONS_PATH } from '../../server/swarm-missions'
 
@@ -8,7 +8,7 @@ export const Route = createFileRoute('/api/swarm-missions')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const auth = requireAuthenticated(request)
+        const auth = requireActiveWorkspaceMember(request)
         if (!auth.ok) return auth.response
         const url = new URL(request.url)
         const id = url.searchParams.get('id')?.trim()
