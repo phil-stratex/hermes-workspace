@@ -5,6 +5,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed — Cross-Workspace + Cross-User Daten-Separation (4 Phasen, 2026-05-12)
+
+Phil hat geflaggt dass „beim Workspace-Wechsel wird auch der swarm usw übernommen" und dass Settings/Usage/Dashboard zwischen Workspaces überschrieben werden. Audit-Ergebnis: 20+ Routes hatten entweder zu lose Auth-Gates oder bedienten globale Datenquellen ohne Workspace-Filter. Behoben in 4 inkrementellen Commits:
+
+**Phase 1a — Auth-Hardening (`8f933b69`)**
+- `swarm-kanban` hatte **keine Auth** (GET/POST/PATCH) — alle Welt konnte Cards lesen/schreiben. Jetzt `requireActiveWorkspaceMember` (GET) und `requireWorkspaceAction('roster-edit')` (Mutations).
+- `swarm-roster` GET, `swarm-memory` GET/POST, `swarm-missions` GET, `swarm-chat` GET, alle 7 `profiles/*` Routes von `requireAuthenticated` (kein WS-Check) auf `requireActiveWorkspaceMember` oder `requireWorkspaceAction(<action>)` umgestellt.
+
+**Phase 2 — Usage WS-scoped (`a5fa9a46`)**
+- `/api/usage` hatte korrektes Permission-Gate aber globale Datenquellen — jeder WS-Member sah alle Hermes-Agent-Sessions. Jetzt: Sessions werden über `sessions-meta.json` des aktiven Workspaces gefiltert; Council-Daten nur im Migration-Default-Workspace sichtbar (env `DEFAULT_WORKSPACE_ID`, fallback `stratex`).
+
+**Phase 3 — Empty-Fallback für Non-Default-Workspaces (`d9859d31`)**
+- Neuer Helper `src/server/workspace-data-scope.ts#isLegacyDataWorkspace(wsId)`. Alle Routes deren Daten noch global rooted sind (`~/.openclaw/`, `HERMES_HOME/`, repo-rooted) geben für non-default-Workspaces einen leeren Response zurück:
+  - `swarm-roster`, `swarm-memory`, `swarm-missions`, `swarm-kanban`, `swarm-chat` → leere Liste / null
+  - `profiles/list`, `profiles/read` → leere Profile-Liste / null
+  - `council` GET → leere sessions, POST → 501 mit Hint
+  - `dashboard/overview` → Achievements/Analytics/Logs für non-default WS unterdrückt (Gateway-Health bleibt — legitim stack-wide)
+- Stratex (Migration-Default) ist unverändert — sieht weiter alle historischen Daten. Neue Workspaces fangen jetzt visuell wirklich leer an.
+
+**Phase 4 — Chat-Settings beim Logout zurücksetzen (`523f4bcd`)**
+- Browser-LocalStorage-Settings (Display-Name, Avatar) leakten zwischen User-Wechseln im selben Browser. Neuer Helper `resetUserScopedChatSettings()` wird im Logout-Flow aufgerufen — Display-Name und Avatar werden auf Default zurückgesetzt. Browser-level Prefs (Theme, Chat-Width, Enter-Behavior) bleiben — die gehören zum Browser, nicht zum Account.
+
+**Was noch offen** (separater Refactor): die globalen Daten-Pfade selbst (`~/.openclaw/workspace/memory/`, `HERMES_HOME/council/sessions/`, repo-rootiges `swarm.yaml`) müssten physisch per-Workspace partitioniert werden — heute schließt der Empty-Fallback das Leak auf Route-Ebene, aber die Storage-Layer-Trennung steht aus. Volle Daten-Migration für neue Workspaces (Plan B etc.) braucht den nächsten Refactor.
+
 ### Added — OpenHands Desktop + Live-VNC im Workspace (Phase 2) (2026-05-12)
 
 Phils Wunsch: „Ich will eine preview funktion ... die auch automatisch im chat kommt was er aktuell nicht tut, ich will D2 mit der funktion dass ich ihm live zusehen kann wie er gerade auf seinem desktop arbeitet, oder sogar als reiter eine funktion entscheide du was besser ist." Implementation als **drei zusammenhängende Capabilities**:
