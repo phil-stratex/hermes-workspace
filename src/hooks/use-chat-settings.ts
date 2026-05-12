@@ -121,6 +121,20 @@ export const useChatSettingsStore = create<ChatSettingsState>()(
   ),
 )
 
+/**
+ * Reset the user-scoped fields in the chat-settings store back to their
+ * defaults. Used on logout so that the next user signing in on the same
+ * browser doesn't inherit the previous user's display name or avatar.
+ * Browser-level preferences (theme, chatWidth, enterBehavior, …) are
+ * left alone — they belong to the browser/device, not the account.
+ */
+export function resetUserScopedChatSettings(): void {
+  useChatSettingsStore.getState().updateSettings({
+    displayName: DEFAULT_CHAT_DISPLAY_NAME,
+    avatarDataUrl: null,
+  })
+}
+
 export function getChatProfileDisplayName(displayName: string): string {
   const trimmed = displayName.trim()
   return trimmed.length > 0 ? trimmed : DEFAULT_CHAT_DISPLAY_NAME

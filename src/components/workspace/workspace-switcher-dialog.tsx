@@ -18,6 +18,7 @@ import {
   switchWorkspace,
 } from '@/lib/workspace-auth'
 import type { CurrentUser, Membership, MeResponse } from '@/lib/workspace-auth'
+import { resetUserScopedChatSettings } from '@/hooks/use-chat-settings'
 
 type Props = {
   open: boolean
@@ -72,6 +73,10 @@ export function WorkspaceSwitcherDialog({ open, onOpenChange, onCreateWorkspace 
     } catch {
       /* ignore */
     }
+    // Clear per-user fields from the chat-settings store so the next
+    // user signing in on this browser doesn't inherit the display name
+    // or avatar. Browser-level prefs (theme, chat-width) survive.
+    resetUserScopedChatSettings()
     window.location.reload()
   }
 
