@@ -29,6 +29,19 @@ Phil hat geflaggt dass „beim Workspace-Wechsel wird auch der swarm usw überno
 
 **Was noch offen** (separater Refactor): die globalen Daten-Pfade selbst (`~/.openclaw/workspace/memory/`, `HERMES_HOME/council/sessions/`, repo-rootiges `swarm.yaml`) müssten physisch per-Workspace partitioniert werden — heute schließt der Empty-Fallback das Leak auf Route-Ebene, aber die Storage-Layer-Trennung steht aus. Volle Daten-Migration für neue Workspaces (Plan B etc.) braucht den nächsten Refactor.
 
+### Changed — Phase 2.4: Preview-Panel Resize-Handle sichtbar + max-Breite 85% Viewport (2026-05-12)
+
+Phil meldete dass er die Panel-Breite nicht verschieben konnte. Tatsächlich war der Resize-Handle schon implementiert — aber als 4px-breiter Streifen mit `bg-primary-200/40` (sehr transparent), praktisch unsichtbar und schwer zu treffen.
+
+**`src/components/preview-panel/preview-panel.tsx`:**
+- `ResizeHandle` neu gestaltet: 20px breite Hit-Area (per `w-5 -left-2`), zentrierte 3px Grip-Bar (`h-12 rounded-full bg-primary-300/80`), zusätzliche 1px volle Trenn-Linie am Rand für visuellen Boundary.
+- Hover-State (`group-hover:bg-primary-500`) macht die Grip-Bar sofort sichtbar, Active-Drag-State färbt sie auf `var(--theme-accent)` ein.
+- `useState(isResizing)` propagiert während des Drags in den Handle → live Highlight beim Ziehen.
+- Max-Width-Cap von **60% Viewport auf 85% angehoben** damit HTML-Dashboards mehr Platz haben (`viewportCap = min(window.innerWidth * 0.85, MAX_PANEL_WIDTH)`). MIN_PANEL_WIDTH (320) und MAX_PANEL_WIDTH (900) im Store bleiben, der Viewport-Cap dominiert auf großen Monitoren.
+- `tabIndex={0}` für Tastatur-Fokus (Future-Work: Arrow-Keys für Tastatur-Resize).
+
+Keine API-Änderung am Store — `panelWidth` persistiert weiterhin in localStorage, `isPanelOpen` session-scoped.
+
 ### Fixed — Phase 2.3: Auto-Preview funktioniert auch auf dem openaiChat-Pfad (2026-05-12)
 
 Root-Cause der Fehlfunktion (von Phase 2.2 noch nicht behoben): Der `/api/send-stream` Endpoint hat drei verschiedene Pfade — `/v1/responses` (responses-api), Hermes-Gateway-Translator-Events, und den **openaiChat** Fallback. Aurora auf dem VPS landet auf dem openaiChat-Pfad weil `HERMES_USE_RESPONSES` nicht gesetzt ist. Dieser Pfad parsed nur `content`, `reasoning` und `event: hermes.tool.progress` aus dem Upstream-Stream — `tool_calls`-deltas (mit args) werden **verworfen** (`parseOpenAIStream` in `src/server/openai-compat-api.ts:194` ignoriert sie). Ergebnis: `chunk.type === 'tool'` hat nur `name + label + toolCallId + status`, kein args/result. Damit returnt `tryCaptureFileArtifact` früh (`readArgsRecord(undefined)` → null), kein `fileArtifact` Event wird emitted, kein PreviewPanel öffnet sich.

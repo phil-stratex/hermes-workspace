@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Cancel01Icon } from '@hugeicons/core-free-icons'
 import { CodeView } from './code-view'
@@ -19,20 +19,47 @@ import {
 
 function ResizeHandle({
   onResizeStart,
+  isResizing,
 }: {
   onResizeStart: (event: React.MouseEvent<HTMLDivElement>) => void
+  isResizing: boolean
 }) {
   return (
     <div
       role="separator"
       aria-orientation="vertical"
       aria-label="Resize preview panel"
+      tabIndex={0}
       onMouseDown={onResizeStart}
+      // Stratex: previously a 4px transparent strip — users couldn't see it
+      // and missed the resize affordance. Now a 6px visible strip with a
+      // centred grip indicator + wide invisible hit-area (8px on each side
+      // via padding) so the cursor catches the col-resize comfortably.
       className={cn(
-        'absolute inset-y-0 left-0 w-1 cursor-col-resize',
-        'bg-primary-200/40 transition-colors hover:bg-primary-300/80',
+        'group absolute inset-y-0 -left-2 z-20 flex w-5 cursor-col-resize items-center justify-center',
+        'select-none',
       )}
-    />
+    >
+      {/* visible vertical bar */}
+      <span
+        className={cn(
+          'block h-12 w-[3px] rounded-full transition-colors',
+          isResizing
+            ? 'bg-[var(--theme-accent)]'
+            : 'bg-primary-300/80 group-hover:bg-primary-500',
+        )}
+      />
+      {/* full-height tinted edge to communicate the panel boundary */}
+      <span
+        aria-hidden="true"
+        className={cn(
+          'pointer-events-none absolute inset-y-0 left-2 w-px transition-colors',
+          isResizing
+            ? 'bg-[var(--theme-accent)]'
+            : 'bg-primary-300/60 group-hover:bg-primary-400',
+        )}
+      />
+    </div>
   )
 }
 
@@ -44,13 +71,16 @@ export function PreviewPanel() {
   const setPanelWidth = usePreviewPanelStore((state) => state.setPanelWidth)
   const togglePanel = usePreviewPanelStore((state) => state.togglePanel)
 
+  const [isResizing, setIsResizing] = useState(false)
+
   const handleResizeStart = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
       event.preventDefault()
+      setIsResizing(true)
 
       function onMove(moveEvent: MouseEvent) {
         const viewportCap = Math.min(
-          window.innerWidth * 0.6,
+          window.innerWidth * 0.85, // Stratex: allow up to 85% viewport so HTML dashboards have room to breathe
           MAX_PANEL_WIDTH,
         )
         const next = Math.min(
@@ -69,6 +99,7 @@ export function PreviewPanel() {
         window.removeEventListener('pointercancel', onUp)
         document.body.style.userSelect = ''
         document.body.style.cursor = ''
+        setIsResizing(false)
       }
 
       document.body.style.userSelect = 'none'
@@ -96,7 +127,7 @@ export function PreviewPanel() {
       )}
       style={{ width: panelWidth }}
     >
-      <ResizeHandle onResizeStart={handleResizeStart} />
+      <ResizeHandle onResizeStart={handleResizeStart} isResizing={isResizing} />
       <div className="flex h-9 shrink-0 items-center justify-between gap-2 border-b border-primary-200 bg-primary-50/80 pl-3 pr-1">
         <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-primary-700">
           Preview
