@@ -4,14 +4,19 @@ import { cn } from '@/lib/utils'
 /**
  * URL for the noVNC web client served by the OpenHands Agent Server.
  *
- * Default expects users to reach the VPS via SSH-tunnel `-L 18002:127.0.0.1:18002`
- * (same pattern as the existing workspace port 3000 tunnel). Override at build
- * time with `VITE_OPENHANDS_VNC_URL` to point at a Traefik-exposed subdomain.
+ * Same-origin via the `/openhands-vnc` proxy in `vite.config.ts` — Phil's
+ * existing port-3000 SSH tunnel covers it; no extra `-L 18002` needed.
+ * The `path=openhands-vnc/websockify` query param tells the noVNC client
+ * where to open its WebSocket; the vite proxy (`ws: true`) forwards the
+ * upgrade to `openhands-agent:8002/websockify`.
+ *
+ * Override at build time with `VITE_OPENHANDS_VNC_URL` for a different
+ * deployment (e.g. Traefik-exposed subdomain with BasicAuth).
  */
 const DEFAULT_VNC_URL =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ((import.meta as any).env?.VITE_OPENHANDS_VNC_URL as string | undefined) ??
-  'http://localhost:18002/vnc.html?autoconnect=1&resize=remote'
+  '/openhands-vnc/vnc.html?autoconnect=1&resize=remote&path=openhands-vnc/websockify'
 
 type DesktopVncIframeProps = {
   /** 'fullscreen' fills its container, 'mini' is height-capped for in-chat use. */
@@ -47,9 +52,9 @@ export function DesktopVncIframe({
       >
         <span className="font-semibold">OpenHands-Desktop nicht erreichbar</span>
         <span className="max-w-sm text-xs text-amber-100/80">
-          Stelle sicher dass der <code>openhands-agent</code> Container auf dem VPS läuft
-          und ein SSH-Tunnel auf Port <code>18002</code> aktiv ist
-          (<code>ssh -L 18002:127.0.0.1:18002 root@&lt;vps&gt;</code>).
+          Stelle sicher dass der <code>openhands-agent</code> Container auf dem
+          VPS läuft und im <code>hermes-agent-zjya_default</code> Netzwerk
+          erreichbar ist (workspace proxied via <code>/openhands-vnc</code>).
         </span>
         <span className="text-[10px] text-amber-100/60">
           URL: <code>{effectiveUrl}</code>

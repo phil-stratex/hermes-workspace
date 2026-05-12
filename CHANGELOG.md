@@ -29,6 +29,22 @@ Phil hat geflaggt dass „beim Workspace-Wechsel wird auch der swarm usw überno
 
 **Was noch offen** (separater Refactor): die globalen Daten-Pfade selbst (`~/.openclaw/workspace/memory/`, `HERMES_HOME/council/sessions/`, repo-rootiges `swarm.yaml`) müssten physisch per-Workspace partitioniert werden — heute schließt der Empty-Fallback das Leak auf Route-Ebene, aber die Storage-Layer-Trennung steht aus. Volle Daten-Migration für neue Workspaces (Plan B etc.) braucht den nächsten Refactor.
 
+### Fixed — Phase 2.1: VNC erreichbar ohne extra SSH-Tunnel + Aurora-Capability-Awareness (2026-05-12)
+
+Zwei Bugs nach Phase 2 (von Phil live verifiziert):
+
+**(1) `/desktop` Route zeigte `ERR_CONNECTION_REFUSED`** — der iframe lud `http://localhost:18002/vnc.html`, aber Phils SSH-Tunnel forwarded nur Port 3000 (Workspace). Fix: Workspace fungiert jetzt als Same-Origin Reverse-Proxy für noVNC.
+- `vite.config.ts` — neue Proxy-Entry `/openhands-vnc` mit `target: 'http://openhands-agent:8002'` (compose-DNS), `ws: true` für VNC-WebSocket-Upgrade, headers-strip für iframe-Embedding (kopiert das `/claude-ui` Pattern aus Zeile 529-541). Target override via `OPENHANDS_INTERNAL_URL` env für Non-VPS-Dev.
+- `src/components/desktop-panel/desktop-vnc-iframe.tsx` — `DEFAULT_VNC_URL` von absolut auf relativ `/openhands-vnc/vnc.html?autoconnect=1&resize=remote&path=openhands-vnc/websockify` (noVNC `path=` query-param sagt dem Client wo die WebSocket-Verbindung hin geht — proxy mit `ws: true` forwarded den Upgrade). Fail-State-Message aktualisiert (kein 18002-Tunnel mehr nötig).
+
+Effekt: Phils existing `ssh -L 3000:127.0.0.1:3000 root@vps` Tunnel reicht — VNC erscheint inline.
+
+**(2) Aurora wusste nicht dass diese Capabilities existieren.** Wenn Phil sie um ein HTML-Dashboard bat, schrieb sie zwar das File, wies aber nicht auf die Auto-Preview hin — und für Browser-Tasks dispatchte sie nicht swarm9/swarm7 mit OpenHands. Fix: `<workspace_capabilities>` Block im injizierten workspace_context-Header.
+- `src/lib/workspace-message-scope.ts` — `buildWorkspaceDirective()` ergänzt um `WORKSPACE_CAPABILITIES_BLOCK` constant mit drei Bullet-Points: `auto-preview-html`, `desktop-vnc`, `swarm-dispatch`. Wording bewusst optional-shaped („dispatch swarm9 — they drive the desktop") statt aktion-versprochend.
+- `src/lib/workspace-message-scope.test.ts` — Test 1 angepasst für neuen Multi-Line-Output; neuer Test verifiziert dass alle drei Capability-Marker (`auto-preview-html`, `desktop-vnc`, `swarm-dispatch`) plus `<workspace_capabilities>` Tags drin sind. Idempotency-Test (keine Doppel-Injection bei retry) bleibt unverändert.
+
+Token-Kosten ~150 pro Chat-Send — trivial bei den 262k-Context-Modellen die im Stack laufen. Block wird nur injiziert wenn `HERMES_INJECT_WORKSPACE_CONTEXT=1` env gesetzt ist (default auf VPS).
+
 ### Added — OpenHands Desktop + Live-VNC im Workspace (Phase 2) (2026-05-12)
 
 Phils Wunsch: „Ich will eine preview funktion ... die auch automatisch im chat kommt was er aktuell nicht tut, ich will D2 mit der funktion dass ich ihm live zusehen kann wie er gerade auf seinem desktop arbeitet, oder sogar als reiter eine funktion entscheide du was besser ist." Implementation als **drei zusammenhängende Capabilities**:

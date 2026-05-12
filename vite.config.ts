@@ -544,6 +544,27 @@ const config = defineConfig(({ mode, command }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/workspace-api/, ''),
         },
+        // Stratex: same-origin proxy for OpenHands noVNC web client.
+        // OpenHands runs as a sibling container `openhands-agent` on port 8002
+        // (compose-DNS reachable from this workspace container). Routing it
+        // via /openhands-vnc/* means Phil's browser hits localhost:3000 (his
+        // existing SSH-tunnel) and we forward HTTP + WebSocket internally —
+        // no extra `-L 18002` tunnel needed. Strip iframe-blocking headers
+        // (same pattern as /claude-ui above) so the noVNC page can embed.
+        // Override target via OPENHANDS_INTERNAL_URL env for non-compose dev.
+        '/openhands-vnc': {
+          target:
+            process.env.OPENHANDS_INTERNAL_URL || 'http://openhands-agent:8002',
+          changeOrigin: true,
+          ws: true,
+          rewrite: (path) => path.replace(/^\/openhands-vnc/, ''),
+          configure: (proxy) => {
+            proxy.on('proxyRes', (_proxyRes) => {
+              delete _proxyRes.headers['x-frame-options']
+              delete _proxyRes.headers['content-security-policy']
+            })
+          },
+        },
       },
     },
     plugins: [
