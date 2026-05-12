@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — Worker-Identity-Seeder (Stratex-Rollen pro Profile) (2026-05-12)
+
+Erkenntnis aus erstem Pilot-Run: bootstrap-ed Workers identifizierten sich als generischer „Hermes Agent" statt mit ihrer Stratex-Rolle (Mirror, Builder, Designer…). Grund: `memory/IDENTITY.md`, `MEMORY.md`, `USER.md` waren leer; nur ein 513-Byte default-`SOUL.md` aus dem Hermes-shipped Template existierte.
+
+**`scripts/seed-worker-identities.py`** (neu, Python+PyYAML) liest `swarm.yaml` und schreibt pro Profile in `/opt/data/profiles/<id>/`:
+
+- `memory/IDENTITY.md` — Worker-ID + Name + Role + Model + Specialty + Standing Mission + Skills-Liste + Capabilities + preferredTaskTypes + Coordination-Contract (Checkpoint-Format, Orchestrator-Routing-Rules, Greenlight-Boundary)
+- `MEMORY.md` — Quick-Reference + Standing-Mission + Pointer auf IDENTITY/USER
+- `USER.md` — Phil's Profile (Stratex-AI Founder, Hospitality SaaS, Web/SEO Services) + Kommunikations-Stil (Deutsch, terse, evidence-based) + Greenlight-Boundary
+- `SOUL.md` — Stratex-Persona (überschreibt default-Stub): role-aware, terse, checkpoint-disziplin
+
+Verifiziert: nach Restart der tmux-Sessions identifiziert sich Mirror als „Mirror (swarm3, Orchestrator + Skill-Hunter + Roster-Curator) mit Modell kimi-k2.6", Builder als „Builder (swarm4, Primary Full-Stack Builder) mit Modell qwen3-coder:480b", Designer als „Designer (swarm9, UI/UX Visual Concept / Design-Spec Authoring) mit Modell kimi-k2.6" — alle mit Standing-Mission-Awareness und Checkpoint-Discipline out-of-the-box.
+
+Idempotent — überschreibt existierende IDENTITY/USER/MEMORY/SOUL. Bei Roster-Änderungen einfach re-runnen + sessions neu starten.
+
 ### Changed — Dev-Team Swarm Roster v4 (10 Worker, all-skills-from-repos) (2026-05-12)
 
 Phils Wunsch: „Lass erstmal nur mit dem Dev-Team starten dass da alles perfekt funktioniert" + „ALLE Skills aus echten GitHub-Repos — keine self-written". Roster komplett umgeschrieben — vorher 12 Worker (11 davon nur Roster-only ohne Profile), jetzt **10 Worker auf reine Dev-Lane fokussiert**, Marketing/Sales/Hospitality kommen später:
