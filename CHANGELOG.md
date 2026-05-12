@@ -29,6 +29,14 @@ Phil hat geflaggt dass „beim Workspace-Wechsel wird auch der swarm usw überno
 
 **Was noch offen** (separater Refactor): die globalen Daten-Pfade selbst (`~/.openclaw/workspace/memory/`, `HERMES_HOME/council/sessions/`, repo-rootiges `swarm.yaml`) müssten physisch per-Workspace partitioniert werden — heute schließt der Empty-Fallback das Leak auf Route-Ebene, aber die Storage-Layer-Trennung steht aus. Volle Daten-Migration für neue Workspaces (Plan B etc.) braucht den nächsten Refactor.
 
+### Fixed — Phase 2.2: HTML-Artefakte rendern beim Auto-Open als Preview (nicht Code) (2026-05-12)
+
+Phil hat Aurora um ein HTML-Dashboard gebeten, sie hat es korrekt nach `workspace/dashboard-test.html` geschrieben — aber das PreviewPanel öffnete sich entweder gar nicht oder mit Code-View statt gerenderter Preview. Root-Cause: `src/stores/chat-store.ts:1272` ruft `openArtifact()` aus dem `fileArtifact` Event-Handler OHNE `viewMode`-Argument. Das defaultet auf `'code'`, gewinnt gegen den späteren `useEffect` in `message-item.tsx` (Phase 2) der `alreadyOpen` checkt und dann skippt.
+
+Fix: in `chat-store.ts` jetzt `isHtml`-check auf den artifact path; bei HTML wird `viewMode: 'preview'` ans `openArtifact()` durchgereicht. Logik gespiegelt zu `artifact-card.tsx:handleOpen()` (das den manuellen Klick-Fall handhabt) — beide Pfade kommen jetzt mit demselben Default an.
+
+Effekt: Aurora schreibt HTML → Panel öffnet sich automatisch rechts → gerenderte Vorschau erscheint direkt (statt erst Code-Tab und dann manueller Wechsel).
+
 ### Fixed — Phase 2.1: VNC erreichbar ohne extra SSH-Tunnel + Aurora-Capability-Awareness (2026-05-12)
 
 Zwei Bugs nach Phase 2 (von Phil live verifiziert):

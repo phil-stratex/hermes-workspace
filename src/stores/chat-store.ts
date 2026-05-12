@@ -1268,13 +1268,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
           // Auto-open the right-side preview panel and add/refresh a tab.
           // Cross-store call is wrapped so panel-store failures (e.g. during
           // SSR/hydration races) cannot break the chat stream.
+          // Stratex: HTML paths default to viewMode='preview' so the rendered
+          // dashboard appears immediately — without this they open as 'code'
+          // and the user has to toggle the view manually.
           try {
+            const lowerPath = meta.path.toLowerCase()
+            const isHtml = lowerPath.endsWith('.html') || lowerPath.endsWith('.htm')
             usePreviewPanelStore.getState().openArtifact({
               artifactId: meta.artifactId,
               sessionId: meta.sessionId,
               path: meta.path,
               version: meta.version,
               toolName: meta.toolName,
+              viewMode: isHtml ? 'preview' : undefined,
             })
           } catch (error) {
             // Log so panel-store failures (e.g. crypto unavailable, persist
