@@ -6,6 +6,7 @@ import {
   getActiveProfileName,
   listProfiles,
 } from '../../../server/profiles-browser'
+import { isLegacyDataWorkspace } from '../../../server/workspace-data-scope'
 
 export const Route = createFileRoute('/api/profiles/list')({
   server: {
@@ -13,6 +14,9 @@ export const Route = createFileRoute('/api/profiles/list')({
       GET: async ({ request }) => {
         const auth = requireActiveWorkspaceMember(request)
         if (!auth.ok) return auth.response
+        if (!isLegacyDataWorkspace(auth.value.wsId)) {
+          return json({ profiles: [], activeProfile: null })
+        }
         try {
           return json({
             profiles: listProfiles(),

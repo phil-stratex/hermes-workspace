@@ -9,6 +9,7 @@ import {
   patchSwarmRosterWorker,
 } from '../../server/swarm-roster'
 import { listSwarmWorkerIds } from '../../server/swarm-foundation'
+import { isLegacyDataWorkspace } from '../../server/workspace-data-scope'
 
 export const Route = createFileRoute('/api/swarm-roster')({
   server: {
@@ -17,6 +18,18 @@ export const Route = createFileRoute('/api/swarm-roster')({
       GET: async ({ request }) => {
         const auth = requireActiveWorkspaceMember(request)
         if (!auth.ok) return auth.response
+        // Legacy global path: only the migration-default workspace
+        // sees the repo-rooted swarm.yaml. Other workspaces get an
+        // empty roster until the data path is itself wsId-keyed.
+        if (!isLegacyDataWorkspace(auth.value.wsId)) {
+          return json({
+            ok: true,
+            path: null,
+            roster: { schemaVersion: 1, workers: [] },
+            fetchedAt: Date.now(),
+            reason: 'workspace has no local swarm roster yet',
+          })
+        }
         const ids = listSwarmWorkerIds()
         return json({
           ok: true,

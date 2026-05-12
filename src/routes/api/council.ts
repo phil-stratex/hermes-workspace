@@ -39,6 +39,7 @@ import { json } from '@tanstack/react-start'
 import { requireWorkspaceAction } from '../../server/route-auth-helpers'
 // (auth-middleware import dropped — uses route-auth-helpers below)
 import { requireJsonContentType } from '../../server/rate-limit'
+import { isLegacyDataWorkspace } from '../../server/workspace-data-scope'
 import {
   extractAttachmentText,
   renderTextAttachmentsAsBlock,
@@ -209,6 +210,19 @@ export const Route = createFileRoute('/api/council')({
       POST: async ({ request }) => {
         const guard = requireWorkspaceAction(request, 'chat')
         if (!guard.ok) return guard.response
+        // Council writes to the global session pool — refuse from any
+        // workspace other than the migration-default until per-WS
+        // council storage exists.
+        if (!isLegacyDataWorkspace(guard.value.wsId)) {
+          return json(
+            {
+              ok: false,
+              error: 'workspace has no local council storage yet',
+              hint: 'council sessions are stored globally under HERMES_HOME — per-workspace storage is on the refactor list',
+            },
+            { status: 501 },
+          )
+        }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
         let body: CouncilRequest
@@ -535,6 +549,11 @@ export const Route = createFileRoute('/api/council')({
       GET: async ({ request }) => {
         const guard = requireWorkspaceAction(request, 'chat')
         if (!guard.ok) return guard.response
+        // Council sessions live globally in `HERMES_HOME/council/sessions/`
+        // — only the migration-default workspace owns them.
+        if (!isLegacyDataWorkspace(guard.value.wsId)) {
+          return json({ ok: true, sessions: [] })
+        }
         const url = new URL(request.url)
         const id = url.searchParams.get('id')
         try {

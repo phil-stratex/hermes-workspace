@@ -3,6 +3,7 @@ import { json } from '@tanstack/react-start'
 import { z } from 'zod'
 import { createKanbanCard, getKanbanBackendMeta, listKanbanCards, updateKanbanCard } from '../../server/kanban-backend'
 import { requireActiveWorkspaceMember, requireWorkspaceAction } from '../../server/route-auth-helpers'
+import { isLegacyDataWorkspace } from '../../server/workspace-data-scope'
 
 const CreateCardSchema = z.object({
   title: z.string().trim().min(1).max(200),
@@ -26,6 +27,14 @@ export const Route = createFileRoute('/api/swarm-kanban')({
       GET: async ({ request }) => {
         const guard = requireActiveWorkspaceMember(request)
         if (!guard.ok) return guard.response
+        if (!isLegacyDataWorkspace(guard.value.wsId)) {
+          return json({
+            ok: true,
+            cards: [],
+            backend: getKanbanBackendMeta(),
+            reason: 'workspace has no local kanban board yet',
+          })
+        }
         return json({
           ok: true,
           cards: await listKanbanCards(),
@@ -35,6 +44,12 @@ export const Route = createFileRoute('/api/swarm-kanban')({
       POST: async ({ request }) => {
         const guard = requireWorkspaceAction(request, 'roster-edit')
         if (!guard.ok) return guard.response
+        if (!isLegacyDataWorkspace(guard.value.wsId)) {
+          return json(
+            { ok: false, error: 'workspace has no local kanban board yet' },
+            { status: 501 },
+          )
+        }
         let body: unknown
         try {
           body = await request.json()
@@ -51,6 +66,12 @@ export const Route = createFileRoute('/api/swarm-kanban')({
       PATCH: async ({ request }) => {
         const guard = requireWorkspaceAction(request, 'roster-edit')
         if (!guard.ok) return guard.response
+        if (!isLegacyDataWorkspace(guard.value.wsId)) {
+          return json(
+            { ok: false, error: 'workspace has no local kanban board yet' },
+            { status: 501 },
+          )
+        }
         let body: unknown
         try {
           body = await request.json()

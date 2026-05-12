@@ -16,7 +16,7 @@
  */
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { requireAuthenticated } from '../../../server/route-auth-helpers'
+import { requireActiveWorkspaceMember } from '../../../server/route-auth-helpers'
 // (auth-middleware import dropped — uses route-auth-helpers below)
 import {
   dashboardFetch,
@@ -26,6 +26,7 @@ import {
   buildDashboardOverview,
   type DashboardFetcher,
 } from '../../../server/dashboard-aggregator'
+import { isLegacyDataWorkspace } from '../../../server/workspace-data-scope'
 
 const overviewFetcher: DashboardFetcher = (path) => dashboardFetch(path)
 // Gateway fetcher hits the gateway URL (8645/8642), which is where
@@ -37,23 +38,27 @@ export const Route = createFileRoute('/api/dashboard/overview')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const auth = requireAuthenticated(request)
+        const auth = requireActiveWorkspaceMember(request)
         if (!auth.ok) return auth.response
         try {
           const url = new URL(request.url)
           const days = Number(url.searchParams.get('days') ?? '30')
           const limit = Number(url.searchParams.get('achievements') ?? '3')
           const logsLimit = Number(url.searchParams.get('logs') ?? '24')
+          // Non-default workspaces share the same Hermes-agent gateway,
+          // so its health/platforms/model info is still informative. But
+          // Achievements + Analytics + Cron-Summary are pulled from the
+          // global gateway with no workspace tagging — those would leak
+          // cross-WS activity. For non-default workspaces we suppress
+          // them with `analyticsWindowDays: 0, achievementsLimit: 0,
+          // logsLimit: 0` so the aggregator skips those slices.
+          const isLegacy = isLegacyDataWorkspace(auth.value.wsId)
           const overview = await buildDashboardOverview({
             fetcher: overviewFetcher,
             gatewayFetcher: overviewGatewayFetcher,
-            analyticsWindowDays: Number.isFinite(days) && days > 0 ? days : 30,
-            achievementsLimit:
-              Number.isFinite(limit) && limit > 0 ? Math.min(limit, 12) : 3,
-            logsLimit:
-              Number.isFinite(logsLimit) && logsLimit > 0
-                ? Math.min(logsLimit, 100)
-                : 24,
+            analyticsWindowDays: !isLegacy ? 0 : (Number.isFinite(days) && days > 0 ? days : 30),
+            achievementsLimit: !isLegacy ? 0 : (Number.isFinite(limit) && limit > 0 ? Math.min(limit, 12) : 3),
+            logsLimit: !isLegacy ? 0 : (Number.isFinite(logsLimit) && logsLimit > 0 ? Math.min(logsLimit, 100) : 24),
           })
           return json(overview, {
             headers: {

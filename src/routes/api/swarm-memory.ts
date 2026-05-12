@@ -12,6 +12,7 @@ import {
   type SwarmMemoryEventType,
   type SwarmMemoryKind,
 } from '../../server/swarm-memory'
+import { isLegacyDataWorkspace } from '../../server/workspace-data-scope'
 
 type SwarmMemoryPostBody = {
   workerId?: unknown
@@ -62,6 +63,13 @@ export const Route = createFileRoute('/api/swarm-memory')({
       GET: async ({ request }) => {
         const auth = requireWorkspaceAction(request, 'memory-read')
         if (!auth.ok) return auth.response
+        // Swarm-memory is rooted in `~/.openclaw/...` (global). Only the
+        // migration-default workspace owns those records; other
+        // workspaces see an empty memory store until the data path is
+        // wsId-keyed.
+        if (!isLegacyDataWorkspace(auth.value.wsId)) {
+          return json({ entries: [], reason: 'workspace has no local swarm memory yet' })
+        }
         const url = new URL(request.url)
         const workerId = url.searchParams.get('workerId')
         const kind = asKind(url.searchParams.get('kind'))
@@ -76,6 +84,17 @@ export const Route = createFileRoute('/api/swarm-memory')({
       POST: async ({ request }) => {
         const auth = requireWorkspaceAction(request, 'memory-write')
         if (!auth.ok) return auth.response
+        // Writes from non-default workspaces would leak into the
+        // migration-default's memory store — refuse until per-WS paths.
+        if (!isLegacyDataWorkspace(auth.value.wsId)) {
+          return json(
+            {
+              error: 'workspace has no local swarm memory yet',
+              hint: 'global swarm memory storage is shared with the migration-default workspace; per-workspace storage is on the Phase-B refactor list',
+            },
+            { status: 501 },
+          )
+        }
 
         let body: SwarmMemoryPostBody
         try {
