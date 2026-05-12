@@ -29,6 +29,20 @@ Phil hat geflaggt dass „beim Workspace-Wechsel wird auch der swarm usw überno
 
 **Was noch offen** (separater Refactor): die globalen Daten-Pfade selbst (`~/.openclaw/workspace/memory/`, `HERMES_HOME/council/sessions/`, repo-rootiges `swarm.yaml`) müssten physisch per-Workspace partitioniert werden — heute schließt der Empty-Fallback das Leak auf Route-Ebene, aber die Storage-Layer-Trennung steht aus. Volle Daten-Migration für neue Workspaces (Plan B etc.) braucht den nächsten Refactor.
 
+### Fixed — Phase 2.3: Auto-Preview funktioniert auch auf dem openaiChat-Pfad (2026-05-12)
+
+Root-Cause der Fehlfunktion (von Phase 2.2 noch nicht behoben): Der `/api/send-stream` Endpoint hat drei verschiedene Pfade — `/v1/responses` (responses-api), Hermes-Gateway-Translator-Events, und den **openaiChat** Fallback. Aurora auf dem VPS landet auf dem openaiChat-Pfad weil `HERMES_USE_RESPONSES` nicht gesetzt ist. Dieser Pfad parsed nur `content`, `reasoning` und `event: hermes.tool.progress` aus dem Upstream-Stream — `tool_calls`-deltas (mit args) werden **verworfen** (`parseOpenAIStream` in `src/server/openai-compat-api.ts:194` ignoriert sie). Ergebnis: `chunk.type === 'tool'` hat nur `name + label + toolCallId + status`, kein args/result. Damit returnt `tryCaptureFileArtifact` früh (`readArgsRecord(undefined)` → null), kein `fileArtifact` Event wird emitted, kein PreviewPanel öffnet sich.
+
+Diagnose: Debug-Log `STRATEX_DEBUG_FILE_ARTIFACT=1` zeigte dass `tryCaptureFileArtifact` für Aurora-Calls **gar nicht aufgerufen** wird (keine `[capture-debug]` Zeile in den vite-Logs), obwohl `.html`-File auf Disk landet. Hermes-Gateway-Translator-Pfad (`event === 'tool.completed'`) feuert nicht weil Aurora auf openaiChat, und der `responses-api`-Pfad ist nicht aktiviert.
+
+Fix (`src/routes/api/send-stream.ts`):
+- Neuer Helper `tryCaptureFileArtifactFromWorkspaceFs()` scannt `HERMES_WORKSPACE_DIR` rekursiv (depth 4, files-limit 50), filtert auf mtime≤60s, picked das neueste File, liest content, ruft `createFileArtifact()` mit synthesized input, emittet `fileArtifact` Event.
+- Im `openaiChat`-Pfad direkt nach `sendEvent('tool', ...)`: wenn `phase === 'complete'` UND `chunk.name` ∈ `FILE_WRITE_TOOL_NAMES_SET`, wird der FS-Fallback aufgerufen. Args-Issue umgangen — wir holen den path aus dem Dateisystem statt aus dem Tool-Stream.
+
+Trade-off: Bei mehreren File-Writes pro Turn picked der Fallback nur das letzte (Single-file-per-turn ist der dominante Pattern für HTML-Dashboards/Reports). Multi-file kann später durch sauberes args-piping in `parseOpenAIStream` gelöst werden (größerer Refactor).
+
+Debug-Code (Phase 2.2.5) bleibt drin; `STRATEX_DEBUG_FILE_ARTIFACT=1` env auf dem VPS aktiviert die `[capture-debug]` Logs für künftige Diagnosen.
+
 ### Fixed — Phase 2.2: HTML-Artefakte rendern beim Auto-Open als Preview (nicht Code) (2026-05-12)
 
 Phil hat Aurora um ein HTML-Dashboard gebeten, sie hat es korrekt nach `workspace/dashboard-test.html` geschrieben — aber das PreviewPanel öffnete sich entweder gar nicht oder mit Code-View statt gerenderter Preview. Root-Cause: `src/stores/chat-store.ts:1272` ruft `openArtifact()` aus dem `fileArtifact` Event-Handler OHNE `viewMode`-Argument. Das defaultet auf `'code'`, gewinnt gegen den späteren `useEffect` in `message-item.tsx` (Phase 2) der `alreadyOpen` checkt und dann skippt.

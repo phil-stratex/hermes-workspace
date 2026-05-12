@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { isAbsolute, join as joinPath } from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { buildResolvedSessionHeaders } from '../../lib/send-stream-session-headers'
@@ -336,6 +336,94 @@ type EmitFileArtifactEvent = (payload: {
   toolCallId?: string
   sessionId: string
 }) => void
+
+/**
+ * Stratex: pragmatic fallback for the openaiChat path which doesn't pipe
+ * tool args through to send-stream. When a write-style tool completes, scan
+ * the workspace dir for the most-recently-modified file (within the last
+ * minute) and synthesize an artifact from that. Single-file-per-turn case is
+ * the dominant pattern.
+ */
+async function tryCaptureFileArtifactFromWorkspaceFs(
+  ctx: { sessionId: string; toolCallId?: string; toolName: string },
+  emit: EmitFileArtifactEvent,
+): Promise<void> {
+  try {
+    const workspaceRoot =
+      process.env.HERMES_WORKSPACE_DIR || '/opt/data/workspace'
+    const recencyWindowMs = 60_000
+    const now = Date.now()
+    type Candidate = { path: string; mtimeMs: number }
+    const candidates: Array<Candidate> = []
+    const visit = (dir: string, depth: number) => {
+      if (depth > 4 || candidates.length > 50) return
+      let entries: Array<string>
+      try {
+        entries = readdirSync(dir)
+      } catch {
+        return
+      }
+      for (const name of entries) {
+        if (name.startsWith('.') || name === 'node_modules') continue
+        const full = joinPath(dir, name)
+        let st: ReturnType<typeof statSync>
+        try {
+          st = statSync(full)
+        } catch {
+          continue
+        }
+        if (st.isDirectory()) {
+          visit(full, depth + 1)
+        } else if (st.isFile()) {
+          if (now - st.mtimeMs <= recencyWindowMs) {
+            candidates.push({ path: full, mtimeMs: st.mtimeMs })
+          }
+        }
+      }
+    }
+    visit(workspaceRoot, 0)
+    if (candidates.length === 0) {
+      if (process.env.STRATEX_DEBUG_FILE_ARTIFACT === '1') {
+        console.log(
+          `[capture-debug] fs-fallback no recent files in ${workspaceRoot}`,
+        )
+      }
+      return
+    }
+    candidates.sort((a, b) => b.mtimeMs - a.mtimeMs)
+    const winner = candidates[0]
+    let content: string
+    try {
+      content = readFileSync(winner.path, 'utf-8')
+    } catch {
+      return
+    }
+    const artifact = await createFileArtifact({
+      sessionId: ctx.sessionId,
+      toolCallId: ctx.toolCallId,
+      toolName: ctx.toolName,
+      path: winner.path,
+      content,
+    })
+    if (process.env.STRATEX_DEBUG_FILE_ARTIFACT === '1') {
+      console.log(
+        `[capture-debug] fs-fallback wrote artifact for ${winner.path} (mtime=${winner.mtimeMs}, id=${artifact?.id})`,
+      )
+    }
+    if (!artifact) return
+    emit({
+      artifactId: artifact.id,
+      path: artifact.path,
+      version: artifact.version,
+      toolCallId: ctx.toolCallId,
+      sessionId: ctx.sessionId,
+    })
+  } catch (err) {
+    if (process.env.STRATEX_DEBUG_FILE_ARTIFACT === '1') {
+      console.log(`[capture-debug] fs-fallback failed: ${err}`)
+    }
+  }
+}
 
 async function tryCaptureFileArtifact(
   ctx: FileArtifactCaptureContext,
@@ -1051,6 +1139,28 @@ export const Route = createFileRoute('/api/send-stream')({
                         sessionKey: portableSessionKey,
                         runId,
                       })
+                      // Stratex: openaiChat's StreamChunkType.tool does not
+                      // carry args, so the standard tryCaptureFileArtifact
+                      // (which needs args.path) returns early. For completed
+                      // write-style tools, fall back to scanning the
+                      // workspace filesystem for the most-recent file so the
+                      // PreviewPanel can auto-open the HTML / dashboard.
+                      if (
+                        phase === 'complete' &&
+                        chunk.name &&
+                        FILE_WRITE_TOOL_NAMES_SET.has(
+                          chunk.name.toLowerCase(),
+                        )
+                      ) {
+                        await tryCaptureFileArtifactFromWorkspaceFs(
+                          {
+                            sessionId: portableSessionKey,
+                            toolCallId,
+                            toolName: chunk.name,
+                          },
+                          (payload) => sendEvent('fileArtifact', payload),
+                        )
+                      }
                     } else {
                       accumulated += chunk.text
                       persistActiveRun((runSessionKey, activeId) =>
