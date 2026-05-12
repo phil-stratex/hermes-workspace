@@ -5,6 +5,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — OpenHands Desktop + Live-VNC im Workspace (Phase 2) (2026-05-12)
+
+Phils Wunsch: „Ich will eine preview funktion ... die auch automatisch im chat kommt was er aktuell nicht tut, ich will D2 mit der funktion dass ich ihm live zusehen kann wie er gerade auf seinem desktop arbeitet, oder sogar als reiter eine funktion entscheide du was besser ist." Implementation als **drei zusammenhängende Capabilities**:
+
+**1. OpenHands Agent Server auf VPS (Container, kein Workspace-Code-Change):**
+- Neuer Service `openhands-agent` in `/docker/hermes-agent-zjya/docker-compose.yml` — `ghcr.io/openhands/agent-server:1.19.1-python` mit `OH_ENABLE_VNC=true`. xfce4 + TigerVNC + noVNC + Chromium drin. Ports auf loopback (`127.0.0.1:18000` API, `127.0.0.1:18002` noVNC) — Phil tunnelt via SSH wie bei Workspace.
+- UID-mismatch fix beim host-mount `data/openhands-workspace` (container user openhands ist UID 10001).
+- Health-verified: `curl /health` returnt `"OK"`, noVNC liefert 17KB HTML page mit live xfce4 Desktop.
+- Inter-container DNS: `hermes-workspace` und `hermes-agent` erreichen OpenHands via `http://openhands-agent:8000` und `:8002`.
+
+**2. Workspace-UI — Auto-Preview für HTML-Artefakte:**
+- `src/stores/preview-panel-store.ts` — `OpenArtifactInput` um optionales `viewMode` Feld erweitert; `openArtifact()` respektiert es beim Anlegen neuer Tabs (`input.viewMode ?? 'code'`).
+- `src/components/preview-panel/artifact-card.tsx` — `handleOpen()` setzt `viewMode: 'preview'` für HTML-Pfade (via `isHtmlPath()` Helper); andere File-Typen bleiben bei Default 'code'.
+- `src/screens/chat/components/message-item.tsx` — neuer `useEffect` neben dem `fileArtifactCards` `useMemo` der bei der letzten Assistant-Message ein HTML-Artefakt automatisch im Preview-Panel öffnet (idempotent über `sessionId+path+version`-Key, gating: `isLastAssistant && !isUser && !effectiveIsStreaming`). Damit erscheint ein Hermes-generiertes HTML-Dashboard **ohne Klick** als gerenderte Preview im Panel.
+
+**3. Workspace-UI — Live-VNC Desktop (sowohl Route als auch Mini-Panel):**
+- `src/routes/desktop.tsx` (neu) — TanStack-Route `/desktop` mit `ssr: false` (gleiches Pattern wie `/council`, `/usage`).
+- `src/screens/desktop/desktop-screen.tsx` (neu) — Full-Screen-Layout mit Header („Hermes Desktop"), Hinweis-Link zum Standalone-noVNC-Tab, und embedded `<DesktopVncIframe size="fullscreen" />`.
+- `src/components/desktop-panel/desktop-vnc-iframe.tsx` (neu) — Reusable iframe-Wrapper. URL aus `VITE_OPENHANDS_VNC_URL` env (Build-Time-Override) oder Default `http://localhost:18002/vnc.html?autoconnect=1&resize=remote`. Fail-State zeigt Anleitung („Stelle sicher dass der `openhands-agent` Container läuft + SSH-Tunnel auf Port 18002 aktiv"). Sandbox-Attribute für noVNC-WebSocket + clipboard.
+- `src/components/desktop-panel/desktop-panel.tsx` (neu) — Right-side resizable Panel im chat-screen (Pattern aus `PreviewPanel`). Drag-Handle, Close-Button, Expand-Link zur `/desktop` Route. Width 280-640px, persistiert via Zustand.
+- `src/components/desktop-panel/desktop-panel-toggle.tsx` (neu) — Schmale Rail-Style-Toggle die rechts am Chat-Screen erscheint **wenn Panel zu ist**; Klick öffnet das Panel. Versteckt wenn schon offen (Panel hat eigenen Close-Button im Header).
+- `src/stores/desktop-panel-store.ts` (neu) — Zustand-Store analog zu `usePreviewPanelStore`. `isPanelOpen` ist session-scoped (NICHT persistiert, damit fresh sessions nicht eagerly noVNC-Handshake feuern); `panelWidth` persistiert.
+- `src/screens/chat/chat-screen.tsx` — Mount von `<DesktopPanelToggle />` + `<DesktopPanel />` rechts neben `<PreviewPanel />` (gated auf `!compact && !isFocusMode && !isMobile`).
+
+**4. Navigation:**
+- `src/screens/chat/components/chat-sidebar.tsx` — Sidebar-Eintrag „Desktop" (HugeIcons `ComputerDesk01Icon`) zwischen Predict und Errors. `isDesktopActive` state für `pathname === '/desktop'`.
+- `src/components/mobile-tab-bar.tsx` — Mobile-Tab-Entry zwischen Swarm und Memory.
+
+**5. Hermes-OpenHands-Skill-Bridge (Phase 2 only swarm7+swarm9):**
+- `skills/openhands/SKILL.md` (neu im Repo + auf VPS unter `/opt/data/skills/openhands/SKILL.md`) — Skill-Doc beschreibt Trigger, Endpoints (`http://openhands-agent:8000`), Conversation-Lifecycle (POST `/api/conversations`, POST `/events`, POST `/run`, DELETE), Pitfalls (Auth, Screenshot-Größe, non-headless Browser sichtbar in Phils noVNC).
+- `swarm.yaml` — **swarm7 QA** + **swarm9 Designer** bekommen den `openhands` Skill in ihrem `skills:` Array sowie `computer-use` in `capabilities`. swarm9 zusätzlich `visual-reference` in preferredTaskTypes, swarm7 `visual-regression`. Roster ist jetzt 33 unique Skills referenziert.
+
+**Decisions (für Phil):**
+- Sowohl Full-Route ALS AUCH Mini-Panel statt nur eines — Route ist Full-Screen-Beobachtung, Mini-Panel ist Live-Glance beim Chatten.
+- VNC läuft auf loopback (keine Traefik-Subdomain) — sicherer, Phil tunnelt via SSH wie bei Port 3000. Subdomain mit BasicAuth-Middleware kann später folgen.
+- Computer-Use-Skill nur für swarm7+swarm9 als Pilot — andere Workers routen über Orchestrator wenn sie OpenHands brauchen.
+
+**Tests:** Health-Endpoint + noVNC-HTML verifiziert auf VPS; inter-container Reachability bestätigt aus hermes-workspace + hermes-agent.
+
 ### Added — Worker-Identity-Seeder (Stratex-Rollen pro Profile) (2026-05-12)
 
 Erkenntnis aus erstem Pilot-Run: bootstrap-ed Workers identifizierten sich als generischer „Hermes Agent" statt mit ihrer Stratex-Rolle (Mirror, Builder, Designer…). Grund: `memory/IDENTITY.md`, `MEMORY.md`, `USER.md` waren leer; nur ein 513-Byte default-`SOUL.md` aus dem Hermes-shipped Template existierte.

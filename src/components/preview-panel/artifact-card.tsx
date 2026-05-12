@@ -5,7 +5,7 @@ import {
   GitCompareIcon,
   TaskAdd01Icon,
 } from '@hugeicons/core-free-icons'
-import { getBasename, getKindAccent, getKindLabel } from './_helpers'
+import { getBasename, getKindAccent, getKindLabel, isHtmlPath } from './_helpers'
 import { usePreviewPanelStore } from '@/stores/preview-panel-store'
 import { cn } from '@/lib/utils'
 
@@ -50,12 +50,15 @@ export function ArtifactCard({
   const kindLabel = getKindLabel(kind)
 
   function handleOpen() {
+    // Stratex: HTML artifacts default to 'preview' view (rendered iframe)
+    // instead of 'code' so users see the visual output immediately.
     usePreviewPanelStore.getState().openArtifact({
       artifactId,
       sessionId,
       path,
       version,
       toolName,
+      viewMode: isHtmlPath(path) ? 'preview' : undefined,
     })
   }
 

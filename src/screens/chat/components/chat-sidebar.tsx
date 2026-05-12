@@ -12,6 +12,7 @@ import {
   Chat01Icon,
   CheckListIcon,
   Clock01Icon,
+  ComputerDesk01Icon,
   ComputerTerminal01Icon,
   DashboardSquare01Icon,
   File01Icon,
@@ -625,6 +626,7 @@ function ChatSidebarComponent({
   const isSwarmActive = pathname === '/swarm' || pathname === '/swarm2'
   const isCouncilActive = pathname === '/council'
   const isPredictActive = pathname === '/predict' || pathname.startsWith('/predict/')
+  const isDesktopActive = pathname === '/desktop'
   const isUsageActive = pathname === '/usage'
   const isErrorsActive = pathname === '/errors' || pathname.startsWith('/errors/')
   const errorsVisibility = useCanSeeErrors()
@@ -906,6 +908,13 @@ function ChatSidebarComponent({
       icon: Telescope01Icon,
       label: 'Predict',
       active: isPredictActive,
+    },
+    {
+      kind: 'link',
+      to: '/desktop',
+      icon: ComputerDesk01Icon,
+      label: 'Desktop',
+      active: isDesktopActive,
     },
     // Stack-Admin-only — entry hidden when /api/errors/health responds 401/403.
     ...(errorsVisibility.canSee

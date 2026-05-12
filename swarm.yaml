@@ -202,9 +202,9 @@ workers:
   - id: swarm7
     name: QA
     role: Smoke / Regression / E2E / Expected-vs-Actual
-    specialty: Smoke tests, regression checks, UI expected-vs-actual passes, artifact verification, build verification
+    specialty: Smoke tests, regression checks, UI expected-vs-actual passes, artifact verification, build verification, visual regression via OpenHands sandbox
     model: kimi-k2.6
-    mission: Verifiziere expected-vs-actual vor Release. Sag exakt was geprüft, exakt was failed, exakt wie zu reproduzieren.
+    mission: "Verifiziere expected-vs-actual vor Release. Sag exakt was geprüft, exakt was failed, exakt wie zu reproduzieren. Visual smoke via OpenHands wenn UI-Changes."
     skills:
       - software-development/test-driven-development
       - software-development/systematic-debugging
@@ -212,6 +212,7 @@ workers:
       - github/codebase-inspection
       - github/github-pr-workflow
       - github/github-auth
+      - openhands
     capabilities:
       - smoke-testing
       - regression-analysis
@@ -219,6 +220,7 @@ workers:
       - expected-vs-actual
       - artifact-verification
       - build-verification
+      - computer-use
     preferredTaskTypes:
       - qa
       - smoke
@@ -226,6 +228,7 @@ workers:
       - e2e
       - verification
       - artifact-check
+      - visual-regression
     maxConcurrentTasks: 1
     acceptsBroadcast: true
     reviewRequired: false
@@ -265,9 +268,9 @@ workers:
   - id: swarm9
     name: Designer
     role: UI/UX Visual Concept / Design-Spec Authoring (KEIN Code)
-    specialty: Wireframes, component-hierarchy, design tokens, interaction patterns, brand-konsistent — Outputs sind design-spec.md docs, KEIN Code
+    specialty: Wireframes, component-hierarchy, design tokens, interaction patterns, brand-konsistent. Nutzt OpenHands für visuelle Hotel-Site-References. Outputs sind design-spec.md docs, KEIN Code
     model: kimi-k2.6
-    mission: "Liefere design-spec.md für jede UI-Mission. Format Wireframe-Beschreibung + Component-Hierarchie + Design-Tokens (color/typo/spacing) + Interaction-Notes + shadcn/Tailwind-Komponenten-Auswahl. FrontendSpec implementiert dann."
+    mission: "Liefere design-spec.md für jede UI-Mission. Format Wireframe-Beschreibung + Component-Hierarchie + Design-Tokens (color/typo/spacing) + Interaction-Notes + shadcn/Tailwind-Komponenten-Auswahl. Für reference-screenshots OpenHands sandbox nutzen. FrontendSpec implementiert dann."
     skills:
       - creative/architecture-diagram
       - creative/excalidraw
@@ -279,6 +282,7 @@ workers:
       - software-development/writing-plans
       - github/github-pr-workflow
       - github/github-auth
+      - openhands
     capabilities:
       - wireframing
       - design-spec-authoring
@@ -286,6 +290,7 @@ workers:
       - interaction-patterns
       - component-selection
       - brand-consistency
+      - computer-use
     preferredTaskTypes:
       - design
       - wireframe
@@ -293,6 +298,7 @@ workers:
       - design-spec
       - tokens
       - mockup
+      - visual-reference
     maxConcurrentTasks: 1
     acceptsBroadcast: true
     reviewRequired: false

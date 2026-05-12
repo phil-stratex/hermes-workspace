@@ -37,8 +37,10 @@ import {
 } from './streaming-activity-ui'
 import { TuiActivityCard } from './tui-activity-card'
 import { ArtifactCard } from '@/components/preview-panel'
+import { isHtmlPath } from '@/components/preview-panel/_helpers'
 import { useChatStore } from '@/stores/chat-store'
 import { FILE_WRITE_TOOL_NAMES_SET } from '@/lib/file-artifact-tool-names'
+import { usePreviewPanelStore } from '@/stores/preview-panel-store'
 
 const WORDS_PER_TICK = 4
 const TICK_INTERVAL_MS = 50
@@ -2443,6 +2445,33 @@ function MessageItemComponent({
     }
     return cards
   }, [finalToolSections, fileArtifactsByToolCall, isUser])
+  // Stratex: auto-open the first HTML artifact in the preview panel so users
+  // see the rendered dashboard/page without an extra click. Gated to the most
+  // recent assistant message to avoid re-opening when scrolling old history.
+  // Idempotent — uses store dedup (tab keyed by sessionId+path).
+  const htmlArtifactKey = useMemo(() => {
+    const html = fileArtifactCards.find((c) => isHtmlPath(c.path))
+    return html ? `${html.sessionId}::${html.path}::${html.version}` : null
+  }, [fileArtifactCards])
+  useEffect(() => {
+    if (isUser || !isLastAssistant || effectiveIsStreaming) return
+    if (!htmlArtifactKey) return
+    const card = fileArtifactCards.find((c) => isHtmlPath(c.path))
+    if (!card) return
+    const store = usePreviewPanelStore.getState()
+    const alreadyOpen = store.tabs.some(
+      (t) => t.sessionId === card.sessionId && t.path === card.path,
+    )
+    if (alreadyOpen) return
+    store.openArtifact({
+      artifactId: card.artifactId,
+      sessionId: card.sessionId,
+      path: card.path,
+      version: card.version,
+      toolName: card.toolName,
+      viewMode: 'preview',
+    })
+  }, [htmlArtifactKey, isUser, isLastAssistant, effectiveIsStreaming, fileArtifactCards])
   const shouldRenderMessageBubble =
     hasText ||
     hasAttachments ||

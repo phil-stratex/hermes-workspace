@@ -91,6 +91,8 @@ import { useWorkspaceStore } from '@/stores/workspace-store'
 import { TerminalPanel } from '@/components/terminal-panel'
 import { AgentViewPanel } from '@/components/agent-view/agent-view-panel'
 import { PreviewPanel } from '@/components/preview-panel'
+import { DesktopPanel } from '@/components/desktop-panel/desktop-panel'
+import { DesktopPanelToggle } from '@/components/desktop-panel/desktop-panel-toggle'
 import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
 import { useModelSuggestions } from '@/hooks/use-model-suggestions'
 import { ModelSuggestionToast } from '@/components/model-suggestion-toast'
@@ -2795,6 +2797,8 @@ export function ChatScreen({
         </main>
         {!compact && !isFocusMode && <AgentViewPanel />}
         {!compact && !isFocusMode && !isMobile && <PreviewPanel />}
+        {!compact && !isFocusMode && !isMobile && <DesktopPanelToggle />}
+        {!compact && !isFocusMode && !isMobile && <DesktopPanel />}
       </div>
       {!compact && !hideUi && !isMobile && !isFocusMode && <TerminalPanel />}
 

@@ -26,6 +26,9 @@ type OpenArtifactInput = {
   path: string
   version: number
   toolName?: string
+  // Stratex: when set, use this viewMode for new tabs (e.g. 'preview' for HTML
+  // so the rendered output appears without an extra manual switch).
+  viewMode?: PreviewViewMode
 }
 
 type PreviewPanelState = {
@@ -105,7 +108,7 @@ export const usePreviewPanelStore = create<PreviewPanelState>()(
             path: input.path,
             toolName: input.toolName,
             version: input.version,
-            viewMode: 'code',
+            viewMode: input.viewMode ?? 'code',
             createdAt: Date.now(),
           }
           return {

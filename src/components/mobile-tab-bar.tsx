@@ -6,6 +6,7 @@ import {
   Chat01Icon,
   Clock01Icon,
   CommandLineIcon,
+  ComputerDesk01Icon,
   DashboardSquare01Icon,
   File01Icon,
   McpServerIcon,
@@ -94,6 +95,13 @@ export const MOBILE_NAV_TABS: Array<TabItem> = [
     icon: UserGroupIcon,
     to: '/swarm',
     match: (p) => p === '/swarm' || p.startsWith('/swarm2'),
+  },
+  {
+    id: 'desktop',
+    label: 'Desktop',
+    icon: ComputerDesk01Icon,
+    to: '/desktop',
+    match: (p) => p === '/desktop',
   },
 
   {
