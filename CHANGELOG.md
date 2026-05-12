@@ -29,6 +29,23 @@ Phil hat geflaggt dass „beim Workspace-Wechsel wird auch der swarm usw überno
 
 **Was noch offen** (separater Refactor): die globalen Daten-Pfade selbst (`~/.openclaw/workspace/memory/`, `HERMES_HOME/council/sessions/`, repo-rootiges `swarm.yaml`) müssten physisch per-Workspace partitioniert werden — heute schließt der Empty-Fallback das Leak auf Route-Ebene, aber die Storage-Layer-Trennung steht aus. Volle Daten-Migration für neue Workspaces (Plan B etc.) braucht den nächsten Refactor.
 
+### Added — Phase 2.5: PreviewPanel-Toggle-Rail (Re-Open nach Close) (2026-05-12)
+
+Phil meldete: nach dem Close-Klick (X-Button im Preview-Header) konnte er das Panel nicht wieder öffnen. Tabs blieben im Store (`tabs.length > 0`, persistiert in localStorage), aber kein UI-Affordance um sie wieder sichtbar zu machen — Phil hätte warten müssen bis ein neues Auto-Open-Event feuert.
+
+**Neue Files:**
+- `src/components/preview-panel/preview-panel-toggle.tsx` — Rail-Style-Button rechts am Chat-Rand. Spiegelt das DesktopPanelToggle-Pattern: `View01Icon` (HugeIcons) + Label „Preview" + optional Tab-Counter-Badge wenn mehrere Tabs.
+
+**Visibility-Gate:**
+- `!isPanelOpen` UND `tabs.length > 0` — nur wenn es was zu zeigen gibt
+- Wenn das Panel offen ist → der Header hat den eigenen Close-X
+- Wenn keine Tabs → Toggle wäre sinnlos (nothing to reopen)
+
+**Mount in `src/screens/chat/chat-screen.tsx`:**
+- Beide Rails (`<PreviewPanelToggle />` + `<DesktopPanelToggle />`) jetzt vertikal gestapelt in einem `flex flex-col gap-2 self-start py-3` Container rechts neben den Panels.
+- Layout: Agent-View | Chat | (PreviewPanel wenn offen) | Toggle-Stack | (DesktopPanel wenn offen)
+- Klick öffnet via `setPanelOpen(true)` — re-uses existing store action, behält bestehende Tabs.
+
 ### Changed — Phase 2.4: Preview-Panel Resize-Handle sichtbar + max-Breite 85% Viewport (2026-05-12)
 
 Phil meldete dass er die Panel-Breite nicht verschieben konnte. Tatsächlich war der Resize-Handle schon implementiert — aber als 4px-breiter Streifen mit `bg-primary-200/40` (sehr transparent), praktisch unsichtbar und schwer zu treffen.

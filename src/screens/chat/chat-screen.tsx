@@ -91,6 +91,7 @@ import { useWorkspaceStore } from '@/stores/workspace-store'
 import { TerminalPanel } from '@/components/terminal-panel'
 import { AgentViewPanel } from '@/components/agent-view/agent-view-panel'
 import { PreviewPanel } from '@/components/preview-panel'
+import { PreviewPanelToggle } from '@/components/preview-panel/preview-panel-toggle'
 import { DesktopPanel } from '@/components/desktop-panel/desktop-panel'
 import { DesktopPanelToggle } from '@/components/desktop-panel/desktop-panel-toggle'
 import { useTerminalPanelStore } from '@/stores/terminal-panel-store'
@@ -2797,7 +2798,12 @@ export function ChatScreen({
         </main>
         {!compact && !isFocusMode && <AgentViewPanel />}
         {!compact && !isFocusMode && !isMobile && <PreviewPanel />}
-        {!compact && !isFocusMode && !isMobile && <DesktopPanelToggle />}
+        {!compact && !isFocusMode && !isMobile && (
+          <div className="flex flex-col gap-2 self-start py-3">
+            <PreviewPanelToggle />
+            <DesktopPanelToggle />
+          </div>
+        )}
         {!compact && !isFocusMode && !isMobile && <DesktopPanel />}
       </div>
       {!compact && !hideUi && !isMobile && !isFocusMode && <TerminalPanel />}
