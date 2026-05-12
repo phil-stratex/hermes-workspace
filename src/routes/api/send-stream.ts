@@ -343,9 +343,25 @@ async function tryCaptureFileArtifact(
 ): Promise<void> {
   try {
     const lowerName = ctx.toolName.toLowerCase()
+    // Stratex debug: surface why HTML auto-preview sometimes silently no-ops.
+    if (process.env.STRATEX_DEBUG_FILE_ARTIFACT === '1') {
+      const argsType = ctx.args === null ? 'null' : typeof ctx.args
+      const argsKeys =
+        ctx.args && typeof ctx.args === 'object'
+          ? Object.keys(ctx.args).slice(0, 6).join(',')
+          : ''
+      console.log(
+        `[capture-debug] tool=${ctx.toolName} match=${FILE_WRITE_TOOL_NAMES_SET.has(lowerName)} argsType=${argsType} argsKeys=${argsKeys}`,
+      )
+    }
     if (!FILE_WRITE_TOOL_NAMES_SET.has(lowerName)) return
     const argsRecord = readArgsRecord(ctx.args)
-    if (!argsRecord) return
+    if (!argsRecord) {
+      if (process.env.STRATEX_DEBUG_FILE_ARTIFACT === '1') {
+        console.log(`[capture-debug] no argsRecord for ${ctx.toolName}`)
+      }
+      return
+    }
 
     const rawPath = pickArgString(argsRecord, [
       'path',
@@ -353,7 +369,14 @@ async function tryCaptureFileArtifact(
       'filename',
       'filepath',
     ])
-    if (!rawPath) return
+    if (!rawPath) {
+      if (process.env.STRATEX_DEBUG_FILE_ARTIFACT === '1') {
+        console.log(
+          `[capture-debug] no rawPath for ${ctx.toolName} keys=${Object.keys(argsRecord).join(',')}`,
+        )
+      }
+      return
+    }
 
     let content = pickArgString(argsRecord, [
       'content',
