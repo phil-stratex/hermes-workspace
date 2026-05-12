@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from '@hugeicons/react'
-import { View01Icon } from '@hugeicons/core-free-icons'
+import { ViewSidebarRightIcon } from '@hugeicons/core-free-icons'
 import { usePreviewPanelStore } from '@/stores/preview-panel-store'
 import { cn } from '@/lib/utils'
 
@@ -34,7 +34,7 @@ export function PreviewPanelToggle({ className }: { className?: string }) {
         className,
       )}
     >
-      <HugeiconsIcon icon={View01Icon} size={14} strokeWidth={1.5} />
+      <HugeiconsIcon icon={ViewSidebarRightIcon} size={14} strokeWidth={1.5} />
       <span className="hidden md:inline">Preview</span>
       {tabsCount > 1 ? (
         <span className="ml-0.5 rounded bg-[var(--theme-accent-soft)] px-1 text-[9px] tabular-nums text-[var(--theme-text)]">
